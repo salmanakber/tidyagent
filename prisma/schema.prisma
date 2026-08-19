@@ -1,0 +1,711 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum PlanKey {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum OnboardingStatus {
+  INSTALLED
+  SITE_CONNECTED
+  ANALYZING
+  QUESTIONS
+  CONFIGURED
+  TESTED
+  PUBLISHED
+}
+
+enum WidgetPosition {
+  BOTTOM_RIGHT
+  BOTTOM_LEFT
+}
+
+enum WidgetEmbedMode {
+  AUTO
+  MANUAL
+}
+
+enum KnowledgeContentType {
+  PAGE
+  PRODUCT
+  FAQ
+  POLICY
+  CUSTOM
+  SERVICE
+}
+
+enum ConversationStatus {
+  OPEN
+  RESOLVED
+  ESCALATED
+}
+
+enum MessageRole {
+  CUSTOMER
+  AGENT
+  HUMAN
+  SYSTEM
+}
+
+enum ToolPermissionMode {
+  DISABLED
+  ALLOWED
+  CONFIRM
+}
+
+model User {
+  id            String   @id @default(cuid())
+  wixUserId     String?  @unique
+  googleId      String?
+  email         String?
+  name          String?
+  passwordHash  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  memberships   OrganizationMember[]
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model Organization {
+  id                String            @id @default(cuid())
+  name              String
+  onboardingStatus  OnboardingStatus  @default(INSTALLED)
+  accessStatus      String            @default("active")
+  suspendedAt       DateTime?
+  suspendedReason   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  members           OrganizationMember[]
+  sites             WixSite[]
+  subscriptions     Subscription[]
+  usageRecords      UsageRecord[]
+  businessProfile   BusinessProfile?
+  knowledgeSources  KnowledgeSource[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeChunks   KnowledgeChunk[]
+  agents            Agent[]
+  customers         Customer[]
+  conversations     Conversation[]
+  messages          Message[]
+  conversationEvents ConversationEvent[]
+  tools             Tool[]
+  toolExecutions    ToolExecution[]
+  humanEscalations  HumanEscalation[]
+  products          Product[]
+  orders            Order[]
+  appointments      Appointment[]
+  analyticsEvents   AnalyticsEvent[]
+  auditLogs         AuditLog[]
+  improvementSuggestions ImprovementSuggestion[]
+  billingEvents     BillingEvent[]
+}
+
+model OrganizationMember {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole @default(OWNER)
+  createdAt      DateTime       @default(now())
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model WixSite {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  wixInstanceId      String   @unique
+  wixSiteId          String?
+  displayName        String?
+  url                String?
+  locale             String?
+  currency           String?
+  ownerEmail         String?
+  originInstanceId   String?
+  installedWixApps   Json     @default("[]")
+  capabilities       Json     @default("{}")
+  connectionStatus   String   @default("connected")
+  accessStatus       String   @default("active")
+  suspendedAt        DateTime?
+  suspendedReason    String?
+  lastSyncedAt       DateTime?
+  lastBillingSyncedAt DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential         WixCredential?
+  agents             Agent[]
+  conversations      Conversation[]
+
+  @@index([organizationId])
+  @@index([wixSiteId])
+}
+
+model WixCredential {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String   @unique
+  instanceId     String
+  /// Encrypted at rest in later phases. Never sent to the browser.
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  site           WixSite  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([instanceId])
+}
+
+model Plan {
+  id                      String   @id @default(cuid())
+  key                     PlanKey  @unique
+  name                    String
+  wixVendorProductId      String?
+  conversationLimit       Int
+  knowledgeLimit          Int
+  voiceEnabled            Boolean  @default(false)
+  advancedToolsEnabled    Boolean  @default(false)
+  automationEnabled       Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  subscriptions           Subscription[]
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  organizationId     String
+  wixSubscriptionId  String?
+  planId             String
+  planKey            PlanKey            @default(FREE)
+  status             SubscriptionStatus @default(NONE)
+  isFree             Boolean            @default(true)
+  vendorProductId    String?
+  billingCycle       String?
+  trialEndsAt        DateTime?
+  currentPeriodEnd   DateTime?
+  autoRenewing       Boolean            @default(false)
+  cancelAtPeriodEnd  Boolean            @default(false)
+  canceledAt         DateTime?
+  cancelReason       String?
+  invoiceId          String?
+  couponName         String?
+  previousVendorProductId String?
+  billingIssue       Boolean            @default(false)
+  rawBilling         Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan               Plan               @relation(fields: [planId], references: [id])
+
+  @@index([organizationId])
+  @@index([wixSubscriptionId])
+}
+
+model UsageRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  metric         String
+  quantity       Int      @default(0)
+  periodStart    DateTime
+  periodEnd      DateTime
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, metric, periodStart])
+}
+
+model BusinessProfile {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  siteId         String?
+  name           String?
+  businessType   String?
+  industry       String?
+  businessModel  String?
+  summary        String?
+  structured     Json     @default("{}")
+  capabilities   Json     @default("{}")
+  analyzedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeSource {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  type           String
+  url            String?
+  title          String?
+  status         String   @default("pending")
+  lastSyncedAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documents      KnowledgeDocument[]
+
+  @@index([organizationId])
+}
+
+model KnowledgeDocument {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  sourceId       String?
+  title          String
+  contentType    KnowledgeContentType @default(PAGE)
+  sourceUrl      String?
+  rawContent     String?
+  cleanedContent String?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  chunks         KnowledgeChunk[]
+
+  @@index([organizationId])
+  @@index([contentType])
+}
+
+model KnowledgeChunk {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  documentId     String
+  content        String
+  sourceUrl      String?
+  title          String?
+  contentType    KnowledgeContentType @default(PAGE)
+  metadata       Json     @default("{}")
+  /// pgvector embedding — always filtered by organizationId before ranking
+  embedding      Unsupported("vector(768)")?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document       KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([siteId])
+  @@index([documentId])
+}
+
+model Agent {
+  id                  String         @id @default(cuid())
+  organizationId      String
+  siteId              String
+  name                String         @default("Sarah")
+  role                String         @default("Customer Assistant")
+  personality         String         @default("friendly")
+  tone                String?
+  status              AgentStatus    @default(DRAFT)
+  focus               String[]       @default([])
+  goals               Json           @default("[]")
+  publishedAt         DateTime?
+  widgetPrimaryColor  String         @default("#1F3A5F")
+  widgetAvatarUrl     String?
+  widgetPosition      WidgetPosition @default(BOTTOM_RIGHT)
+  widgetGreeting      String         @default("Hi! How can I help you today?")
+  widgetEmbedMode     WidgetEmbedMode @default(AUTO)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site                WixSite        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  capabilities        AgentCapability[]
+  rules               AgentRule[]
+  toolPermissions     AgentToolPermission[]
+  workflows           AgentWorkflow[]
+  conversations       Conversation[]
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+model AgentCapability {
+  id             String   @id @default(cuid())
+  organizationId String
+  agentId        String
+  key            String
+  enabled        Boolean  @default(true)
+  source         String   @default("recommended")
+  createdAt      DateTime @default(now())
+
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, key])
+  @@index([organizationId])
+}
+
+model AgentRule {
+  id             String   @id @default(cuid())
+  organizationId String
+  agentId        String
+  key            String
+  description    String
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, key])
+  @@index([organizationId])
+}
+
+model AgentToolPermission {
+  id             String             @id @default(cuid())
+  organizationId String
+  agentId        String
+  toolKey        String
+  mode           ToolPermissionMode @default(DISABLED)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  agent          Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, toolKey])
+  @@index([organizationId])
+}
+
+model AgentWorkflow {
+  id             String   @id @default(cuid())
+  organizationId String
+  agentId        String
+  key            String
+  enabled        Boolean  @default(true)
+  config         Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, key])
+  @@index([organizationId])
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  wixContactId   String?
+  email          String?
+  name           String?
+  phone          String?
+  memory         Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations  Conversation[]
+
+  @@index([organizationId])
+  @@index([wixContactId])
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  organizationId String
+  siteId         String
+  agentId        String?
+  customerId     String?
+  visitorId      String?
+  status         ConversationStatus @default(OPEN)
+  language       String?
+  metadata       Json               @default("{}")
+  startedAt      DateTime           @default(now())
+  lastMessageAt  DateTime           @default(now())
+  resolvedAt     DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site           WixSite      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  agent          Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages       Message[]
+  events         ConversationEvent[]
+  toolExecutions ToolExecution[]
+  escalations    HumanEscalation[]
+
+  @@index([organizationId, lastMessageAt])
+  @@index([visitorId])
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  organizationId String
+  conversationId String
+  role           MessageRole
+  content        String
+  evidence       Json?
+  confidence     Float?
+  metadata       Json        @default("{}")
+  createdAt      DateTime    @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([conversationId, createdAt])
+}
+
+model ConversationEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  conversationId String
+  type           String
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Tool {
+  id             String   @id @default(cuid())
+  organizationId String?
+  key            String
+  name           String
+  description    String
+  requiresConfirm Boolean @default(false)
+  createdAt      DateTime @default(now())
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions     ToolExecution[]
+
+  @@unique([organizationId, key])
+}
+
+model ToolExecution {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  siteId              String?
+  agentId             String?
+  customerId          String?
+  conversationId      String?
+  toolId              String?
+  toolKey             String
+  action              String
+  input               Json
+  result              Json?
+  permissionDecision  String
+  success             Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation        Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  tool                Tool? @relation(fields: [toolId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
+
+model HumanEscalation {
+  id             String   @id @default(cuid())
+  organizationId String
+  conversationId String
+  reason         String
+  summary        String?
+  status         String   @default("open")
+  createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  wixProductId   String
+  name           String
+  data           Json
+  syncedAt       DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, wixProductId])
+  @@index([organizationId])
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  wixOrderId     String
+  number         String?
+  data           Json
+  syncedAt       DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, wixOrderId])
+  @@index([organizationId])
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  wixBookingId   String
+  data           Json
+  syncedAt       DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, wixBookingId])
+  @@index([organizationId])
+}
+
+model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  siteId         String?
+  type           String
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, type, createdAt])
+}
+
+model AuditLog {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  siteId             String?
+  agentId            String?
+  customerId         String?
+  conversationId     String?
+  tool               String?
+  action             String
+  input              Json?
+  result             Json?
+  permissionDecision String?
+  createdAt          DateTime @default(now())
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+model ImprovementSuggestion {
+  id             String   @id @default(cuid())
+  organizationId String
+  topic          String
+  question       String
+  occurrences    Int      @default(1)
+  status         String   @default("open")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+}
+
+model BillingEvent {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  siteId          String?
+  wixInstanceId   String
+  eventType       String
+  vendorProductId String?
+  payload         Json     @default("{}")
+  createdAt       DateTime @default(now())
+
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([wixInstanceId, createdAt])
+  @@index([organizationId])
+}
+
+model PlatformAdmin {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String
+  role        String    @default("SUPER")
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  auditLogs   PlatformAuditLog[]
+}
+
+model PlatformAuditLog {
+  id             String   @id @default(cuid())
+  adminId        String?
+  adminEmail     String
+  action         String
+  organizationId String?
+  siteId         String?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  admin          PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([organizationId])
+}
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @default("")
+  secret    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+

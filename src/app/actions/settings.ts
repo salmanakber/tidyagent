@@ -1,0 +1,128 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireAdminSession } from "@/lib/security/admin-session";
+import { getAIRuntimeConfig, getCloudinaryConfig, getSetting, setSetting, settingExists } from "@/lib/security/settings";
+import { getAIProvider } from "@/modules/ai/factory";
+import { hashPassword } from "@/lib/security/passwords";
+import { getEnv } from "@/lib/env";
+import { GEMINI_MODELS, GROQ_MODELS, OPENAI_MODELS } from "@/modules/ai/models";
+
+export async function getPlatformSettingsView() {
+  await requireAdminSession("SUPER");
+  const config = await getAIRuntimeConfig();
+  const cloudinary = await getCloudinaryConfig();
+  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet] = await Promise.all([
+    settingExists("gemini_api_key"),
+    settingExists("groq_api_key"),
+    settingExists("openai_api_key"),
+    settingExists("google_client_id"),
+    settingExists("google_client_secret"),
+    settingExists("cloudinary_cloud_name"),
+    settingExists("cloudinary_api_key"),
+    settingExists("cloudinary_api_secret"),
+  ]);
+  const env = getEnv();
+  const googleClientId = await getSetting("google_client_id");
+  const cloudinaryCloudName = await getSetting("cloudinary_cloud_name", cloudinary.cloudName);
+  const operatorEmail = await getSetting("platform_admin_email", env.PLATFORM_ADMIN_EMAIL);
+  const extraEmails = await getSetting("platform_admin_emails", env.PLATFORM_ADMIN_EMAILS);
+  const passwordSet = await settingExists("platform_admin_password_hash");
+
+  return {
+    failoverEnabled: config.failoverEnabled,
+    order: config.order.join(","),
+    configured: {
+      gemini: geminiSet || Boolean(config.keys.gemini),
+      groq: groqSet || Boolean(config.keys.groq),
+      openai: openaiSet || Boolean(config.keys.openai),
+      googleClientId: googleIdSet || Boolean(googleClientId),
+      googleClientSecret: googleSecretSet,
+      cloudinaryCloudName: cloudNameSet || Boolean(cloudinary.cloudName),
+      cloudinaryApiKey: cloudKeySet || Boolean(cloudinary.apiKey),
+      cloudinaryApiSecret: cloudSecretSet || Boolean(cloudinary.apiSecret),
+      adminPassword: passwordSet,
+    },
+    googleClientId,
+    cloudinaryCloudName,
+    operatorEmail,
+    extraEmails,
+    models: config.models,
+    modelOptions: {
+      gemini: GEMINI_MODELS,
+      groq: GROQ_MODELS,
+      openai: OPENAI_MODELS,
+    },
+  };
+}
+
+export async function savePlatformSettings(_prev: { ok: boolean; error?: string } | null, formData: FormData) {
+  try {
+    await requireAdminSession("SUPER");
+
+    const gemini = String(formData.get("gemini_api_key") ?? "").trim();
+    const groq = String(formData.get("groq_api_key") ?? "").trim();
+    const openai = String(formData.get("openai_api_key") ?? "").trim();
+    const googleClientId = String(formData.get("google_client_id") ?? "").trim();
+    const googleClientSecret = String(formData.get("google_client_secret") ?? "").trim();
+    const cloudinaryCloudName = String(formData.get("cloudinary_cloud_name") ?? "").trim();
+    const cloudinaryApiKey = String(formData.get("cloudinary_api_key") ?? "").trim();
+    const cloudinaryApiSecret = String(formData.get("cloudinary_api_secret") ?? "").trim();
+    const operatorEmail = String(formData.get("platform_admin_email") ?? "").trim().toLowerCase();
+    const extraEmails = String(formData.get("platform_admin_emails") ?? "").trim().toLowerCase();
+    const adminPassword = String(formData.get("platform_admin_password") ?? "");
+    const adminPasswordConfirm = String(formData.get("platform_admin_password_confirm") ?? "");
+    const order = String(formData.get("ai_provider_order") ?? "gemini,groq,openai").trim();
+    const failover = formData.get("ai_failover_enabled") === "on" ? "true" : "false";
+    const geminiModel = String(formData.get("gemini_model") ?? "").trim();
+    const groqModel = String(formData.get("groq_model") ?? "").trim();
+    const openaiModel = String(formData.get("openai_model") ?? "").trim();
+
+    if (gemini) await setSetting("gemini_api_key", gemini);
+    if (groq) await setSetting("groq_api_key", groq);
+    if (openai) await setSetting("openai_api_key", openai);
+    if (googleClientId) await setSetting("google_client_id", googleClientId);
+    if (googleClientSecret) await setSetting("google_client_secret", googleClientSecret);
+    if (cloudinaryCloudName) await setSetting("cloudinary_cloud_name", cloudinaryCloudName);
+    if (cloudinaryApiKey) await setSetting("cloudinary_api_key", cloudinaryApiKey);
+    if (cloudinaryApiSecret) await setSetting("cloudinary_api_secret", cloudinaryApiSecret);
+    if (operatorEmail) await setSetting("platform_admin_email", operatorEmail);
+    await setSetting("platform_admin_emails", extraEmails);
+    if (adminPassword || adminPasswordConfirm) {
+      if (adminPassword.length < 8) {
+        return { ok: false, error: "Admin password must be at least 8 characters." };
+      }
+      if (adminPassword !== adminPasswordConfirm) {
+        return { ok: false, error: "Admin passwords do not match." };
+      }
+      await setSetting("platform_admin_password_hash", await hashPassword(adminPassword));
+    }
+    await setSetting("ai_provider_order", order);
+    await setSetting("ai_failover_enabled", failover);
+    if (geminiModel) await setSetting("gemini_model", geminiModel);
+    if (groqModel) await setSetting("groq_model", groqModel);
+    if (openaiModel) await setSetting("openai_model", openaiModel);
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/access");
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save settings.";
+    return { ok: false, error: message };
+  }
+}
+
+export async function testAIProviders() {
+  await requireAdminSession("SUPER");
+  try {
+    const ai = await getAIProvider();
+    const result = await ai.generate({
+      system: "Reply with the single word pong.",
+      prompt: "ping",
+      maxTokens: 8,
+    });
+    return { ok: true as const, provider: result.provider, model: result.model, text: result.text.slice(0, 80) };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Test failed" };
+  }
+}
