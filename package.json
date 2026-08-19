@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 5060",
+    "start": "next start -H 0.0.0.0 -p 5061",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -25,6 +25,7 @@
     "@wix/sdk": "^1.21.16",
     "@wix/stores": "^1.0.876",
     "clsx": "^2.1.1",
+    "dotenv": "^16.6.1",
     "jose": "^6.2.9",
     "lucide-react": "^1.32.0",
     "next": "^15.5.7",

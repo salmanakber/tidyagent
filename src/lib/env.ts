@@ -38,6 +38,10 @@ export function getEnv(): AppEnv {
   return parsed.data;
 }
 
+export function getAppOrigin() {
+  return getEnv().APP_URL.replace(/\/$/, "");
+}
+
 export function isDevMode() {
   return getEnv().TIDYAGENT_DEV_MODE === "true";
 }
