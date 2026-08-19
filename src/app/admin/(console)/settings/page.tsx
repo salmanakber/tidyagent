@@ -22,6 +22,11 @@ export default async function AdminSettingsPage() {
         extraEmails={settings.extraEmails}
         models={settings.models}
         modelOptions={settings.modelOptions}
+        planPriceStarter={settings.planPriceStarter}
+        planPriceBusiness={settings.planPriceBusiness}
+        planPricePro={settings.planPricePro}
+        planPriceCurrency={settings.planPriceCurrency}
+        planTrialDays={settings.planTrialDays}
       />
     </div>
   );

@@ -28,6 +28,11 @@ export async function getPlatformSettingsView() {
   const operatorEmail = await getSetting("platform_admin_email", env.PLATFORM_ADMIN_EMAIL);
   const extraEmails = await getSetting("platform_admin_emails", env.PLATFORM_ADMIN_EMAILS);
   const passwordSet = await settingExists("platform_admin_password_hash");
+  const planPriceStarter = await getSetting("plan_price_starter");
+  const planPriceBusiness = await getSetting("plan_price_business");
+  const planPricePro = await getSetting("plan_price_pro");
+  const planPriceCurrency = await getSetting("plan_price_currency", "USD");
+  const planTrialDays = await getSetting("plan_trial_days", "7");
 
   return {
     failoverEnabled: config.failoverEnabled,
@@ -53,6 +58,11 @@ export async function getPlatformSettingsView() {
       groq: GROQ_MODELS,
       openai: OPENAI_MODELS,
     },
+    planPriceStarter,
+    planPriceBusiness,
+    planPricePro,
+    planPriceCurrency,
+    planTrialDays,
   };
 }
 
@@ -102,9 +112,15 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     if (geminiModel) await setSetting("gemini_model", geminiModel);
     if (groqModel) await setSetting("groq_model", groqModel);
     if (openaiModel) await setSetting("openai_model", openaiModel);
+    await setSetting("plan_price_starter", String(formData.get("plan_price_starter") ?? "").trim());
+    await setSetting("plan_price_business", String(formData.get("plan_price_business") ?? "").trim());
+    await setSetting("plan_price_pro", String(formData.get("plan_price_pro") ?? "").trim());
+    await setSetting("plan_price_currency", String(formData.get("plan_price_currency") ?? "USD").trim() || "USD");
+    await setSetting("plan_trial_days", String(formData.get("plan_trial_days") ?? "7").trim() || "7");
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/access");
+    revalidatePath("/pricing");
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save settings.";

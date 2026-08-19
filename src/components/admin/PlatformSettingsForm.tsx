@@ -13,6 +13,11 @@ export function PlatformSettingsForm({
   extraEmails,
   models,
   modelOptions,
+  planPriceStarter,
+  planPriceBusiness,
+  planPricePro,
+  planPriceCurrency,
+  planTrialDays,
 }: {
   failoverEnabled: boolean;
   order: string;
@@ -37,6 +42,11 @@ export function PlatformSettingsForm({
     groq: { id: string; label: string; note: string }[];
     openai: { id: string; label: string; note: string }[];
   };
+  planPriceStarter: string;
+  planPriceBusiness: string;
+  planPricePro: string;
+  planPriceCurrency: string;
+  planTrialDays: string;
 }) {
   const [state, formAction, saving] = useActionState(savePlatformSettings, null);
   const [pending, startTransition] = useTransition();
@@ -197,6 +207,36 @@ export function PlatformSettingsForm({
           <label className="text-sm text-navy-300">
             API secret {configured.cloudinaryApiSecret ? <span className="text-emerald-300">(saved)</span> : null}
             <input className="field mt-2" name="cloudinary_api_secret" type="password" autoComplete="off" />
+          </label>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">Displayed plan prices</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          The public pricing page first loads live Wix App Plans prices. These fields are the fallback if Wix does not
+          return amounts.
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="text-sm text-navy-300">
+            Starter / month
+            <input className="field mt-2" name="plan_price_starter" defaultValue={planPriceStarter} placeholder="19" />
+          </label>
+          <label className="text-sm text-navy-300">
+            Business / month
+            <input className="field mt-2" name="plan_price_business" defaultValue={planPriceBusiness} placeholder="49" />
+          </label>
+          <label className="text-sm text-navy-300">
+            Pro / month
+            <input className="field mt-2" name="plan_price_pro" defaultValue={planPricePro} placeholder="99" />
+          </label>
+          <label className="text-sm text-navy-300">
+            Currency
+            <input className="field mt-2" name="plan_price_currency" defaultValue={planPriceCurrency} placeholder="USD" />
+          </label>
+          <label className="text-sm text-navy-300">
+            Trial days
+            <input className="field mt-2" name="plan_trial_days" defaultValue={planTrialDays} placeholder="7" />
           </label>
         </div>
       </div>
