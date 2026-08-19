@@ -5,7 +5,7 @@ import { getEnv } from "@/lib/env";
 import { parseWixInstance } from "@/lib/security/instance";
 import { PricingView } from "@/components/marketing/PricingView";
 
-const PAID_PLANS: PlanKey[] = ["STARTER", "GROWTH", "PRO"];
+const PAID_PLANS = ["STARTER", "GROWTH", "PRO"] as const;
 
 export default async function PricingPage({
   searchParams,
