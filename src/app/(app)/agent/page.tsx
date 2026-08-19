@@ -3,8 +3,6 @@ import { getSession } from "@/lib/security/session";
 import { getWorkspace } from "@/modules/organizations/workspace";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AgentStudio } from "@/components/agent/AgentStudio";
-import { WidgetInstallCard } from "@/components/widget/WidgetInstallCard";
-import { getAppOrigin } from "@/lib/env";
 
 export default async function AgentPage() {
   const session = await getSession();
@@ -19,7 +17,6 @@ export default async function AgentPage() {
         title={workspace.agent.name}
         description="Configuration stays simple. Tools, knowledge, and handoff are decided for you — you can still refine."
       />
-      <WidgetInstallCard instanceId={session.wixInstanceId} appOrigin={getAppOrigin()} />
       <AgentStudio
         agent={{
           id: workspace.agent.id,

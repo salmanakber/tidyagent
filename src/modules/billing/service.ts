@@ -10,7 +10,7 @@ import {
   type BillingEventInput,
   type DerivedSubscription,
 } from "@/modules/billing/lifecycle";
-import { resolveEntitlements, type Entitlements } from "@/modules/billing/entitlements";
+import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "@/modules/billing/entitlements";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -205,24 +205,35 @@ export async function entitlementsForOrganization(organizationId: string): Promi
     prisma.organization.findUnique({ where: { id: organizationId } }),
   ]);
 
+  const suspended = organization?.accessStatus === "suspended";
+  const grant = organization?.compPlanKey ?? null;
+
   if (!subscription) {
-    return resolveEntitlements({
-      planKey: "FREE",
-      status: "NONE",
-      isFree: true,
-      suspended: organization?.accessStatus === "suspended",
-    });
+    return withComplimentaryGrant(
+      resolveEntitlements({
+        planKey: "FREE",
+        status: "NONE",
+        isFree: true,
+        suspended,
+      }),
+      grant,
+      suspended,
+    );
   }
 
-  return resolveEntitlements({
-    planKey: subscription.planKey,
-    status: subscription.status,
-    isFree: subscription.isFree,
-    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-    billingIssue: subscription.billingIssue,
-    currentPeriodEnd: subscription.currentPeriodEnd,
-    suspended: organization?.accessStatus === "suspended",
-  });
+  return withComplimentaryGrant(
+    resolveEntitlements({
+      planKey: subscription.planKey,
+      status: subscription.status,
+      isFree: subscription.isFree,
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      billingIssue: subscription.billingIssue,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      suspended,
+    }),
+    grant,
+    suspended,
+  );
 }
 
 function asString(value: unknown): string | null {

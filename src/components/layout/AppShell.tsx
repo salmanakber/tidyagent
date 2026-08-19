@@ -51,6 +51,7 @@ export function AppShell({
   impersonating,
   suspended,
   suspendedReason,
+  locked,
 }: {
   children: React.ReactNode;
   orgName: string;
@@ -60,9 +61,12 @@ export function AppShell({
   impersonating?: string | null;
   suspended?: boolean;
   suspendedReason?: string | null;
+  locked?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const nav = locked ? NAV.filter((item) => item.href === "/billing") : NAV;
+  const mobile = locked ? [{ href: "/billing", label: "Plan", icon: CreditCard }] : MOBILE_PRIMARY;
 
   return (
     <div className="min-h-dvh bg-brand-gradient bg-noise">
@@ -73,7 +77,7 @@ export function AppShell({
             <p className="mt-4 truncate text-xs text-navy-300">{siteName}</p>
           </div>
           <nav className="flex-1 space-y-1 px-3">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
@@ -116,7 +120,7 @@ export function AppShell({
                 </button>
               </div>
               <nav className="space-y-1">
-                {NAV.map((item) => (
+                {NAV.filter((item) => !locked || item.href === "/billing").map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -139,6 +143,11 @@ export function AppShell({
           {impersonating ? (
             <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
               Viewing as site owner · signed in as platform admin {impersonating}
+            </div>
+          ) : null}
+          {locked ? (
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
+              Choose a plan to unlock the dashboard and the live chat bubble.
             </div>
           ) : null}
           {suspended ? (
@@ -167,8 +176,8 @@ export function AppShell({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-navy-950/90 px-2 py-2 backdrop-blur-xl lg:hidden">
-        <div className="grid grid-cols-5">
-          {MOBILE_PRIMARY.map((item) => {
+        <div className={cn("grid", locked ? "grid-cols-1" : "grid-cols-5")}>
+          {mobile.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
@@ -184,10 +193,12 @@ export function AppShell({
               </Link>
             );
           })}
+          {locked ? null : (
           <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-1 py-2 text-[11px] text-navy-300">
             <Menu className="h-5 w-5" />
             More
           </button>
+          )}
         </div>
       </nav>
     </div>

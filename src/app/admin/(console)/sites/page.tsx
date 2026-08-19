@@ -34,8 +34,13 @@ export default async function AdminSitesPage() {
                   <p className="text-xs text-navy-400">{site.ownerEmail || site.url || site.wixInstanceId}</p>
                 </td>
                 <td className="px-4 py-4">
-                  {site.planKey}
-                  {site.cancelAtPeriodEnd ? <span className="ml-2 text-xs text-amber-300">ends soon</span> : null}
+                  {site.isFree ? "FREE" : site.planKey}
+                  {site.compPlanKey ? (
+                    <span className="ml-2 text-xs text-amber-300">comp {site.compPlanKey}</span>
+                  ) : null}
+                  {site.cancelAtPeriodEnd && !site.compPlanKey ? (
+                    <span className="ml-2 text-xs text-amber-300">ends soon</span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-4">
                   <StatusPill status={site.connectionStatus} />

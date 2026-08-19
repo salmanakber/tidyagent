@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireSession } from "@/lib/security/session";
 import { prisma } from "@/lib/prisma";
 import { getWorkspace } from "@/modules/organizations/workspace";
-import { requireKnowledgeCapacity } from "@/modules/billing/guard";
+import { requireKnowledgeCapacity, requirePaidSeat } from "@/modules/billing/guard";
 
 const agentUpdateSchema = z.object({
   name: z.string().min(1).max(60).optional(),
@@ -22,6 +22,7 @@ const agentUpdateSchema = z.object({
 
 export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   const session = await requireSession();
+  await requirePaidSeat(session);
   const data = agentUpdateSchema.parse(input);
   const workspace = await getWorkspace(session);
   if (!workspace.agent) {
@@ -99,8 +100,31 @@ export async function addCustomKnowledge(title: string, content: string) {
   revalidatePath("/knowledge");
 }
 
+export async function runSiteScan() {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const { scanOrganizationSite } = await import("@/modules/knowledge/scanner");
+  const result = await scanOrganizationSite({
+    organizationId: session.organizationId,
+    siteId: session.siteId,
+    wixInstanceId: session.wixInstanceId,
+  });
+  if (result.ok) {
+    await prisma.organization.update({
+      where: { id: session.organizationId },
+      data: { onboardingStatus: "ANALYZING" },
+    });
+  }
+  revalidatePath("/onboarding");
+  revalidatePath("/knowledge");
+  revalidatePath("/dashboard");
+  revalidatePath("/agent");
+  return result;
+}
+
 export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CONFIGURED" | "TESTED" | "PUBLISHED") {
   const session = await requireSession();
+  await requirePaidSeat(session);
   await prisma.organization.update({
     where: { id: session.organizationId },
     data: { onboardingStatus: status },

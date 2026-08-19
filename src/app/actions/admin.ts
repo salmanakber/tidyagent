@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/security/session";
@@ -100,8 +101,52 @@ export async function syncSiteBilling(siteId: string) {
   await writeAudit("billing.sync", { siteId, organizationId: site.organizationId, wixInstanceId: site.wixInstanceId });
 }
 
+export async function grantComplimentaryPlan(siteId: string, planKey: "STARTER" | "GROWTH" | "PRO", note?: string) {
+  const admin = await requireAdminSession("SUPER");
+  const site = await prisma.wixSite.findUniqueOrThrow({ where: { id: siteId } });
+  await prisma.organization.update({
+    where: { id: site.organizationId },
+    data: {
+      compPlanKey: planKey,
+      compGrantedAt: new Date(),
+      compGrantedBy: admin.email,
+      compNote: note?.slice(0, 200) || null,
+    },
+  });
+  await writeAudit("billing.comp.grant", {
+    siteId,
+    organizationId: site.organizationId,
+    planKey,
+    note,
+    admin: admin.email,
+  });
+  revalidatePath("/admin/sites");
+  revalidatePath(`/admin/sites/${siteId}`);
+}
+
+export async function revokeComplimentaryPlan(siteId: string) {
+  const admin = await requireAdminSession("SUPER");
+  const site = await prisma.wixSite.findUniqueOrThrow({ where: { id: siteId } });
+  await prisma.organization.update({
+    where: { id: site.organizationId },
+    data: {
+      compPlanKey: null,
+      compGrantedAt: null,
+      compGrantedBy: null,
+      compNote: null,
+    },
+  });
+  await writeAudit("billing.comp.revoke", {
+    siteId,
+    organizationId: site.organizationId,
+    admin: admin.email,
+  });
+  revalidatePath("/admin/sites");
+  revalidatePath(`/admin/sites/${siteId}`);
+}
+
 export async function openSiteAsOwner(siteId: string) {
-  await requireAdminSession("SUPPORT");
+  const admin = await requireAdminSession("SUPPORT");
   const site = await prisma.wixSite.findUniqueOrThrow({
     where: { id: siteId },
     include: { organization: { include: { members: true } } },
@@ -109,7 +154,6 @@ export async function openSiteAsOwner(siteId: string) {
   const member = site.organization.members[0];
   if (!member) throw new Error("No owner membership on this site");
 
-  const admin = await requireAdminSession("SUPPORT");
   await setSessionCookie({
     userId: member.userId,
     organizationId: site.organizationId,

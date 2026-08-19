@@ -107,6 +107,11 @@ model Organization {
   accessStatus      String            @default("active")
   suspendedAt       DateTime?
   suspendedReason   String?
+  /// Complimentary paid seat from platform admin. Survives Wix billing sync.
+  compPlanKey       PlanKey?
+  compGrantedAt     DateTime?
+  compGrantedBy     String?
+  compNote          String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   deletedAt         DateTime?

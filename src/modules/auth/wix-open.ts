@@ -4,6 +4,7 @@ import type { AppSession } from "@/lib/security/session";
 import { fetchWixAppInstance } from "@/services/wix/client";
 import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { prisma } from "@/lib/prisma";
+import { entitlementsForOrganization } from "@/modules/billing/service";
 
 export async function completeWixLogin(instance: string): Promise<{
   session: AppSession;
@@ -28,9 +29,14 @@ export async function completeWixLogin(instance: string): Promise<{
   const organization = await prisma.organization.findUniqueOrThrow({
     where: { id: session.organizationId },
   });
+  const entitlements = await entitlementsForOrganization(session.organizationId);
 
   return {
     session,
-    destination: organization.onboardingStatus === "PUBLISHED" ? "/dashboard" : "/onboarding",
+    destination: !entitlements.isPaidSeat
+      ? "/billing"
+      : organization.onboardingStatus === "PUBLISHED"
+        ? "/dashboard"
+        : "/onboarding",
   };
 }

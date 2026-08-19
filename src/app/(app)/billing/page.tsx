@@ -19,8 +19,12 @@ export default async function BillingPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Wix billing"
-        title="Plan & limits"
-        description="Checkout stays on Wix. Paid plans include a 7-day free trial. Trial signup fires Paid Plan Purchased; the first charge after trial does not."
+        title={e.isPaidSeat ? "Plan & limits" : "Choose a plan to go live"}
+        description={
+          e.isPaidSeat
+            ? "Checkout stays on Wix. Paid plans include a 7-day free trial. Trial signup fires Paid Plan Purchased; the first charge after trial does not."
+            : "The dashboard and live chat bubble stay off until a plan is purchased. Start a 7-day trial on Wix — Starter, Business, or Pro."
+        }
         actions={
           <>
             {upgradeUrl ? (
@@ -37,7 +41,13 @@ export default async function BillingPage() {
         }
       />
 
-      {e.status === "TRIALING" ? (
+      {e.grantedByAdmin ? (
+        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          This workspace has complimentary paid access from the platform owner. Wix checkout is optional while the
+          grant is active.
+        </div>
+      ) : null}
+      {e.status === "TRIALING" && !e.grantedByAdmin ? (
         <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
           7-day free trial is active. Wix charges when the trial ends. That conversion has no webhook — click Refresh
           from Wix after day 7, or just reopen the dashboard.

@@ -1,6 +1,8 @@
 import { createClient, AppStrategy } from "@wix/sdk";
 import { appInstances, embeddedScripts, billing } from "@wix/app-management";
-import { products } from "@wix/stores";
+import { products, collections as storeCatalogs } from "@wix/stores";
+import { collections as cmsCollections, items as cmsItems } from "@wix/data";
+import { siteProperties } from "@wix/business-tools";
 import { getEnv } from "@/lib/env";
 
 export function createWixAppClient(instanceId: string) {
@@ -21,6 +23,10 @@ export function createWixAppClient(instanceId: string) {
       embeddedScripts,
       billing,
       products,
+      storeCatalogs,
+      cmsCollections,
+      cmsItems,
+      siteProperties,
     },
   });
 }

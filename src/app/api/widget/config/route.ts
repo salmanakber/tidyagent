@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { verifyWidgetInitToken } from "@/lib/security/widget-token";
 import { prisma } from "@/lib/prisma";
+import { getAppOrigin } from "@/lib/env";
+import { entitlementsForOrganization } from "@/modules/billing/service";
 
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": "no-store",
   };
 }
 
@@ -33,17 +36,26 @@ export async function GET(request: Request) {
   }
 
   const suspended = agent.organization.accessStatus === "suspended";
+  const entitlements = await entitlementsForOrganization(agent.organization.id);
+  const live = entitlements.isPaidSeat && !suspended && agent.status === "ACTIVE";
+
+  const origin = getAppOrigin();
+  const avatar = agent.widgetAvatarUrl
+    ? agent.widgetAvatarUrl.startsWith("/")
+      ? `${origin}${agent.widgetAvatarUrl}`
+      : agent.widgetAvatarUrl.replace(/^http:\/\//, "https://")
+    : null;
 
   return NextResponse.json(
     {
       name: agent.name,
       greeting: agent.widgetGreeting,
       primaryColor: agent.widgetPrimaryColor,
-      avatarUrl: agent.widgetAvatarUrl,
+      avatarUrl: avatar,
       position: agent.widgetPosition,
-      status: suspended ? "PAUSED" : agent.status,
+      status: live ? agent.status : "LOCKED",
     },
-    { headers: corsHeaders() },
+    { headers: { ...corsHeaders(), "Cache-Control": "no-store" } },
   );
 }
 

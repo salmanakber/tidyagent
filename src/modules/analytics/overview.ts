@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getWorkspace } from "@/modules/organizations/workspace";
-import { resolveEntitlements } from "@/modules/billing/entitlements";
+import { entitlementsForOrganization } from "@/modules/billing/service";
 import type { AppSession } from "@/lib/security/session";
 import type { KnowledgeContentType } from "@prisma/client";
 
 export async function getDashboardOverview(session: AppSession) {
   const workspace = await getWorkspace(session);
-  const { organization, site, subscription, profile, agent } = workspace;
+  const { organization, site, profile, agent } = workspace;
 
   const [conversationCount, resolvedCount, escalationCount, leadCount, unanswered, knowledge] =
     await Promise.all([
@@ -34,22 +34,7 @@ export async function getDashboardOverview(session: AppSession) {
     knowledge.map((row) => [row.contentType, row._count._all]),
   ) as Partial<Record<KnowledgeContentType, number>>;
 
-  const entitlements = subscription
-    ? resolveEntitlements({
-        planKey: subscription.planKey,
-        status: subscription.status,
-        isFree: subscription.isFree,
-        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-        billingIssue: subscription.billingIssue,
-        currentPeriodEnd: subscription.currentPeriodEnd,
-        suspended: organization.accessStatus === "suspended",
-      })
-    : resolveEntitlements({
-        planKey: "FREE",
-        status: "NONE",
-        isFree: true,
-        suspended: organization.accessStatus === "suspended",
-      });
+  const entitlements = await entitlementsForOrganization(session.organizationId);
 
   const knowledgeTotal = knowledge.reduce((sum, row) => sum + row._count._all, 0);
   const coverage =

@@ -63,13 +63,14 @@ body {
   mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black, transparent);
 }
 
-@keyframes wave-bar {
-  0%,
-  100% {
-    transform: scaleY(0.45);
+@keyframes widget-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
   }
-  50% {
-    transform: scaleY(1);
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

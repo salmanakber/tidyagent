@@ -26,15 +26,14 @@ export function planLabel(key: PlanKey) {
 /** What each paid package is allowed to do. Wix permissions stay app-wide; we gate here. */
 export const PLAN_SCOPES: Record<PlanKey, string[]> = {
   FREE: [
-    "Install on a Wix site and open the dashboard",
-    "Preview the AI employee (not live on the storefront)",
-    "100 conversations / month",
-    "50 knowledge pages",
+    "Install on a Wix site",
+    "Choose Starter, Business, or Pro to unlock the dashboard and live widget",
   ],
   STARTER: [
     "7-day free trial",
     "Live chat widget on every published page",
-    "Answers from your site, FAQ, and knowledge",
+    "Wix site profile, pages, and CMS (no store catalog)",
+    "Domain crawl of the live website",
     "Human handoff when the AI is unsure",
     "Basic automations (greeting, handoff, follow-up)",
     "1,000 conversations / month",
@@ -43,7 +42,8 @@ export const PLAN_SCOPES: Record<PlanKey, string[]> = {
   GROWTH: [
     "Everything in Starter",
     "7-day free trial",
-    "Wix Stores: product search, cart help, order tracking",
+    "Wix Stores catalog, CMS, and bookings data",
+    "Product search, cart help, order tracking",
     "Full automations for support and sales",
     "5,000 conversations / month",
     "1,000 knowledge pages",
@@ -51,6 +51,7 @@ export const PLAN_SCOPES: Record<PlanKey, string[]> = {
   PRO: [
     "Everything in Business",
     "7-day free trial",
+    "Deepest Wix API + domain crawl",
     "Voice conversations",
     "Highest limits for busy stores",
     "25,000 conversations / month",

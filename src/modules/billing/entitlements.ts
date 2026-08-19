@@ -16,9 +16,17 @@ export type Entitlements = {
   isUsable: boolean;
   cancelAtPeriodEnd: boolean;
   billingIssue: boolean;
+  grantedByAdmin: boolean;
 };
 
-export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "status" | "isUsable" | "isFree" | "isPaidSeat" | "cancelAtPeriodEnd" | "billingIssue">> = {
+export const PLAN_RANK: Record<PlanKey, number> = {
+  FREE: 0,
+  STARTER: 1,
+  GROWTH: 2,
+  PRO: 3,
+};
+
+export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "status" | "isUsable" | "isFree" | "isPaidSeat" | "cancelAtPeriodEnd" | "billingIssue" | "grantedByAdmin">> = {
   FREE: {
     conversationLimit: 100,
     knowledgeLimit: 50,
@@ -58,6 +66,7 @@ export function resolveEntitlements(input: {
   currentPeriodEnd?: Date | null;
   suspended?: boolean;
   now?: Date;
+  grantedByAdmin?: boolean;
 }): Entitlements {
   const now = input.now ?? new Date();
   const stillInPaidPeriod =
@@ -74,7 +83,7 @@ export function resolveEntitlements(input: {
 
   const planKey = isPaidSeat ? input.planKey : "FREE";
   const limits = PLAN_ENTITLEMENTS[planKey];
-  const isUsable = !input.suspended && (isPaidSeat || planKey === "FREE");
+  const isUsable = !input.suspended && isPaidSeat;
 
   return {
     planKey,
@@ -85,6 +94,31 @@ export function resolveEntitlements(input: {
     isUsable,
     cancelAtPeriodEnd: Boolean(input.cancelAtPeriodEnd),
     billingIssue: Boolean(input.billingIssue),
+    grantedByAdmin: Boolean(input.grantedByAdmin),
+  };
+}
+
+/** Admin complimentary seat. Survives Wix isFree and is a floor under a real Wix purchase. */
+export function withComplimentaryGrant(
+  base: Entitlements,
+  grantPlan: PlanKey | null | undefined,
+  suspended?: boolean,
+): Entitlements {
+  if (!grantPlan || grantPlan === "FREE") {
+    return { ...base, grantedByAdmin: false };
+  }
+  const wixPlan = base.isPaidSeat ? base.planKey : "FREE";
+  const planKey = PLAN_RANK[grantPlan] >= PLAN_RANK[wixPlan] ? grantPlan : wixPlan;
+  return {
+    ...resolveEntitlements({
+      planKey,
+      status: base.isPaidSeat ? base.status : "ACTIVE",
+      isFree: false,
+      cancelAtPeriodEnd: base.cancelAtPeriodEnd,
+      billingIssue: base.billingIssue,
+      suspended,
+    }),
+    grantedByAdmin: true,
   };
 }
 

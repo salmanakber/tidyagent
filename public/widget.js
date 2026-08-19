@@ -1,15 +1,23 @@
 (() => {
-  const script = document.currentScript;
+  const script =
+    document.currentScript ||
+    document.querySelector('script[src*="/widget.js"]') ||
+    document.querySelector("script[data-instance], script[data-token]");
   if (!script || !script.src) return;
 
   const origin = new URL(script.src).origin;
   const token = script.getAttribute("data-token") || "";
-  const instance = script.getAttribute("data-instance") || "";
+  const rawInstance = script.getAttribute("data-instance") || "";
+  const instance = rawInstance.includes("{") ? "" : rawInstance;
 
   const boot = () => {
+    if (!document.body) {
+      document.addEventListener("DOMContentLoaded", boot, { once: true });
+      return;
+    }
     if (document.getElementById("tidyagent-widget-root")) return;
     const loader = document.createElement("script");
-    loader.src = `${origin}/widget/embed.js`;
+    loader.src = `${origin}/widget/embed.js?v=20260819c`;
     loader.async = true;
     if (token) loader.dataset.token = token;
     if (instance) loader.dataset.instance = instance;

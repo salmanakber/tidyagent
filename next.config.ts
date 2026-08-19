@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
     const widgetCors = [
       { key: "Access-Control-Allow-Origin", value: "*" },
       { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
+      { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
     ];
     return [
       { source: "/widget.js", headers: widgetCors },

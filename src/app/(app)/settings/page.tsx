@@ -4,8 +4,6 @@ import { getDashboardOverview } from "@/modules/analytics/overview";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { AgentStudio } from "@/components/agent/AgentStudio";
-import { WidgetInstallCard } from "@/components/widget/WidgetInstallCard";
-import { getAppOrigin } from "@/lib/env";
 import { planLabel } from "@/modules/billing/catalog";
 
 export default async function SettingsPage() {
@@ -50,9 +48,7 @@ export default async function SettingsPage() {
         </div>
       </div>
       {data.agent ? (
-        <>
-          <WidgetInstallCard instanceId={session.wixInstanceId} appOrigin={getAppOrigin()} />
-          <AgentStudio
+        <AgentStudio
             agent={{
               id: data.agent.id,
               name: data.agent.name,
@@ -67,7 +63,6 @@ export default async function SettingsPage() {
               capabilities: data.agent.capabilities,
             }}
           />
-        </>
       ) : null}
     </div>
   );

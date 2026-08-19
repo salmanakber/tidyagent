@@ -36,16 +36,18 @@ If the iframe is blank: publish a new app version, then on the test site open **
 Wix will not inject the chat bubble unless the app has an **Embedded Script** extension.
 
 1. Wix Developers → your app → **Extensions** → **Embedded Script**.
-2. Load on all pages. Type: essential.
-3. HTML:
+2. Type: **Essential**. Placement: **Body** (not Head).
+3. **Uncheck** “The embedded script uses frontend modules from the Wix JavaScript SDK”. Our widget is a normal script, not a Wix SDK module. That checkbox will prevent `widget.js` from appearing on the site.
+4. HTML:
 
 ```html
-<script src="https://<tidyagent-host>/widget.js" data-instance="{{instanceId}}" async></script>
+<script src="https://agent.tidyflowapp.com/widget.js" data-instance="{{instanceId}}" async></script>
 ```
 
-4. Add a dynamic parameter named exactly `instanceId`.
-5. Permission: **Manage Embedded Scripts** (plus Manage Your App).
-6. Copy the extension ID into `WIX_EMBEDDED_SCRIPT_COMPONENT_ID` if Wix shows more than one script.
+5. Add a **dynamic parameter** named exactly `instanceId`.
+6. Release a **new app version**, then update the app on the test site.
+7. **Publish** the Wix site (Editor preview often does not inject embedded scripts).
+8. Permission: Manage Embedded Scripts. Copy the extension ID into `WIX_EMBEDDED_SCRIPT_COMPONENT_ID` if you have more than one script.
 
 On install / publish, tidyAgent calls Wix `embedScript` with that `instanceId`. The live site must be **published** for visitors to see the widget.
 
@@ -60,16 +62,18 @@ Ask for:
 - Manage Your App
 - Manage Embedded Scripts
 - Read Site Owner Email
+- Read site, business, and email details (site properties)
+- Wix Data: Read collections and items
 - Stores: Read Products, Read Orders (used by Business and Pro)
 
 tidyAgent then **gates** features per plan in the backend:
 
 | Wix plan | tidyAgent seat | Includes |
 | --- | --- | --- |
-| (none / free install) | Free | Dashboard + preview only |
-| Starter | Starter | Live widget, Q&A, handoff |
-| Business | Business (stored as GROWTH) | Stores tools + automations |
-| Pro | Pro | Voice + highest limits |
+| (none / free install) | Locked | Billing only — no dashboard, no live bubble |
+| Starter | Starter | Live widget, site profile, pages, CMS, domain crawl |
+| Business | Business (stored as GROWTH) | Stores catalog + bookings + automations |
+| Pro | Pro | Deepest APIs + voice + highest limits |
 
 Put each Wix Pricing plan ID in `.env`:
 

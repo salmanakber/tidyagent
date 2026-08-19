@@ -139,7 +139,7 @@ export function AgentStudio({ agent }: { agent: AgentView }) {
       </div>
       <div className="panel overflow-hidden p-4">
         <p className="mb-3 px-2 text-sm text-navy-300">Live widget preview — owner brand, not tidyAgent amber/navy</p>
-        <div className="rounded-[32px] bg-slate-200 p-4">
+        <div className="relative min-h-[560px] overflow-hidden rounded-[32px] bg-slate-200">
           <ChatWidget name={name} greeting={greeting} primaryColor={color} position={position} avatarUrl={avatarUrl} preview />
         </div>
       </div>

@@ -85,6 +85,7 @@ export async function listManagedSites() {
       planKey: subscription?.planKey ?? "FREE",
       billingStatus: subscription?.status ?? "NONE",
       isFree: subscription?.isFree ?? true,
+      compPlanKey: site.organization.compPlanKey,
       cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
       agentStatus: site.organization.agents[0]?.status ?? "DRAFT",
       conversations: site.organization._count.conversations,

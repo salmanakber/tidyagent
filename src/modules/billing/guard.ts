@@ -7,12 +7,16 @@ import {
 } from "@/modules/billing/entitlements";
 import type { AppSession } from "@/lib/security/session";
 
-export async function requireTenantEntitlements(session: AppSession): Promise<Entitlements> {
+export async function requirePaidSeat(session: AppSession): Promise<Entitlements> {
   const entitlements = await entitlementsForOrganization(session.organizationId);
-  if (!entitlements.isUsable) {
-    throw new EntitlementDeniedError("isUsable");
+  if (!entitlements.isPaidSeat || !entitlements.isUsable) {
+    throw new EntitlementDeniedError("paid_plan");
   }
   return entitlements;
+}
+
+export async function requireTenantEntitlements(session: AppSession): Promise<Entitlements> {
+  return requirePaidSeat(session);
 }
 
 export async function requirePaidFeature(

@@ -1,21 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 import { advanceOnboarding, updateAgent } from "@/app/actions/workspace";
 import { ChatWidget } from "@/components/widget/ChatWidget";
+import { SiteScanPanel } from "@/components/knowledge/SiteScanPanel";
 import { cn } from "@/lib/utils";
+import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
 
-const STEPS = [
-  "Connected",
-  "Analyze",
-  "Understand",
-  "Capabilities",
-  "Questions",
-  "Configure",
-  "Test",
-  "Publish",
-];
+const STEPS = ["Connected", "Scan", "Understanding", "Capabilities", "Focus", "Configure", "Test", "Publish"];
 
 const FOCUS_OPTIONS = [
   { key: "customer_support", label: "Customer support" },
@@ -28,26 +21,40 @@ const FOCUS_OPTIONS = [
 
 export function OnboardingWizard({
   siteName,
+  siteUrl,
+  planLabel,
+  scopeNote,
   capabilities,
   agentName,
   greeting,
   color,
+  avatarUrl,
+  existingUnderstanding,
 }: {
   siteName: string;
+  siteUrl?: string | null;
+  planLabel: string;
+  scopeNote: string;
   capabilities: { key: string; label: string; available: boolean }[];
   agentName: string;
   greeting: string;
   color: string;
+  avatarUrl?: string | null;
+  existingUnderstanding?: SiteUnderstanding | null;
 }) {
   const [step, setStep] = useState(1);
+  const [scan, setScan] = useState<ScanResult | null>(null);
   const [focus, setFocus] = useState<string[]>(["everything"]);
   const [personality, setPersonality] = useState<"friendly" | "professional" | "casual">("friendly");
   const [embed, setEmbed] = useState<"AUTO" | "MANUAL">("AUTO");
   const [pending, startTransition] = useTransition();
 
+  const understanding = scan?.understanding ?? existingUnderstanding ?? null;
+
   function next() {
+    if (step === 2 && !scan?.ok && !existingUnderstanding) return;
     startTransition(async () => {
-      if (step === 1) await advanceOnboarding("ANALYZING");
+      if (step === 2) await advanceOnboarding("ANALYZING");
       if (step === 4) await advanceOnboarding("QUESTIONS");
       if (step === 5) {
         await updateAgent({ personality, focus, widgetEmbedMode: embed });
@@ -74,36 +81,69 @@ export function OnboardingWizard({
 
       <div className="panel p-6 sm:p-8">
         {step === 1 && (
-          <Step title="Website connected" body={`${siteName} is securely identified. Next we’ll understand the business — not just copy the site text.`}>
-            <div className="rounded-2xl bg-navy-950/50 p-4 text-sm text-navy-200">Wix site identity synced. Tenant created. Subscription state stored server-side.</div>
-          </Step>
-        )}
-        {step === 2 && (
-          <Step title="Analyzing your website" body="Collecting pages, products, policies, and calls to action. Raw HTML is never sent straight to the model.">
-            <div className="space-y-3">
-              {["Homepage & about", "Products and pricing", "Policies & FAQ", "Contact and hours"].map((item) => (
-                <div key={item} className="flex items-center gap-3 text-sm">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-amber-300">
-                    <Sparkles className="h-3.5 w-3.5 animate-pulse-soft" />
-                  </span>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </Step>
-        )}
-        {step === 3 && (
-          <Step title="We think we understand the business" body="Online fashion and product catalog signals are strongest, so we’ll prove the AI employee on ecommerce first.">
+          <Step
+            title="Website connected"
+            body={`${siteName} is identified through Wix. The next step is a real read of the live site — scoped to ${planLabel} — so the employee learns this business, not a generic script.`}
+          >
             <div className="grid gap-3 sm:grid-cols-2">
-              <Info label="Business" value="Online fashion store" />
-              <Info label="Model" value="Ecommerce catalog + cart" />
-              <Info label="Customers" value="Shoppers choosing products" />
-              <Info label="AI focus" value="Support + guided shopping" />
+              <Info label="Site" value={siteName} />
+              <Info label="Public URL" value={siteUrl || "Unpublished"} />
+              <Info label="Plan" value={planLabel} />
+              <Info label="Scan depth" value={scopeNote} />
             </div>
           </Step>
         )}
+
+        {step === 2 && (
+          <Step
+            title="Read and understand the website"
+            body="This pulls pages, policies, and (on Business/Pro) catalog data from the live site. Re-run it whenever the site changes."
+          >
+            <SiteScanPanel
+              planLabel={planLabel}
+              scopeNote={scopeNote}
+              siteUrl={siteUrl}
+              onComplete={setScan}
+            />
+          </Step>
+        )}
+
+        {step === 3 && (
+          <Step
+            title="What we understand about this business"
+            body="This profile is built from pages the scanner actually read. If something is thin, add knowledge later rather than inventing it."
+          >
+            {understanding ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Info label="Business" value={understanding.name} />
+                  <Info label="Industry" value={understanding.industry} />
+                  <Info label="Model" value={understanding.businessModel} />
+                  <Info label="Audience" value={understanding.audience} />
+                </div>
+                <p className="text-sm leading-6 text-navy-200">{understanding.summary}</p>
+                {understanding.offerings.length ? (
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-navy-400">Offerings</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {understanding.offerings.slice(0, 10).map((item) => (
+                        <span key={item} className="rounded-full bg-white/5 px-3 py-1 text-xs text-navy-100">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <p className="text-xs text-navy-400">Confidence: {understanding.confidence}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-navy-300">Run the scanner first so this is based on the live site.</p>
+            )}
+          </Step>
+        )}
+
         {step === 4 && (
-          <Step title="Detected Wix capabilities" body="The agent will only get tools that this site actually supports.">
+          <Step title="Detected Wix capabilities" body="Tools stay limited to apps this site actually has, and to what the current plan is allowed to use.">
             <div className="grid gap-2 sm:grid-cols-2">
               {capabilities.map((capability) => (
                 <div key={capability.key} className="flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
@@ -116,8 +156,9 @@ export function OnboardingWizard({
             </div>
           </Step>
         )}
+
         {step === 5 && (
-          <Step title="A few simple questions" body="What should your AI employee focus on? We’ll recommend the rest.">
+          <Step title="How should the employee spend its time?" body="We’ll recommend the rest from the site scan. You can change this later in Agent Studio.">
             <div className="grid gap-2 sm:grid-cols-2">
               {FOCUS_OPTIONS.map((option) => {
                 const selected = focus.includes(option.key);
@@ -153,7 +194,7 @@ export function OnboardingWizard({
                 <input type="radio" checked={embed === "AUTO"} onChange={() => setEmbed("AUTO")} />
                 <span>
                   <span className="block text-sm font-medium">Auto-install (recommended)</span>
-                  <span className="text-sm text-navy-300">Adds the widget to every page. No manual setup.</span>
+                  <span className="text-sm text-navy-300">Adds the widget to every published page.</span>
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 p-4">
@@ -166,10 +207,23 @@ export function OnboardingWizard({
             </div>
           </Step>
         )}
+
         {step === 6 && (
-          <Step title="Your AI employee is configured" body={`${agentName} is ready with support, shopping help, lead capture, and human handoff.`}>
+          <Step
+            title={`${agentName} is ready for this business`}
+            body={
+              understanding
+                ? `Trained on ${understanding.name}. Answers will stay inside what was read from the site and any knowledge you add.`
+                : "Publish after a successful scan so the employee is not guessing."
+            }
+          >
             <ul className="space-y-2 text-sm">
-              {["Customer support", "Product recommendations", "Cart assistance", "Order support", "Lead generation"].map((item) => (
+              {[
+                "Answers from scanned site content",
+                "Human handoff when evidence is missing",
+                "Owner-branded widget, not tidyAgent colors",
+                scan?.counts.products ? "Catalog-aware replies in plan scope" : "Page and policy knowledge",
+              ].map((item) => (
                 <li key={item} className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-amber-400" /> {item}
                 </li>
@@ -177,16 +231,30 @@ export function OnboardingWizard({
             </ul>
           </Step>
         )}
+
         {step === 7 && (
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <Step title="Test your AI employee" body="This preview uses the same widget customers will see. Brand colors are yours, not tidyAgent’s." />
-            <ChatWidget name={agentName} greeting={greeting} primaryColor={color} preview />
+            <Step
+              title="Test the employee"
+              body="This is the same launcher customers will see — avatar, greeting animation, and your position setting."
+            />
+            <ChatWidget
+              name={agentName}
+              greeting={greeting}
+              primaryColor={color}
+              avatarUrl={avatarUrl}
+              preview
+            />
           </div>
         )}
 
         <div className="mt-8 flex justify-end">
-          <button className="btn-primary" onClick={next} disabled={pending}>
-            {step >= 7 ? "Publish AI employee" : pending ? "Working…" : "Continue"}
+          <button
+            className="btn-primary"
+            onClick={next}
+            disabled={pending || (step === 2 && !scan?.ok && !existingUnderstanding)}
+          >
+            {step >= 7 ? "Publish AI employee" : pending ? "Working…" : step === 2 && !scan?.ok && !existingUnderstanding ? "Scan required" : "Continue"}
           </button>
         </div>
       </div>

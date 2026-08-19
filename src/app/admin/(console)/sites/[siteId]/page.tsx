@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { getManagedSite } from "@/modules/admin/reporting";
+import { getAdminSession } from "@/lib/security/admin-session";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { SiteAdminActions } from "@/components/admin/SiteAdminActions";
+import { CompPlanForm } from "@/components/admin/CompPlanForm";
 import { relativeTime } from "@/lib/utils";
 import { planLabel } from "@/modules/billing/catalog";
 
@@ -12,17 +14,18 @@ export default async function AdminSiteDetailPage({
   params: Promise<{ siteId: string }>;
 }) {
   const { siteId } = await params;
-  const data = await getManagedSite(siteId);
+  const [data, admin] = await Promise.all([getManagedSite(siteId), getAdminSession()]);
   if (!data) notFound();
   const { site, events } = data;
   const subscription = site.organization.subscriptions[0];
+  const org = site.organization;
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Website"
         title={site.displayName || site.organization.name}
-        description="Platform control for this Wix install. Billing still comes from Wix; we only store entitlements and access."
+        description="Platform control for this Wix install. Wix billing stays the source of truth unless you grant a complimentary paid seat below."
         actions={<SiteAdminActions siteId={site.id} suspended={site.organization.accessStatus === "suspended"} />}
       />
       <div className="grid gap-4 lg:grid-cols-2">
@@ -64,6 +67,14 @@ export default async function AdminSiteDetailPage({
           </dl>
         </div>
       </div>
+      <CompPlanForm
+        siteId={site.id}
+        canGrant={admin?.role === "SUPER"}
+        currentPlan={org.compPlanKey === "STARTER" || org.compPlanKey === "GROWTH" || org.compPlanKey === "PRO" ? org.compPlanKey : null}
+        grantedBy={org.compGrantedBy}
+        grantedAt={org.compGrantedAt}
+        note={org.compNote}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Usage</h2>
