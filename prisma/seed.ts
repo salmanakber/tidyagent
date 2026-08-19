@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 const PLANS: { key: PlanKey; name: string; conversationLimit: number; knowledgeLimit: number; voiceEnabled: boolean; advancedToolsEnabled: boolean; automationEnabled: boolean }[] = [
   { key: "FREE", name: "Free", conversationLimit: 100, knowledgeLimit: 50, voiceEnabled: false, advancedToolsEnabled: false, automationEnabled: false },
   { key: "STARTER", name: "Starter", conversationLimit: 1000, knowledgeLimit: 250, voiceEnabled: false, advancedToolsEnabled: false, automationEnabled: true },
-  { key: "GROWTH", name: "Growth", conversationLimit: 5000, knowledgeLimit: 1000, voiceEnabled: true, advancedToolsEnabled: true, automationEnabled: true },
+  { key: "GROWTH", name: "Business", conversationLimit: 5000, knowledgeLimit: 1000, voiceEnabled: false, advancedToolsEnabled: true, automationEnabled: true },
   { key: "PRO", name: "Pro", conversationLimit: 25000, knowledgeLimit: 5000, voiceEnabled: true, advancedToolsEnabled: true, automationEnabled: true },
 ];
 

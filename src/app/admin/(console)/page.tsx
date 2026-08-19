@@ -31,7 +31,7 @@ export default async function AdminOverviewPage() {
           <dl className="mt-5 space-y-3 text-sm">
             <Row label="Free" value={data.planMix.FREE} />
             <Row label="Starter" value={data.planMix.STARTER} />
-            <Row label="Growth" value={data.planMix.GROWTH} />
+            <Row label="Business" value={data.planMix.GROWTH} />
             <Row label="Pro" value={data.planMix.PRO} />
             <Row label="Cancel at period end" value={data.canceling} />
             <Row label="Billing issue / past due" value={data.pastDue} />

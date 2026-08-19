@@ -28,7 +28,7 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
     throw new Error("Agent not found");
   }
 
-  const { widgetAvatarUrl, ...rest } = data;
+  const { widgetAvatarUrl, widgetEmbedMode, ...rest } = data;
   await prisma.agent.update({
     where: {
       id: workspace.agent.id,
@@ -36,9 +36,15 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
     },
     data: {
       ...rest,
+      ...(widgetEmbedMode !== undefined ? { widgetEmbedMode } : {}),
       ...(widgetAvatarUrl !== undefined ? { widgetAvatarUrl: widgetAvatarUrl || null } : {}),
     },
   });
+
+  if (widgetEmbedMode) {
+    const { embedSiteWidget } = await import("@/modules/wix/embed");
+    await embedSiteWidget(session.wixInstanceId, widgetEmbedMode === "MANUAL");
+  }
 
   revalidatePath("/agent");
   revalidatePath("/settings");
@@ -104,6 +110,8 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
       where: { organizationId: session.organizationId, siteId: session.siteId },
       data: { status: "ACTIVE", publishedAt: new Date() },
     });
+    const { embedSiteWidget } = await import("@/modules/wix/embed");
+    await embedSiteWidget(session.wixInstanceId, false);
   }
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");

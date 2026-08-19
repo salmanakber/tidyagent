@@ -32,7 +32,23 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
+    const widgetCors = [
+      { key: "Access-Control-Allow-Origin", value: "*" },
+      { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
+    ];
     return [
+      { source: "/widget.js", headers: widgetCors },
+      { source: "/widget/:path*", headers: widgetCors },
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "frame-ancestors 'self' https://manage.wix.com https://www.wix.com https://*.wix.com https://*.editor.wix.com https://*.studio.wix.com https://*.harmony.wix.com",
+          },
+        ],
+      },
       {
         source: "/api/:path*",
         headers: [

@@ -23,12 +23,12 @@ export default async function AdminBillingPage() {
         <div className="mt-5 grid gap-3 sm:grid-cols-4 text-sm">
           <Mix label="Free" value={data.planMix.FREE} />
           <Mix label="Starter" value={data.planMix.STARTER} />
-          <Mix label="Growth" value={data.planMix.GROWTH} />
+          <Mix label="Business" value={data.planMix.GROWTH} />
           <Mix label="Pro" value={data.planMix.PRO} />
         </div>
         <p className="mt-6 text-sm leading-6 text-navy-300">
           Trial → first charge has no Wix webhook. Use Sync Wix billing on a site, or wait for the owner to reopen the
-          dashboard (Get App Instance). Map each Wix Pricing plan ID with WIX_VENDOR_PRODUCT_STARTER / GROWTH / PRO.
+          dashboard (Get App Instance). Map each Wix Pricing plan ID with WIX_VENDOR_PRODUCT_STARTER / BUSINESS / PRO.
         </p>
       </div>
     </div>

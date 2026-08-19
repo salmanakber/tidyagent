@@ -17,7 +17,7 @@ import { WidgetSimulator } from "@/components/marketing/WidgetSimulator";
 const NAV_LINKS = [
   { href: "#product", label: "Product" },
   { href: "#how", label: "How it works" },
-  { href: "#built-for", label: "Industries" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 const FEATURES = [
@@ -116,8 +116,8 @@ export function Landing() {
                 Get started
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
-              <Link href="/login" className="btn-secondary">
-                Sign in
+              <Link href="/pricing" className="btn-secondary">
+                View plans
               </Link>
             </div>
             <ul className="mt-8 space-y-2.5">

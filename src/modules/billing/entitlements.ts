@@ -36,7 +36,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
   GROWTH: {
     conversationLimit: 5000,
     knowledgeLimit: 1000,
-    voiceEnabled: true,
+    voiceEnabled: false,
     advancedToolsEnabled: true,
     automationEnabled: true,
   },

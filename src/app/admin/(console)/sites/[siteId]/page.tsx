@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { SiteAdminActions } from "@/components/admin/SiteAdminActions";
 import { relativeTime } from "@/lib/utils";
+import { planLabel } from "@/modules/billing/catalog";
 
 export default async function AdminSiteDetailPage({
   params,
@@ -49,7 +50,7 @@ export default async function AdminSiteDetailPage({
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Wix subscription</h2>
           <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Plan" value={subscription?.planKey ?? "FREE"} />
+            <Row label="Plan" value={subscription ? planLabel(subscription.planKey) : "Free"} />
             <Row label="Status" value={subscription?.status ?? "NONE"} />
             <Row label="vendorProductId" value={subscription?.vendorProductId || "—"} />
             <Row label="Cycle" value={subscription?.billingCycle || "—"} />

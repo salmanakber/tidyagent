@@ -68,6 +68,17 @@ describe("Wix purchase lifecycle", () => {
     expect(entitlements.isPaidSeat).toBe(true);
   });
 
+  it("maps Wix Business pricing names to the Business seat", () => {
+    const derived = applyPaidPlanPurchased({
+      eventType: "PaidPlanPurchased",
+      vendorProductId: "Business",
+      expiresOn: "2030-01-01T00:00:00.000Z",
+    });
+    expect(derived.planKey).toBe("GROWTH");
+    expect(derived.isFree).toBe(false);
+    expect(derived.status).toBe("ACTIVE");
+  });
+
   it("classifies Wix billing webhooks", () => {
     expect(classifyWixEvent("AppInstancePaidPlanPurchased")).toBe("purchased");
     expect(classifyWixEvent("PaidPlanChanged")).toBe("changed");

@@ -20,5 +20,8 @@ describe("entitlements", () => {
     expect(server.voiceEnabled).toBe(false);
     expect(server.advancedToolsEnabled).toBe(false);
     expect(mapWixPackageToPlan("growth-yearly")).toBe("GROWTH");
+    expect(mapWixPackageToPlan("business-monthly")).toBe("GROWTH");
+    expect(mapWixPackageToPlan("Starter")).toBe("STARTER");
+    expect(mapWixPackageToPlan("Pro")).toBe("PRO");
   });
 });

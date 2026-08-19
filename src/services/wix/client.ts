@@ -1,5 +1,5 @@
 import { createClient, AppStrategy } from "@wix/sdk";
-import { appInstances } from "@wix/app-management";
+import { appInstances, embeddedScripts, billing } from "@wix/app-management";
 import { products } from "@wix/stores";
 import { getEnv } from "@/lib/env";
 
@@ -18,6 +18,8 @@ export function createWixAppClient(instanceId: string) {
     }),
     modules: {
       appInstances,
+      embeddedScripts,
+      billing,
       products,
     },
   });

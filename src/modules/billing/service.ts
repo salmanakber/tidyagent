@@ -44,13 +44,13 @@ export async function applyWixBillingWebhook(envelope: WixWebhookEnvelope) {
   if (!instanceId) throw new Error("Webhook missing instanceId");
 
   const eventType = envelope.eventType ?? envelope.metadata?.eventType ?? "unknown";
-  const data = (envelope.data ?? {}) as Record<string, unknown>;
+  const data = flattenWebhookData(envelope.data);
   const kind = classifyWixEvent(eventType);
 
   await persistBillingEvent({
     wixInstanceId: instanceId,
     eventType,
-    vendorProductId: typeof data.vendorProductId === "string" ? data.vendorProductId : null,
+    vendorProductId: vendorProductFrom(data) ?? vendorProductFrom(envelope as unknown as Record<string, unknown>),
     payload: envelope as Prisma.InputJsonValue,
   });
 
@@ -65,9 +65,9 @@ export async function applyWixBillingWebhook(envelope: WixWebhookEnvelope) {
   const snapshot = await fetchWixAppInstance(instanceId).catch(() => null);
   const event: BillingEventInput = {
     eventType,
-    vendorProductId: asString(data.vendorProductId),
-    cycle: asString(data.cycle),
-    expiresOn: asString(data.expiresOn),
+    vendorProductId: vendorProductFrom(data) ?? vendorProductFrom(envelope as unknown as Record<string, unknown>),
+    cycle: asString(data.cycle) ?? asString(data.billingCycle),
+    expiresOn: asString(data.expiresOn) ?? asString(data.expirationDate),
     invoiceId: asString(data.invoiceId),
     couponName: asString(data.couponName),
     previousVendorProductId: asString(data.previousVendorProductId),
@@ -227,4 +227,23 @@ export async function entitlementsForOrganization(organizationId: string): Promi
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function flattenWebhookData(data?: Record<string, unknown>) {
+  const base = { ...(data ?? {}) };
+  const nested = base.payload;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return { ...base, ...(nested as Record<string, unknown>) };
+  }
+  return base;
+}
+
+function vendorProductFrom(data?: Record<string, unknown> | null) {
+  if (!data) return null;
+  return (
+    asString(data.vendorProductId) ??
+    asString(data.packageName) ??
+    asString(data.productId) ??
+    asString(data.planId)
+  );
 }

@@ -1,6 +1,8 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
-import { getEnv } from "@/lib/env";
+import { getAppOrigin, getEnv } from "@/lib/env";
+
+export const SESSION_COOKIE = "tidyagent_session";
 
 export const SESSION_COOKIE = "tidyagent_session";
 
@@ -53,16 +55,22 @@ export async function readSessionToken(token: string): Promise<AppSession | null
   }
 }
 
+export function sessionCookieOptions() {
+  const https = getAppOrigin().startsWith("https") || getEnv().NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    path: "/",
+    maxAge: 60 * 60 * 12,
+    secure: https,
+    sameSite: (https ? "none" : "lax") as "lax" | "none",
+    partitioned: https,
+  };
+}
+
 export async function setSessionCookie(session: AppSession) {
   const token = await createSessionToken(session);
   const store = await cookies();
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: getEnv().NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
+  store.set(SESSION_COOKIE, token, sessionCookieOptions());
 }
 
 export async function clearSessionCookie() {

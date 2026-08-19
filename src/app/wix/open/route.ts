@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { completeWixLogin } from "@/modules/auth/wix-open";
-import { createSessionToken, SESSION_COOKIE } from "@/lib/security/session";
-import { getAppOrigin, getEnv } from "@/lib/env";
+import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/security/session";
+import { getAppOrigin } from "@/lib/env";
 
 export async function GET(request: Request) {
   const origin = getAppOrigin();
@@ -21,13 +21,7 @@ export async function GET(request: Request) {
     const { session, destination } = await completeWixLogin(instance);
     const token = await createSessionToken(session);
     const response = NextResponse.redirect(new URL(destination, origin));
-    response.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: origin.startsWith("https") || getEnv().NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 12,
-    });
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch {
     return NextResponse.redirect(new URL("/wix/missing?error=invalid", origin));

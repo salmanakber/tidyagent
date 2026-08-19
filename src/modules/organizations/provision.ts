@@ -180,6 +180,9 @@ export async function provisionTenantFromWix(input: ProvisionInput): Promise<App
     throw new Error("Failed to provision tenant");
   }
 
+  const { embedSiteWidget } = await import("@/modules/wix/embed");
+  await embedSiteWidget(instanceId, false);
+
   return {
     userId: user.id,
     organizationId,

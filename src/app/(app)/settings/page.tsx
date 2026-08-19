@@ -4,6 +4,9 @@ import { getDashboardOverview } from "@/modules/analytics/overview";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { AgentStudio } from "@/components/agent/AgentStudio";
+import { WidgetInstallCard } from "@/components/widget/WidgetInstallCard";
+import { getAppOrigin } from "@/lib/env";
+import { planLabel } from "@/modules/billing/catalog";
 
 export default async function SettingsPage() {
   const session = await getSession();
@@ -39,7 +42,7 @@ export default async function SettingsPage() {
             Frontend plan badges are never trusted. Entitlements are enforced on the backend.
           </p>
           <dl className="mt-5 space-y-3 text-sm">
-            <Row label="Plan" value={data.entitlements.planKey} />
+            <Row label="Plan" value={planLabel(data.entitlements.planKey)} />
             <Row label="Conversations" value={String(data.entitlements.conversationLimit)} />
             <Row label="Knowledge" value={String(data.entitlements.knowledgeLimit)} />
             <Row label="Voice" value={data.entitlements.voiceEnabled ? "On" : "Off"} />
@@ -47,21 +50,24 @@ export default async function SettingsPage() {
         </div>
       </div>
       {data.agent ? (
-        <AgentStudio
-          agent={{
-            id: data.agent.id,
-            name: data.agent.name,
-            role: data.agent.role,
-            personality: data.agent.personality,
-            status: data.agent.status,
-            widgetPrimaryColor: data.agent.widgetPrimaryColor,
-            widgetGreeting: data.agent.widgetGreeting,
-            widgetPosition: data.agent.widgetPosition,
-            widgetEmbedMode: data.agent.widgetEmbedMode,
-            widgetAvatarUrl: data.agent.widgetAvatarUrl,
-            capabilities: data.agent.capabilities,
-          }}
-        />
+        <>
+          <WidgetInstallCard instanceId={session.wixInstanceId} appOrigin={getAppOrigin()} />
+          <AgentStudio
+            agent={{
+              id: data.agent.id,
+              name: data.agent.name,
+              role: data.agent.role,
+              personality: data.agent.personality,
+              status: data.agent.status,
+              widgetPrimaryColor: data.agent.widgetPrimaryColor,
+              widgetGreeting: data.agent.widgetGreeting,
+              widgetPosition: data.agent.widgetPosition,
+              widgetEmbedMode: data.agent.widgetEmbedMode,
+              widgetAvatarUrl: data.agent.widgetAvatarUrl,
+              capabilities: data.agent.capabilities,
+            }}
+          />
+        </>
       ) : null}
     </div>
   );

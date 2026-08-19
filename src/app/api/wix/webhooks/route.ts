@@ -82,7 +82,13 @@ function normalizeEnvelope(payload: Record<string, unknown>): WixWebhookEnvelope
 }
 
 function asVendor(envelope: WixWebhookEnvelope) {
-  const value = envelope.data?.vendorProductId;
+  const data = envelope.data ?? {};
+  const nested = data.payload;
+  const merged =
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? { ...data, ...(nested as Record<string, unknown>) }
+      : data;
+  const value = merged.vendorProductId ?? merged.packageName ?? merged.productId;
   return typeof value === "string" ? value : null;
 }
 
