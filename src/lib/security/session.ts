@@ -4,8 +4,6 @@ import { getAppOrigin, getEnv } from "@/lib/env";
 
 export const SESSION_COOKIE = "tidyagent_session";
 
-export const SESSION_COOKIE = "tidyagent_session";
-
 export type SessionRole = "OWNER" | "ADMIN" | "MEMBER";
 
 export type AppSession = {

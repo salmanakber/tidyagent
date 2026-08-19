@@ -43,6 +43,7 @@ export default async function BillingPage() {
           from Wix after day 7, or just reopen the dashboard.
         </div>
       ) : null}
+      {e.cancelAtPeriodEnd ? (
         <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
           Auto-renewal is off. You keep paid features until the current Wix billing period ends.
         </div>
