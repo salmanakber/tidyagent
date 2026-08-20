@@ -28,7 +28,7 @@ export default async function OnboardingPage() {
       siteUrl={workspace.site.url}
       planLabel={planLabel(entitlements.planKey)}
       scopeNote={scope.depthNote}
-      capabilities={capabilities}
+      capabilities={capabilities.filter((item) => item.available)}
       agentName={workspace.agent?.name ?? "Sarah"}
       greeting={workspace.agent?.widgetGreeting ?? "Hi! How can I help you today?"}
       color={workspace.agent?.widgetPrimaryColor ?? "#1F3A5F"}

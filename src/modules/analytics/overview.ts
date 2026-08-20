@@ -6,7 +6,7 @@ import type { KnowledgeContentType } from "@prisma/client";
 
 export async function getDashboardOverview(session: AppSession) {
   const workspace = await getWorkspace(session);
-  const { organization, site, profile, agent } = workspace;
+  const { organization, site, profile, agent, agents } = workspace;
 
   const [conversationCount, resolvedCount, escalationCount, leadCount, unanswered, knowledge] =
     await Promise.all([
@@ -70,11 +70,34 @@ export async function getDashboardOverview(session: AppSession) {
           widgetPosition: agent.widgetPosition,
           widgetGreeting: agent.widgetGreeting,
           widgetEmbedMode: agent.widgetEmbedMode,
+          widgetTemplate: agent.widgetTemplate,
+          voiceEnabled: agent.voiceEnabled,
+          isPrimary: agent.isPrimary,
+          specialty: agent.specialty,
+          knowledgeScopes: agent.knowledgeScopes,
           capabilities: agent.capabilities,
           rules: agent.rules,
           toolPermissions: agent.toolPermissions,
         }
       : null,
+    agents: agents.map((row) => ({
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      personality: row.personality,
+      status: row.status,
+      widgetPrimaryColor: row.widgetPrimaryColor,
+      widgetAvatarUrl: row.widgetAvatarUrl,
+      widgetPosition: row.widgetPosition,
+      widgetGreeting: row.widgetGreeting,
+      widgetEmbedMode: row.widgetEmbedMode,
+      widgetTemplate: row.widgetTemplate,
+      voiceEnabled: row.voiceEnabled,
+      isPrimary: row.isPrimary,
+      specialty: row.specialty,
+      knowledgeScopes: row.knowledgeScopes,
+      capabilities: row.capabilities,
+    })),
     entitlements,
     metrics: {
       conversations: conversationCount,

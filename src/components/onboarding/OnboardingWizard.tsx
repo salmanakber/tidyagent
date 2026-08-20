@@ -160,7 +160,15 @@ export function OnboardingWizard({
         {step === 5 && (
           <Step title="How should the employee spend its time?" body="We’ll recommend the rest from the site scan. You can change this later in Agent Studio.">
             <div className="grid gap-2 sm:grid-cols-2">
-              {FOCUS_OPTIONS.map((option) => {
+              {FOCUS_OPTIONS.filter((option) => {
+                if (option.key === "product_recommendations") {
+                  return capabilities.some((item) => item.key === "products" || item.key === "product_search");
+                }
+                if (option.key === "bookings") {
+                  return capabilities.some((item) => item.key === "bookings");
+                }
+                return true;
+              }).map((option) => {
                 const selected = focus.includes(option.key);
                 return (
                   <button

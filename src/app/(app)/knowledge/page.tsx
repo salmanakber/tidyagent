@@ -7,6 +7,7 @@ import { SiteScanPanel } from "@/components/knowledge/SiteScanPanel";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { knowledgeCardsForSite, siteFactsFromApps } from "@/modules/knowledge/site-facts";
 
 export const maxDuration = 120;
 
@@ -17,13 +18,16 @@ export default async function KnowledgePage() {
   const entitlements = await entitlementsForOrganization(session.organizationId);
   const scope = scanScopeForPlan(entitlements.planKey);
 
-  const cards = [
-    { label: "Website", value: data.knowledge.pages, hint: "pages" },
-    { label: "Products", value: data.knowledge.products, hint: "products" },
-    { label: "FAQs", value: data.knowledge.faqs, hint: "FAQs" },
-    { label: "Policies", value: data.knowledge.policies, hint: "policies" },
-    { label: "Custom knowledge", value: data.knowledge.custom, hint: "notes" },
-  ];
+  const facts = siteFactsFromApps(data.site.installedWixApps);
+  const cards = knowledgeCardsForSite({
+    hasStores: facts.hasStores,
+    hasBookings: facts.hasBookings,
+    pages: data.knowledge.pages,
+    products: data.knowledge.products,
+    faqs: data.knowledge.faqs,
+    policies: data.knowledge.policies,
+    custom: data.knowledge.custom,
+  });
 
   return (
     <div className="space-y-8">

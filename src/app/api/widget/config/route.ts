@@ -54,6 +54,8 @@ export async function GET(request: Request) {
       avatarUrl: avatar,
       position: agent.widgetPosition,
       status: live ? agent.status : "LOCKED",
+      template: agent.widgetTemplate || "CLASSIC",
+      voiceEnabled: Boolean(live && entitlements.voiceEnabled && agent.voiceEnabled),
     },
     { headers: { ...corsHeaders(), "Cache-Control": "no-store" } },
   );
@@ -77,7 +79,7 @@ async function agentFromInstance(instanceId: string) {
     where: { wixInstanceId: instanceId },
     include: {
       organization: true,
-      agents: { orderBy: { createdAt: "asc" }, take: 1 },
+      agents: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
     },
   });
   const agent = site?.agents[0];
@@ -92,7 +94,7 @@ async function agentFromSiteHost(host: string) {
     where: { connectionStatus: "connected" },
     include: {
       organization: true,
-      agents: { orderBy: { createdAt: "asc" }, take: 1 },
+      agents: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
     },
     take: 200,
   });

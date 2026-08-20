@@ -57,6 +57,21 @@ enum WidgetEmbedMode {
   MANUAL
 }
 
+enum WidgetTemplate {
+  CLASSIC
+  SOFT
+  BAR
+  MINIMAL
+}
+
+enum AgentSpecialty {
+  GENERAL
+  ECOMMERCE
+  SUPPORT
+  BOOKINGS
+  CONTENT
+}
+
 enum KnowledgeContentType {
   PAGE
   PRODUCT
@@ -362,6 +377,11 @@ model Agent {
   widgetPosition      WidgetPosition @default(BOTTOM_RIGHT)
   widgetGreeting      String         @default("Hi! How can I help you today?")
   widgetEmbedMode     WidgetEmbedMode @default(AUTO)
+  widgetTemplate      WidgetTemplate @default(CLASSIC)
+  voiceEnabled        Boolean        @default(true)
+  isPrimary           Boolean        @default(false)
+  specialty           AgentSpecialty @default(GENERAL)
+  knowledgeScopes     String[]       @default(["PAGE", "FAQ", "POLICY", "CUSTOM"])
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 

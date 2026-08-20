@@ -3,7 +3,6 @@ import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { AgentStudio } from "@/components/agent/AgentStudio";
 import { planLabel } from "@/modules/billing/catalog";
 
 export default async function SettingsPage() {
@@ -48,21 +47,13 @@ export default async function SettingsPage() {
         </div>
       </div>
       {data.agent ? (
-        <AgentStudio
-            agent={{
-              id: data.agent.id,
-              name: data.agent.name,
-              role: data.agent.role,
-              personality: data.agent.personality,
-              status: data.agent.status,
-              widgetPrimaryColor: data.agent.widgetPrimaryColor,
-              widgetGreeting: data.agent.widgetGreeting,
-              widgetPosition: data.agent.widgetPosition,
-              widgetEmbedMode: data.agent.widgetEmbedMode,
-              widgetAvatarUrl: data.agent.widgetAvatarUrl,
-              capabilities: data.agent.capabilities,
-            }}
-          />
+        <p className="text-sm text-navy-300">
+          Widget appearance lives in{" "}
+          <a href="/agent" className="text-amber-300">
+            AI Agent
+          </a>
+          . Voice is {data.entitlements.voiceEnabled ? "included on this plan" : "a Pro feature"}.
+        </p>
       ) : null}
     </div>
   );

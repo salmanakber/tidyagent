@@ -8,6 +8,7 @@ import { getWorkspace } from "@/modules/organizations/workspace";
 import { requireKnowledgeCapacity, requirePaidSeat } from "@/modules/billing/guard";
 
 const agentUpdateSchema = z.object({
+  agentId: z.string().optional(),
   name: z.string().min(1).max(60).optional(),
   role: z.string().min(1).max(80).optional(),
   personality: z.enum(["friendly", "professional", "casual", "custom"]).optional(),
@@ -16,23 +17,32 @@ const agentUpdateSchema = z.object({
   widgetGreeting: z.string().min(1).max(160).optional(),
   widgetPosition: z.enum(["BOTTOM_RIGHT", "BOTTOM_LEFT"]).optional(),
   widgetEmbedMode: z.enum(["AUTO", "MANUAL"]).optional(),
+  widgetTemplate: z.enum(["CLASSIC", "SOFT", "BAR", "MINIMAL"]).optional(),
   widgetAvatarUrl: z.union([z.string().url(), z.literal("")]).optional(),
+  voiceEnabled: z.boolean().optional(),
+  specialty: z.enum(["GENERAL", "ECOMMERCE", "SUPPORT", "BOOKINGS", "CONTENT"]).optional(),
+  knowledgeScopes: z.array(z.enum(["PAGE", "PRODUCT", "FAQ", "POLICY", "CUSTOM", "SERVICE"])).optional(),
   focus: z.array(z.string()).optional(),
 });
 
 export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   const session = await requireSession();
-  await requirePaidSeat(session);
+  const entitlements = await requirePaidSeat(session);
   const data = agentUpdateSchema.parse(input);
   const workspace = await getWorkspace(session);
-  if (!workspace.agent) {
+  const target =
+    workspace.agents.find((agent) => agent.id === data.agentId) ?? workspace.agent;
+  if (!target) {
     throw new Error("Agent not found");
   }
+  if (data.voiceEnabled && !entitlements.voiceEnabled) {
+    throw new Error("Voice is included on Pro.");
+  }
 
-  const { widgetAvatarUrl, widgetEmbedMode, ...rest } = data;
+  const { widgetAvatarUrl, widgetEmbedMode, agentId: _id, ...rest } = data;
   await prisma.agent.update({
     where: {
-      id: workspace.agent.id,
+      id: target.id,
       organizationId: session.organizationId,
     },
     data: {
@@ -50,6 +60,75 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   revalidatePath("/agent");
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+}
+
+export async function createSpecialistAgent(input: {
+  name: string;
+  specialty: "ECOMMERCE" | "SUPPORT" | "BOOKINGS" | "CONTENT";
+  knowledgeScopes?: ("PAGE" | "PRODUCT" | "FAQ" | "POLICY" | "CUSTOM" | "SERVICE")[];
+}) {
+  const session = await requireSession();
+  const entitlements = await requirePaidSeat(session);
+  const { maxAgentsForPlan, scopesForSpecialty } = await import("@/modules/agents/team");
+  const { siteFactsFromApps } = await import("@/modules/knowledge/site-facts");
+  const workspace = await getWorkspace(session);
+  const limit = maxAgentsForPlan(entitlements.planKey);
+  if (workspace.agents.length >= limit) {
+    throw new Error(`This plan allows ${limit} agent${limit === 1 ? "" : "s"}.`);
+  }
+  const facts = siteFactsFromApps(workspace.site.installedWixApps);
+  if (input.specialty === "ECOMMERCE" && !facts.hasStores) {
+    throw new Error("This site does not have Wix Stores, so a store agent cannot be added.");
+  }
+  if (input.specialty === "BOOKINGS" && !facts.hasBookings) {
+    throw new Error("This site does not have Wix Bookings, so a bookings agent cannot be added.");
+  }
+  const name = z.string().min(1).max(60).parse(input.name);
+  const scopes = input.knowledgeScopes?.length
+    ? input.knowledgeScopes.filter((scope) => facts.contentTypes.includes(scope))
+    : scopesForSpecialty(input.specialty, facts.contentTypes);
+
+  await prisma.agent.create({
+    data: {
+      organizationId: session.organizationId,
+      siteId: session.siteId,
+      name,
+      role:
+        input.specialty === "ECOMMERCE"
+          ? "Store specialist"
+          : input.specialty === "BOOKINGS"
+            ? "Bookings specialist"
+            : input.specialty === "SUPPORT"
+              ? "Support specialist"
+              : "Content specialist",
+      personality: workspace.agent?.personality ?? "friendly",
+      status: workspace.agent?.status === "ACTIVE" ? "ACTIVE" : "DRAFT",
+      isPrimary: false,
+      specialty: input.specialty,
+      knowledgeScopes: scopes,
+      widgetPrimaryColor: workspace.agent?.widgetPrimaryColor ?? "#1F3A5F",
+      widgetGreeting: `Hi, I’m ${name}. I can help with this.`,
+      widgetPosition: workspace.agent?.widgetPosition ?? "BOTTOM_RIGHT",
+      widgetTemplate: workspace.agent?.widgetTemplate ?? "CLASSIC",
+      voiceEnabled: workspace.agent?.voiceEnabled ?? true,
+    },
+  });
+  revalidatePath("/agent");
+}
+
+export async function deleteAgent(agentId: string) {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const workspace = await getWorkspace(session);
+  const target = workspace.agents.find((agent) => agent.id === agentId);
+  if (!target) throw new Error("Agent not found");
+  if (target.isPrimary || workspace.agents.length === 1) {
+    throw new Error("The general agent cannot be removed.");
+  }
+  await prisma.agent.delete({
+    where: { id: target.id, organizationId: session.organizationId },
+  });
+  revalidatePath("/agent");
 }
 
 export async function toggleRule(ruleId: string, enabled: boolean) {

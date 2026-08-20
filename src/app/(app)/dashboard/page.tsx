@@ -42,11 +42,8 @@ export default async function DashboardPage() {
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Top questions</h2>
           <div className="mt-5 space-y-3">
-            {(data.topQuestions.length ? data.topQuestions : [
-              { topic: "Shipping", question: "Do you deliver to my area?", occurrences: 8 },
-              { topic: "Sizing", question: "What size should I buy?", occurrences: 5 },
-              { topic: "Returns", question: "How do returns work?", occurrences: 4 },
-            ]).map((item, index) => (
+            {data.topQuestions.length ? (
+              data.topQuestions.map((item, index) => (
               <div key={item.topic} className="flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3">
                 <div>
                   <p className="text-sm text-white">
@@ -56,7 +53,10 @@ export default async function DashboardPage() {
                 </div>
                 <span className="text-xs text-amber-300">{item.occurrences}×</span>
               </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-navy-300">Questions from live chats will show here after visitors start talking.</p>
+            )}
           </div>
         </div>
         <div className="panel p-6">

@@ -116,11 +116,11 @@ function ScanSummary({
           </div>
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Pages" value={result.counts.pages} />
-        <Stat label="Products" value={result.counts.products} />
-        <Stat label="FAQs" value={result.counts.faqs} />
-        <Stat label="Policies" value={result.counts.policies} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {result.counts.pages > 0 ? <Stat label="Pages" value={result.counts.pages} /> : null}
+        {result.counts.products > 0 ? <Stat label="Products" value={result.counts.products} /> : null}
+        {result.counts.faqs > 0 ? <Stat label="FAQs" value={result.counts.faqs} /> : null}
+        {result.counts.policies > 0 ? <Stat label="Policies" value={result.counts.policies} /> : null}
       </div>
       {understanding ? (
         <div className="rounded-2xl border border-white/10 p-4">

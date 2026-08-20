@@ -1,9 +1,10 @@
-import type { KnowledgeContentType } from "@prisma/client";
+import type { AgentSpecialty, KnowledgeContentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAIProvider } from "@/modules/ai/factory";
 import { retrieveKnowledgeChunks } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
 
 const OPENER =
@@ -42,6 +43,25 @@ export async function replyToVisitor(input: {
   }
 
   const conversation = await getOrCreateConversation(input);
+  const team = await prisma.agent.findMany({
+    where: { organizationId: input.agent.organizationId, siteId: input.agent.siteId },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+  });
+  const current =
+    team.find((row) => row.id === conversation.agentId) ??
+    team.find((row) => row.isPrimary) ??
+    input.agent;
+  const intent = isCasualOpener(message) ? "GENERAL" : classifyVisitorIntent(message);
+  const routed = pickAgentForIntent(team, intent) ?? current;
+  const handedOff = routed.id !== current.id && !isCasualOpener(message);
+
+  if (handedOff) {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { agentId: routed.id },
+    });
+  }
+
   await prisma.message.create({
     data: {
       organizationId: input.agent.organizationId,
@@ -63,6 +83,7 @@ export async function replyToVisitor(input: {
         siteId: input.agent.siteId,
         question: message,
         includeStores: scope.includeStores,
+        contentTypes: routed.knowledgeScopes as KnowledgeContentType[],
       });
 
   const history = await prisma.message.findMany({
@@ -72,9 +93,10 @@ export async function replyToVisitor(input: {
   });
 
   const text = await generateReply({
-    agentName: input.agent.name,
-    role: input.agent.role,
-    personality: input.agent.personality,
+    agentName: routed.name,
+    role: routed.role,
+    personality: routed.personality,
+    specialty: routed.specialty,
     businessName,
     summary: profile?.summary || "",
     industry: profile?.industry || "",
@@ -82,6 +104,7 @@ export async function replyToVisitor(input: {
     greeting: isCasualOpener(message),
     evidence,
     history: history.map((row) => ({ role: row.role, content: row.content })),
+    handoffFrom: handedOff ? current.name : null,
   });
 
   await prisma.message.create({
@@ -98,7 +121,17 @@ export async function replyToVisitor(input: {
     data: { lastMessageAt: new Date() },
   });
 
-  return { conversationId: conversation.id, text };
+  return {
+    conversationId: conversation.id,
+    text,
+    agent: {
+      id: routed.id,
+      name: routed.name,
+      specialty: routed.specialty,
+      avatarUrl: routed.widgetAvatarUrl,
+    },
+    handoff: handedOff ? { from: current.name, to: routed.name, specialty: routed.specialty } : null,
+  };
 }
 
 async function getOrCreateConversation(input: {
@@ -133,8 +166,14 @@ async function gatherEvidence(input: {
   siteId: string;
   question: string;
   includeStores: boolean;
+  contentTypes?: KnowledgeContentType[];
 }) {
-  const typeFilter = input.includeStores ? undefined : ({ not: "PRODUCT" as KnowledgeContentType });
+  const scopedTypes = (input.contentTypes ?? []).filter(Boolean);
+  const contentTypeWhere = scopedTypes.length
+    ? { contentType: { in: scopedTypes } }
+    : input.includeStores
+      ? {}
+      : { contentType: { not: "PRODUCT" as KnowledgeContentType } };
   const terms = input.question
     .replace(/[%_]/g, "")
     .split(/\s+/)
@@ -149,7 +188,7 @@ async function gatherEvidence(input: {
           where: {
             organizationId: input.organizationId,
             siteId: input.siteId,
-            ...(typeFilter ? { contentType: typeFilter } : {}),
+            ...contentTypeWhere,
             OR: terms.flatMap((term) => [
               { content: { contains: term, mode: "insensitive" as const } },
               { title: { contains: term, mode: "insensitive" as const } },
@@ -177,7 +216,10 @@ async function gatherEvidence(input: {
   }
 
   const merged = [...keywordHits, ...vectorHits]
-    .filter((row) => input.includeStores || row.contentType !== "PRODUCT")
+    .filter((row) => {
+      if (scopedTypes.length) return scopedTypes.includes(row.contentType as KnowledgeContentType);
+      return input.includeStores || row.contentType !== "PRODUCT";
+    })
     .reduce(
       (acc, row) => {
         const key = `${row.title}|${row.content.slice(0, 80)}`;
@@ -204,7 +246,7 @@ async function gatherEvidence(input: {
     where: {
       organizationId: input.organizationId,
       siteId: input.siteId,
-      ...(typeFilter ? { contentType: typeFilter } : {}),
+      ...contentTypeWhere,
     },
     take: 6,
     orderBy: { createdAt: "desc" },
@@ -216,6 +258,7 @@ async function generateReply(input: {
   agentName: string;
   role: string;
   personality: string;
+  specialty: AgentSpecialty;
   businessName: string;
   summary: string;
   industry: string;
@@ -223,9 +266,15 @@ async function generateReply(input: {
   greeting: boolean;
   evidence: { content: string; title: string | null; sourceUrl: string | null }[];
   history: { role: string; content: string }[];
+  handoffFrom: string | null;
 }) {
+  const intro = input.handoffFrom
+    ? `${input.handoffFrom} connected the visitor to you. Briefly introduce yourself as the specialist, then answer.`
+    : "";
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help you today?`
+    : input.handoffFrom
+      ? `I’m connecting you with ${input.agentName}, who handles this. ${input.evidence.length ? answerFromEvidence(input.question, input.evidence) : "They’ll take it from here."}`
     : input.evidence.length
       ? answerFromEvidence(input.question, input.evidence)
       : `I don’t have that on file for ${input.businessName} yet. I can connect you with the team to confirm.`;
@@ -243,15 +292,17 @@ async function generateReply(input: {
       temperature: input.greeting ? 0.4 : 0.2,
       maxTokens: 420,
       system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
+Specialty: ${input.specialty}. Stay inside that specialty and the evidence. If the question belongs to another team, say you are connecting them.
 You are a real customer-service employee for this Wix business, not a generic chatbot.
 Never invent prices, policies, hours, or products. Use only the business profile and evidence.
+${intro}
 If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
 If the question needs facts you do not have, say so plainly and offer a human handoff.`,
       prompt: `Business: ${input.businessName}
 Industry: ${input.industry || "unknown"}
 Profile: ${input.summary || "none"}
 
-Evidence from the site (plan-scoped):
+Evidence from the site (this agent’s assigned data only):
 ${evidenceBlock || "(none retrieved)"}
 
 Recent thread:

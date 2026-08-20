@@ -30,7 +30,7 @@ export async function getWorkspace(session: AppSession) {
           rules: true,
           toolPermissions: true,
         },
-        take: 1,
+        orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
       },
     },
   });
@@ -44,12 +44,23 @@ export async function getWorkspace(session: AppSession) {
     throw new TenantAccessError();
   }
 
+  const agents = organization.agents;
+  if (agents.length && !agents.some((row) => row.isPrimary)) {
+    await prisma.agent.update({
+      where: { id: agents[0].id },
+      data: { isPrimary: true },
+    });
+    agents[0] = { ...agents[0], isPrimary: true };
+  }
+  const agent = agents.find((row) => row.isPrimary) ?? agents[0] ?? null;
+
   return {
     organization,
     site,
     subscription: organization.subscriptions[0] ?? null,
     profile: organization.businessProfile,
-    agent: organization.agents[0] ?? null,
+    agent,
+    agents,
   };
 }
 

@@ -41,7 +41,7 @@ export function detectWixCapabilities(installedWixApps: string[]): DetectedCapab
     { key: "product_search", label: "Product search", available: hasStores, source: "wix-app" },
     { key: "cart", label: "Cart", available: hasStores, source: "wix-app" },
     { key: "orders", label: "Orders", available: hasStores, source: "wix-app" },
-    { key: "customer_data", label: "Customer data", available: true, source: "wix-app" },
+    { key: "customer_data", label: "Customer data", available: false, source: "wix-app" },
     { key: "bookings", label: "Bookings", available: hasBookings, source: "wix-app" },
     { key: "events", label: "Events", available: hasEvents, source: "wix-app" },
     { key: "blog", label: "Blog", available: hasBlog, source: "content" },

@@ -14,7 +14,7 @@ export async function resolveWidgetAgent(input: {
     return prisma.agent.findFirst({
       where: { organizationId: input.organizationId, siteId: input.siteId },
       include: { organization: true, site: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
     });
   }
   if (input.token) {
@@ -27,7 +27,7 @@ export async function resolveWidgetAgent(input: {
       where: { wixInstanceId: input.instanceId },
       include: {
         organization: true,
-        agents: { orderBy: { createdAt: "asc" }, take: 1 },
+        agents: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
       },
     });
     const agent = site?.agents[0];
@@ -41,7 +41,7 @@ export async function resolveWidgetAgent(input: {
       where: { connectionStatus: "connected" },
       include: {
         organization: true,
-        agents: { orderBy: { createdAt: "asc" }, take: 1 },
+        agents: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
       },
       take: 200,
     });
