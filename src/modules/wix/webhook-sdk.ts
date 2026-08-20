@@ -9,7 +9,10 @@ import { extractWixJwt, normalizePublicKey, parseWixWebhook } from "@/modules/bi
 
 type SdkEvent = {
   data?: unknown;
-  metadata?: { instanceId?: string; eventType?: string };
+  metadata?: {
+    instanceId?: string | null;
+    eventType?: string | null;
+  } | null;
 };
 
 type Processor = {
@@ -23,11 +26,13 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function envelopeFromSdk(event: SdkEvent, fallbackType: string): WixWebhookEnvelope {
+  const instanceId = event.metadata?.instanceId ?? undefined;
+  const eventType = event.metadata?.eventType ?? fallbackType;
   return {
-    eventType: event.metadata?.eventType ?? fallbackType,
-    instanceId: event.metadata?.instanceId,
+    eventType,
+    instanceId,
     data: asRecord(event.data),
-    metadata: event.metadata,
+    metadata: { instanceId, eventType },
   };
 }
 
