@@ -68,6 +68,16 @@ export const SPECIALTIES: {
   },
 ];
 
+export function specialtyAvailableOnSite(
+  specialty: (typeof SPECIALTIES)[number],
+  site: { hasStores: boolean; hasBookings: boolean },
+) {
+  if (specialty.key === "GENERAL") return false;
+  if (specialty.needs === "stores") return site.hasStores;
+  if (specialty.needs === "bookings") return site.hasBookings;
+  return true;
+}
+
 export function maxAgentsForPlan(planKey: PlanKey) {
   return PLAN_ENTITLEMENTS[planKey].maxAgents;
 }

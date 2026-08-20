@@ -50,6 +50,8 @@ export default async function AgentPage() {
         maxAgents={entitlements.maxAgents}
         hasStores={facts.hasStores}
         hasBookings={facts.hasBookings}
+        hasBlog={facts.hasBlog}
+        hasEvents={facts.hasEvents}
         contentTypes={facts.contentTypes}
         presentCapabilities={facts.toolsPresent.map((tool) => tool.key)}
       />

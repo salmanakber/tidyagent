@@ -89,6 +89,18 @@ body {
   }
 }
 
+.logo-mark-light {
+  display: none;
+}
+
+html.theme-light .logo-mark-dark {
+  display: none;
+}
+
+html.theme-light .logo-mark-light {
+  display: block;
+}
+
 html.theme-light {
   color-scheme: light;
 }

@@ -256,7 +256,32 @@ Work through this on a **premium test site**, Chrome + Safari, desktop and phone
 
 ---
 
-## 9. Submit
+## 9. Security & privacy disclaimer (Wix form)
+
+Click these unless you know a fact that contradicts them. Do not invent a DPO or a clean history.
+
+### Security Disclaimer
+
+| Question | Answer | Why |
+| --- | --- | --- |
+| Is access to Wix user data through your networks, operating systems and databases configured to prevent unauthorised access and changes? | **Yes** | HTTPS only. Signed Wix `instance` / session cookies. Every query is scoped to `organizationId`. Passwords are hashed. Widget tokens are site-scoped. API keys in settings are encrypted. |
+| Is Wix user data either fully pseudonymised, anonymised, encrypted, or a combination of these methods, both in transit and at rest? | **Yes** *if* the production disk/volume (or Postgres) is encrypted at rest | In transit: TLS on `agent.tidyflowapp.com` and all Wix/API calls. At rest: password hashes + AES-256-GCM for secrets. Site content and chats sit in Postgres — that counts as encrypted at rest only if the VPS volume/database has encryption enabled. Turn that on if it is not already, then answer Yes. |
+| Does your company or any of its subcontractors use cloud computing (including cloud hosting) to receive, process, host or access Wix user data? | **Yes** | The app is hosted in the cloud. Subprocessors include AI providers (Gemini / Groq / OpenAI), Cloudinary (photos), and Google TTS / Amazon Polly (voice). |
+
+If the database disk is **not** encrypted, answer **No** on the second question rather than guessing. Wix can ask how you encrypt at rest.
+
+### Privacy Disclaimer
+
+| Question | Answer | Why |
+| --- | --- | --- |
+| Do you sell consumer personal data? | **No** | Privacy Policy: chats and owner lists are not sold. |
+| Did your company receive any complaints, claims or notifications from any third parties with regard to your respective privacy compliance requirements? | **No** | Only if that is actually true for you. If you have had a complaint, click Yes. |
+| Did your company have a personal data breach or been investigated and/or fined by any data protection authority or been involved in litigation or claims relating to privacy or data protection? | **No** | Only if that is actually true. If there was a breach or investigation, click Yes. |
+| Is there a designated organizational structure or function responsible for data privacy or data protection (e.g. a DPO)? | **No** unless you have named a person | Support inbox is not automatically a DPO. If you appoint someone (even a founder) as privacy contact and they handle `/privacy` requests, you may click **Yes**. Otherwise **No**. |
+
+---
+
+## 10. Submit
 
 1. Fix every **blocker** in the app dashboard (listing, HTTPS, extensions, pricing).  
 2. Release the version that is on production (`agent.tidyflowapp.com`).  

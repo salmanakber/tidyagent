@@ -20,11 +20,18 @@ export function Logo({
           className="h-9 w-9 rounded-xl object-cover"
         />
       ) : (
-        <img
-          src="/images/logo.png"
-          alt="tidyAgent"
-          className="h-10 w-auto max-w-[200px] object-contain object-left"
-        />
+        <>
+          <img
+            src="/images/logo-white.png"
+            alt="tidyAgent"
+            className="logo-mark-dark h-10 w-auto max-w-[200px] object-contain object-left"
+          />
+          <img
+            src="/images/logo.png"
+            alt="tidyAgent"
+            className="logo-mark-light h-10 w-auto max-w-[200px] object-contain object-left"
+          />
+        </>
       )}
     </Link>
   );

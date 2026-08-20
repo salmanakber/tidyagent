@@ -40,6 +40,8 @@ export function AgentStudio({
   maxAgents = 1,
   hasStores = false,
   hasBookings = false,
+  hasBlog = false,
+  hasEvents = false,
   contentTypes = ["PAGE", "FAQ", "POLICY", "CUSTOM"],
   presentCapabilities,
 }: {
@@ -51,6 +53,8 @@ export function AgentStudio({
   maxAgents?: number;
   hasStores?: boolean;
   hasBookings?: boolean;
+  hasBlog?: boolean;
+  hasEvents?: boolean;
   contentTypes?: KnowledgeContentType[];
   presentCapabilities?: string[];
 }) {
@@ -249,6 +253,8 @@ export function AgentStudio({
           voiceOnPlan={voiceOnPlan}
           hasStores={hasStores}
           hasBookings={hasBookings}
+          hasBlog={hasBlog}
+          hasEvents={hasEvents}
           contentTypes={contentTypes}
         />
       </div>
