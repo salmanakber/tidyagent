@@ -50,6 +50,21 @@ describe("Wix webhook unwrap", () => {
     expect(envelope.instanceId).toBeUndefined();
   });
 
+  it("verifies a JWT even if Wix wraps it with newlines", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("RS256");
+    const spki = await exportSPKI(publicKey);
+    const jwt = await new SignJWT({
+      data: JSON.stringify({ eventType: "AppInstanceInstalled" }),
+    })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuedAt()
+      .sign(privateKey);
+
+    const wrapped = `${jwt.slice(0, 40)}\n${jwt.slice(40)}`;
+    const envelope = await parseWixWebhook(wrapped, spki, null);
+    expect(envelope.eventType).toBe("AppInstanceInstalled");
+  });
+
   it("finds a JWT in the raw body or Authorization header", () => {
     const jwt = `${"a".repeat(20)}.${"b".repeat(20)}.${"c".repeat(20)}`;
     expect(extractWixJwt(jwt, null)).toBe(jwt);

@@ -4,7 +4,7 @@ import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { fetchWixAppInstance } from "@/services/wix/client";
 import { applyWixBillingWebhook, type WixWebhookEnvelope } from "@/modules/billing/service";
 import { classifyWixEvent } from "@/modules/billing/lifecycle";
-import { parseWixWebhook } from "@/modules/billing/wix-webhook";
+import { parseWixWebhook, extractWixJwt, peekWixJwtHeader } from "@/modules/billing/wix-webhook";
 
 function keyStatus() {
   const key = process.env.WIX_APP_PUBLIC_KEY ?? "";
@@ -39,7 +39,12 @@ export async function POST(request: Request) {
       envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "verify failed";
-      console.error("[wix-webhook] verify failed:", message, keyStatus());
+      const jwt = extractWixJwt(raw, request.headers.get("authorization"));
+      console.error("[wix-webhook] ack unverified:", message, {
+        ...keyStatus(),
+        jwtParts: jwt ? jwt.split(".").length : 0,
+        ...peekWixJwtHeader(jwt),
+      });
       return ack({ received: true, verified: false });
     }
 

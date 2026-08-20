@@ -1,4 +1,4 @@
-import { jwtVerify, importSPKI } from "jose";
+import { createPublicKey, createVerify } from "node:crypto";
 import type { WixWebhookEnvelope } from "@/modules/billing/service";
 
 export function normalizePublicKey(value: string) {
@@ -11,6 +11,103 @@ export function normalizePublicKey(value: string) {
   if (!body) throw new Error("WIX_APP_PUBLIC_KEY is empty");
   const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
   return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
+}
+
+export function compactJwt(value: string) {
+  return value.replace(/^\uFEFF/, "").trim().replace(/\s+/g, "");
+}
+
+function b64ToBuf(segment: string) {
+  const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return Buffer.from(`${normalized}${pad}`, "base64");
+}
+
+export function peekWixJwtHeader(token: string) {
+  try {
+    const header = JSON.parse(b64ToBuf(compactJwt(token).split(".")[0] ?? "").toString("utf8")) as Record<
+      string,
+      unknown
+    >;
+    return {
+      alg: typeof header.alg === "string" ? header.alg : undefined,
+      typ: typeof header.typ === "string" ? header.typ : undefined,
+      kid: typeof header.kid === "string" ? header.kid : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function looksLikeJwt(value: string) {
+  const compact = compactJwt(value);
+  const parts = compact.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 8 && /^[A-Za-z0-9+/=_-]+$/.test(part));
+}
+
+export function extractWixJwt(raw: string, authorization: string | null) {
+  const bearer = authorization?.replace(/^Bearer\s+/i, "").trim() ?? "";
+  let body = raw.replace(/^\uFEFF/, "").trim();
+  if (body.startsWith('"') && body.endsWith('"')) {
+    try {
+      body = JSON.parse(body) as string;
+    } catch {
+      /* keep */
+    }
+  }
+  if (looksLikeJwt(body)) return compactJwt(body);
+  if (looksLikeJwt(bearer)) return compactJwt(bearer);
+  if (body.startsWith("{")) {
+    try {
+      const json = JSON.parse(body) as Record<string, unknown>;
+      for (const value of [json.jwt, json.token, json.data, json.payload]) {
+        if (typeof value === "string" && looksLikeJwt(value)) return compactJwt(value);
+      }
+    } catch {
+      /* keep */
+    }
+  }
+  return "";
+}
+
+let cachedKey: ReturnType<typeof createPublicKey> | null = null;
+let cachedPem = "";
+
+function nodePublicKey(publicKey: string) {
+  const pem = normalizePublicKey(publicKey);
+  if (cachedKey && cachedPem === pem) return cachedKey;
+  cachedKey = createPublicKey(pem);
+  cachedPem = pem;
+  return cachedKey;
+}
+
+/** Wix sample uses jsonwebtoken + PEM. Node crypto is the same algorithm, more tolerant of base64 padding. */
+export function verifyWixJwt(token: string, publicKey: string) {
+  const compact = compactJwt(token);
+  const parts = compact.split(".");
+  if (parts.length !== 3) throw new Error("JWT does not have 3 parts");
+  const [headerPart, payloadPart, signaturePart] = parts;
+
+  let header: { alg?: string };
+  try {
+    header = JSON.parse(b64ToBuf(headerPart).toString("utf8")) as { alg?: string };
+  } catch {
+    throw new Error("JWS Protected Header is invalid");
+  }
+  if (header.alg && header.alg !== "RS256") {
+    throw new Error(`Unexpected JWT alg ${header.alg}`);
+  }
+
+  const verifier = createVerify("RSA-SHA256");
+  verifier.update(`${headerPart}.${payloadPart}`);
+  const ok = verifier.verify(nodePublicKey(publicKey), b64ToBuf(signaturePart));
+  if (!ok) throw new Error("signature verification failed");
+
+  const payload = JSON.parse(b64ToBuf(payloadPart).toString("utf8")) as unknown;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("JWT payload is not an object");
+  }
+  return payload as Record<string, unknown>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -66,49 +163,6 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function looksLikeJwt(value: string) {
-  const trimmed = value.trim();
-  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmed)) return false;
-  const parts = trimmed.split(".");
-  return parts.length === 3 && parts.every((part) => part.length > 8);
-}
-
-export function extractWixJwt(raw: string, authorization: string | null) {
-  const bearer = authorization?.replace(/^Bearer\s+/i, "").trim() ?? "";
-  let body = raw.trim();
-  if (body.startsWith('"') && body.endsWith('"')) {
-    try {
-      body = JSON.parse(body) as string;
-    } catch {
-      /* keep */
-    }
-  }
-  if (looksLikeJwt(body)) return body;
-  if (looksLikeJwt(bearer)) return bearer;
-  if (body.startsWith("{")) {
-    try {
-      const json = JSON.parse(body) as Record<string, unknown>;
-      for (const value of [json.data, json.jwt, json.token, json.payload]) {
-        if (typeof value === "string" && looksLikeJwt(value)) return value;
-      }
-    } catch {
-      /* keep */
-    }
-  }
-  return "";
-}
-
-let cachedVerifyKey: CryptoKey | null = null;
-let cachedVerifyPem = "";
-
-async function verifyKey(publicKey: string) {
-  const pem = normalizePublicKey(publicKey);
-  if (cachedVerifyKey && cachedVerifyPem === pem) return cachedVerifyKey;
-  cachedVerifyKey = await importSPKI(pem, "RS256");
-  cachedVerifyPem = pem;
-  return cachedVerifyKey;
-}
-
 export async function parseWixWebhook(
   raw: string,
   publicKey: string,
@@ -118,12 +172,7 @@ export async function parseWixWebhook(
 
   if (jwtCandidate) {
     if (!publicKey.trim()) throw new Error("WIX_APP_PUBLIC_KEY is empty on this server");
-    const key = await verifyKey(publicKey);
-    const { payload } = await jwtVerify(jwtCandidate, key, {
-      algorithms: ["RS256"],
-      clockTolerance: 120,
-    });
-    return unwrapWixWebhookPayload(payload as unknown as Record<string, unknown>);
+    return unwrapWixWebhookPayload(verifyWixJwt(jwtCandidate, publicKey));
   }
 
   const body = raw.trim();
