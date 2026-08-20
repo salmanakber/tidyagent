@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { fetchWixAppInstance } from "@/services/wix/client";
@@ -24,50 +24,64 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const env = getEnv();
-  console.info("[wix-webhook] received", {
-    bytes: raw.length,
-    contentType: request.headers.get("content-type"),
-    hasAuth: Boolean(request.headers.get("authorization")),
-    ...keyStatus(),
-  });
-
-  let envelope: WixWebhookEnvelope;
   try {
-    envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
+    const raw = await request.text();
+    const env = getEnv();
+    console.info("[wix-webhook] received", {
+      bytes: raw.length,
+      contentType: request.headers.get("content-type"),
+      hasAuth: Boolean(request.headers.get("authorization")),
+      ...keyStatus(),
+    });
+
+    let envelope: WixWebhookEnvelope;
+    try {
+      envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "verify failed";
+      console.error("[wix-webhook] verify failed:", message, keyStatus());
+      return ack({ received: true, verified: false });
+    }
+
+    const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
+    if (instanceId) {
+      // Wix Trigger test times out after 1250ms. Ack first, then process.
+      after(() =>
+        handleVerifiedWebhook(envelope).catch((error) => {
+          const message = error instanceof Error ? error.message : "handler failed";
+          console.error("[wix-webhook] handler failed:", message);
+        }),
+      );
+    } else {
+      console.info("[wix-webhook] verified test ping", envelope.eventType ?? "unknown");
+    }
+
+    return ack({ test: !instanceId, verified: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "verify failed";
-    console.error("[wix-webhook] verify failed:", message, keyStatus());
-    // Wix treats any non-2xx as "The webhook server returned an error."
-    // Ack receipt so Trigger test can pass; unsigned JSON is not processed as a billing event.
-    return NextResponse.json({ ok: true, received: true, verified: false }, { headers: corsHeaders() });
+    const message = error instanceof Error ? error.message : "crash";
+    console.error("[wix-webhook] crash:", message);
+    return ack({ received: true });
   }
+}
 
-  const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
-  if (!instanceId) {
-    console.info("[wix-webhook] verified test ping", envelope.eventType ?? "unknown");
-    return NextResponse.json({ ok: true, test: true }, { headers: corsHeaders() });
-  }
-
+async function handleVerifiedWebhook(envelope: WixWebhookEnvelope) {
   const kind = classifyWixEvent(envelope.eventType ?? envelope.metadata?.eventType);
-
-  try {
-    if (kind === "installed") {
+  if (kind === "installed") {
+    const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
+    if (instanceId) {
       const snapshot = await fetchWixAppInstance(instanceId).catch(() => null);
       await provisionTenantFromWix({
         instance: { instanceId, uid: envelope.uid, vendorProductId: asVendor(envelope) },
         snapshot,
       });
     }
-
-    await applyWixBillingWebhook(envelope);
-    return NextResponse.json({ ok: true, kind }, { headers: corsHeaders() });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "handler failed";
-    console.error("[wix-webhook] handler failed:", message);
-    return NextResponse.json({ ok: false, error: "handler_failed" }, { status: 500, headers: corsHeaders() });
   }
+  await applyWixBillingWebhook(envelope);
+  console.info("[wix-webhook] processed", kind);
+}
+
+function ack(body: Record<string, unknown>) {
+  return NextResponse.json({ ok: true, ...body }, { status: 200, headers: corsHeaders() });
 }
 
 function asVendor(envelope: WixWebhookEnvelope) {
@@ -82,9 +96,8 @@ function asVendor(envelope: WixWebhookEnvelope) {
 }
 
 function corsHeaders() {
-  const appId = process.env.WIX_APP_ID ?? "";
   return {
-    "Access-Control-Allow-Origin": appId ? `https://${appId}.wix.run` : "*",
+    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };

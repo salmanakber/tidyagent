@@ -98,6 +98,17 @@ export function extractWixJwt(raw: string, authorization: string | null) {
   return "";
 }
 
+let cachedVerifyKey: CryptoKey | null = null;
+let cachedVerifyPem = "";
+
+async function verifyKey(publicKey: string) {
+  const pem = normalizePublicKey(publicKey);
+  if (cachedVerifyKey && cachedVerifyPem === pem) return cachedVerifyKey;
+  cachedVerifyKey = await importSPKI(pem, "RS256");
+  cachedVerifyPem = pem;
+  return cachedVerifyKey;
+}
+
 export async function parseWixWebhook(
   raw: string,
   publicKey: string,
@@ -107,7 +118,7 @@ export async function parseWixWebhook(
 
   if (jwtCandidate) {
     if (!publicKey.trim()) throw new Error("WIX_APP_PUBLIC_KEY is empty on this server");
-    const key = await importSPKI(normalizePublicKey(publicKey), "RS256");
+    const key = await verifyKey(publicKey);
     const { payload } = await jwtVerify(jwtCandidate, key, {
       algorithms: ["RS256"],
       clockTolerance: 120,
