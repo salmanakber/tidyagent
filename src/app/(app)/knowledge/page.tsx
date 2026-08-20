@@ -9,6 +9,8 @@ import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import { knowledgeCardsForSite, siteFactsFromApps } from "@/modules/knowledge/site-facts";
+import { KnowledgeIntelligence } from "@/components/knowledge/KnowledgeIntelligence";
+import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 120;
 
@@ -21,6 +23,23 @@ export default async function KnowledgePage() {
   const scope = scanScopeFromConfig(entitlements.planKey, planScope);
 
   const facts = siteFactsFromApps(data.site.installedWixApps);
+  const [storedFacts, conflicts, pages] = await Promise.all([
+    prisma.knowledgeFact.findMany({
+      where: { organizationId: session.organizationId, siteId: session.siteId },
+      orderBy: [{ kind: "asc" }, { entity: "asc" }],
+      take: 80,
+    }),
+    prisma.knowledgeConflict.findMany({
+      where: { organizationId: session.organizationId, siteId: session.siteId, status: "OPEN" },
+      take: 20,
+    }),
+    prisma.knowledgeDocument.findMany({
+      where: { organizationId: session.organizationId, siteId: session.siteId, contentType: { not: "CUSTOM" } },
+      select: { id: true, title: true, sourceUrl: true, contentType: true },
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+    }),
+  ]);
   const cards = knowledgeCardsForSite({
     hasStores: facts.hasStores,
     hasBookings: facts.hasBookings,
@@ -29,6 +48,8 @@ export default async function KnowledgePage() {
     faqs: data.knowledge.faqs,
     policies: data.knowledge.policies,
     custom: data.knowledge.custom,
+    facts: storedFacts.length,
+    conflicts: conflicts.length,
   });
 
   return (
@@ -38,7 +59,7 @@ export default async function KnowledgePage() {
         title="What your AI employee knows"
         description="The scanner reads the live Wix site in this plan’s scope. Custom notes you add sit above that and are never overwritten."
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <div key={card.label} className="panel p-5">
             <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">{card.label}</p>
@@ -65,6 +86,24 @@ export default async function KnowledgePage() {
         </div>
       </div>
       <AddKnowledgeForm lastSynced={data.knowledge.lastSyncedAt?.toISOString() ?? null} />
+      <KnowledgeIntelligence
+        facts={storedFacts.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          entity: row.entity,
+          value: row.value,
+          sourceUrl: row.sourceUrl,
+          confidence: row.confidence,
+          extractionMethod: row.extractionMethod,
+        }))}
+        conflicts={conflicts.map((row) => ({
+          id: row.id,
+          entity: row.entity,
+          kind: row.kind,
+          values: Array.isArray(row.values) ? (row.values as { value?: string; sourceUrl?: string }[]) : [],
+        }))}
+        pages={pages}
+      />
     </div>
   );
 }

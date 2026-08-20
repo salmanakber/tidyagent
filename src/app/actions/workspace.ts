@@ -14,6 +14,10 @@ const agentUpdateSchema = z.object({
   personality: z.enum(["friendly", "professional", "casual", "custom"]).optional(),
   status: z.enum(["DRAFT", "ACTIVE", "PAUSED"]).optional(),
   widgetPrimaryColor: z.string().regex(/^#([0-9a-fA-F]{6})$/).optional(),
+  widgetUseGradient: z.boolean().optional(),
+  widgetGradientTo: z.string().regex(/^#([0-9a-fA-F]{6})$/).optional(),
+  widgetTextColor: z.string().regex(/^#([0-9a-fA-F]{6})$/).optional(),
+  widgetMessageColor: z.string().regex(/^#([0-9a-fA-F]{6})$/).optional(),
   widgetGreeting: z.string().min(1).max(160).optional(),
   widgetPosition: z.enum(["BOTTOM_RIGHT", "BOTTOM_LEFT"]).optional(),
   widgetEmbedMode: z.enum(["AUTO", "MANUAL"]).optional(),
@@ -119,6 +123,10 @@ export async function createSpecialistAgent(input: {
       specialty: input.specialty,
       knowledgeScopes: scopes,
       widgetPrimaryColor: workspace.agent?.widgetPrimaryColor ?? "#1F3A5F",
+      widgetUseGradient: workspace.agent?.widgetUseGradient ?? false,
+      widgetGradientTo: workspace.agent?.widgetGradientTo ?? "#4F8CFF",
+      widgetTextColor: workspace.agent?.widgetTextColor ?? "#FFFFFF",
+      widgetMessageColor: workspace.agent?.widgetMessageColor ?? "#1E293B",
       widgetGreeting: `Hi, I’m ${name}. I can help with this.`,
       widgetPosition: workspace.agent?.widgetPosition ?? "BOTTOM_RIGHT",
       widgetTemplate: workspace.agent?.widgetTemplate ?? "CLASSIC",
@@ -189,6 +197,66 @@ export async function addCustomKnowledge(title: string, content: string) {
     },
   });
 
+  const { factsFromPage } = await import("@/modules/knowledge/structured");
+  const extracted = factsFromPage({
+    url: "custom://owner",
+    title: titleSafe,
+    description: "",
+    headings: [titleSafe],
+    text: contentSafe,
+    emails: [],
+    phones: [],
+    links: [],
+    contentType: "CUSTOM",
+    jsonLd: [],
+  }).map((fact) => ({
+    ...fact,
+    extractionMethod: "custom" as const,
+    confidence: "HIGH" as const,
+  }));
+  if (extracted.length) {
+    await prisma.knowledgeFact.createMany({
+      data: extracted.map((fact) => ({
+        organizationId: session.organizationId,
+        siteId: session.siteId,
+        documentId: document.id,
+        kind: fact.kind,
+        entity: fact.entity,
+        entityKey: fact.entityKey,
+        value: fact.value,
+        sourceUrl: null,
+        extractionMethod: "custom",
+        confidence: "HIGH",
+      })),
+    });
+  }
+
+  revalidatePath("/knowledge");
+}
+
+export async function resolveKnowledgeConflict(conflictId: string, value: string) {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const chosen = z.string().min(1).max(200).parse(value);
+  const conflict = await prisma.knowledgeConflict.findFirst({
+    where: { id: conflictId, organizationId: session.organizationId },
+  });
+  if (!conflict) throw new Error("Conflict not found");
+
+  await prisma.knowledgeConflict.update({
+    where: { id: conflict.id },
+    data: { status: "RESOLVED", resolvedValue: chosen },
+  });
+  await prisma.knowledgeFact.deleteMany({
+    where: {
+      organizationId: session.organizationId,
+      siteId: conflict.siteId,
+      kind: conflict.kind,
+      entityKey: conflict.entityKey,
+      value: { not: chosen },
+      extractionMethod: { not: "custom" },
+    },
+  });
   revalidatePath("/knowledge");
 }
 

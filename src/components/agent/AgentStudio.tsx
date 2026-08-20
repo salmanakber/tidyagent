@@ -18,6 +18,10 @@ type AgentView = {
   personality: string;
   status: string;
   widgetPrimaryColor: string;
+  widgetUseGradient?: boolean;
+  widgetGradientTo?: string;
+  widgetTextColor?: string;
+  widgetMessageColor?: string;
   widgetGreeting: string;
   widgetPosition: "BOTTOM_RIGHT" | "BOTTOM_LEFT";
   widgetEmbedMode: "AUTO" | "MANUAL";
@@ -62,6 +66,10 @@ export function AgentStudio({
   const [role, setRole] = useState(agent.role);
   const [personality, setPersonality] = useState(agent.personality);
   const [color, setColor] = useState(agent.widgetPrimaryColor);
+  const [useGradient, setUseGradient] = useState(Boolean(agent.widgetUseGradient));
+  const [gradientTo, setGradientTo] = useState(agent.widgetGradientTo || "#4F8CFF");
+  const [textColor, setTextColor] = useState(agent.widgetTextColor || "#FFFFFF");
+  const [messageColor, setMessageColor] = useState(agent.widgetMessageColor || "#1E293B");
   const [greeting, setGreeting] = useState(agent.widgetGreeting);
   const [position, setPosition] = useState(agent.widgetPosition);
   const [avatarUrl, setAvatarUrl] = useState(agent.widgetAvatarUrl ?? null);
@@ -78,6 +86,10 @@ export function AgentStudio({
         role,
         personality: personality as "friendly" | "professional" | "casual" | "custom",
         widgetPrimaryColor: color,
+        widgetUseGradient: useGradient,
+        widgetGradientTo: gradientTo,
+        widgetTextColor: textColor,
+        widgetMessageColor: messageColor,
         widgetGreeting: greeting,
         widgetPosition: position,
         widgetAvatarUrl: avatarUrl ?? "",
@@ -133,10 +145,9 @@ export function AgentStudio({
               Greeting
               <input className="field mt-2" value={greeting} onChange={(event) => setGreeting(event.target.value)} />
             </label>
-            <label className="text-sm text-navy-300">
-              Widget color
-              <input className="field mt-2" type="color" value={color} onChange={(event) => setColor(event.target.value)} />
-            </label>
+            <ColorField label="Widget color" value={color} onChange={setColor} />
+            <ColorField label="Header & bubble text" value={textColor} onChange={setTextColor} />
+            <ColorField label="Message text" value={messageColor} onChange={setMessageColor} />
             <label className="text-sm text-navy-300">
               Position
               <select className="field mt-2" value={position} onChange={(event) => setPosition(event.target.value as typeof position)}>
@@ -144,6 +155,14 @@ export function AgentStudio({
                 <option value="BOTTOM_LEFT">Bottom left</option>
               </select>
             </label>
+            <label className="flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm sm:col-span-2">
+              <span>
+                <span className="block text-white">Gradient</span>
+                <span className="text-xs text-navy-400">Blend the widget color into a second color on the header, bubbles, and send button.</span>
+              </span>
+              <input type="checkbox" checked={useGradient} onChange={(event) => setUseGradient(event.target.checked)} />
+            </label>
+            {useGradient ? <ColorField label="Second color" value={gradientTo} onChange={setGradientTo} /> : null}
           </div>
           <div className="mt-5">
             <p className="text-sm text-navy-300">Chat template</p>
@@ -260,11 +279,15 @@ export function AgentStudio({
       </div>
       <div className="panel overflow-hidden p-4">
         <p className="mb-3 px-2 text-sm text-navy-300">Live widget preview — owner brand, not tidyAgent amber/navy</p>
-        <div className="relative min-h-[560px] overflow-hidden rounded-[32px] bg-slate-200">
+        <div className="relative min-h-[min(62dvh,480px)] overflow-hidden rounded-[32px] bg-slate-200">
           <ChatWidget
             name={name}
             greeting={greeting}
             primaryColor={color}
+            useGradient={useGradient}
+            gradientTo={gradientTo}
+            textColor={textColor}
+            messageColor={messageColor}
             position={position}
             avatarUrl={avatarUrl}
             preview
@@ -275,5 +298,30 @@ export function AgentStudio({
         </div>
       </div>
     </div>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="text-sm text-navy-300">
+      {label}
+      <span className="mt-2 flex items-center gap-2">
+        <input
+          className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-white/10 bg-transparent p-1"
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <input className="field flex-1 uppercase" value={value} readOnly />
+      </span>
+    </label>
   );
 }

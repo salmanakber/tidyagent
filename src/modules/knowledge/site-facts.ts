@@ -31,6 +31,8 @@ export function knowledgeCardsForSite(input: {
   faqs: number;
   policies: number;
   custom: number;
+  facts?: number;
+  conflicts?: number;
 }) {
   const cards: { label: string; value: number; hint: string }[] = [
     { label: "Website", value: input.pages, hint: "pages actually read" },
@@ -38,6 +40,8 @@ export function knowledgeCardsForSite(input: {
   if (input.hasStores) cards.push({ label: "Products", value: input.products, hint: "catalog items" });
   if (input.faqs > 0) cards.push({ label: "FAQs", value: input.faqs, hint: "from the live site" });
   if (input.policies > 0) cards.push({ label: "Policies", value: input.policies, hint: "from the live site" });
+  cards.push({ label: "Facts", value: input.facts ?? 0, hint: "structured business facts" });
+  if ((input.conflicts ?? 0) > 0) cards.push({ label: "Conflicts", value: input.conflicts ?? 0, hint: "need a human choice" });
   cards.push({ label: "Custom notes", value: input.custom, hint: "added by you" });
   return cards;
 }

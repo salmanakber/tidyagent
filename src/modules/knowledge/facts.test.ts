@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractJsonLdNodes, factsFromJsonLd, pageFactsBlock } from "@/modules/knowledge/facts";
+import { extractJsonLdNodes, extractLabeledPrices, factsFromJsonLd, pageFactsBlock } from "@/modules/knowledge/facts";
 
 describe("structured page facts", () => {
   it("reads Product JSON-LD name, price, and url", () => {
@@ -12,5 +12,25 @@ describe("structured page facts", () => {
     const block = pageFactsBlock("<p></p>", "Starter is $19 / month and Pro is $99/mo");
     expect(block).toContain("PRICES AND ITEMS");
     expect(block).toMatch(/\$19/);
+  });
+
+  it("pairs offer names with nearby prices", () => {
+    const text = `
+2 HOUR SESSION
+120 Minutes residential cleaning
+Up to 12 rooms
+$400
+
+HALF DAY PACKAGE
+Half day deep clean
+$600
+
+FULL DAY SERVICE
+$900
+`;
+    const labeled = extractLabeledPrices(text);
+    expect(labeled.some((line) => /session/i.test(line) && /\$400/.test(line))).toBe(true);
+    expect(labeled.some((line) => /\$600/.test(line))).toBe(true);
+    expect(labeled.some((line) => /\$900/.test(line))).toBe(true);
   });
 });

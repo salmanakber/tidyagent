@@ -1,6 +1,6 @@
 import type { KnowledgeContentType } from "@prisma/client";
 import { pathPriority } from "@/modules/knowledge/scan-scope";
-import { pageFactsBlock } from "@/modules/knowledge/facts";
+import { extractJsonLdNodes, pageFactsBlock } from "@/modules/knowledge/facts";
 
 export type ExtractedPage = {
   url: string;
@@ -12,6 +12,7 @@ export type ExtractedPage = {
   phones: string[];
   links: string[];
   contentType: KnowledgeContentType;
+  jsonLd: Record<string, unknown>[];
 };
 
 const BLOCKED_HOSTS = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1|\[::1\])/i;
@@ -60,7 +61,8 @@ export function stripHtml(html: string, maxChars: number) {
     .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|h1|h2|h3|li|tr|section|article)>/gi, "\n")
+    .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, "\n$2\n")
+    .replace(/<\/(p|div|h1|h2|h3|h4|li|tr|section|article)>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -69,7 +71,11 @@ export function stripHtml(html: string, maxChars: number) {
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">");
 
-  return collapse(decodeEntities(without)).slice(0, maxChars);
+  return decodeEntities(without)
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim()
+    .slice(0, maxChars);
 }
 
 export function extractMeta(html: string, name: string) {
@@ -85,7 +91,7 @@ export function extractTitle(html: string) {
 }
 
 export function extractHeadings(html: string, limit = 12) {
-  const matches = [...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)];
+  const matches = [...html.matchAll(/<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi)];
   return unique(
     matches
       .map((item) => collapse(stripHtml(item[1] ?? "", 160)))
@@ -96,7 +102,7 @@ export function extractHeadings(html: string, limit = 12) {
 export function extractLinks(html: string, baseUrl: string) {
   const hrefs = [...html.matchAll(/<a\s[^>]*href=["']([^"']+)["']/gi)].map((item) => item[1] ?? "");
   const resolved: string[] = [];
-  for (const href of hrefs) {
+  for (const href of [...hrefs, ...extractEmbeddedPaths(html)]) {
     if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) {
       continue;
     }
@@ -150,7 +156,7 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
     extractMeta(html, "og:description") || extractMeta(html, "description") || "";
   const headings = extractHeadings(html);
   const text = stripHtml(html, maxChars);
-  const facts = pageFactsBlock(html, `${description}\n${headings.join(" ")}\n${text}`);
+  const facts = pageFactsBlock(html, `${description}\n${headings.join("\n")}\n${text}`);
   const combined = [facts, description, headings.join("\n"), text].filter(Boolean).join("\n\n").slice(0, maxChars + 2500);
   const { emails, phones } = extractContacts(`${description}\n${combined}`);
   const links = extractLinks(html, url);
@@ -164,22 +170,132 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
     phones,
     links,
     contentType: classifyPage(url, title, `${description} ${combined}`),
+    jsonLd: extractJsonLdNodes(html),
   };
 }
 
+export function guessServiceUrls(baseUrl: string, headings: string[], text: string) {
+  const blob = `${headings.join(" ")} ${text}`.toLowerCase();
+  const paths = new Set<string>();
+  const add = (path: string) => {
+    if (path.length > 2 && path.length < 64) paths.add(path);
+  };
+
+  if (/pric|rate|package/.test(blob)) {
+    add("/pricing");
+    add("/prices");
+    add("/rates");
+    add("/packages");
+  }
+  if (/service/.test(blob)) add("/services");
+  if (/rental/.test(blob)) {
+    add("/rentals");
+    add("/rental");
+  }
+  if (/book|appoint/.test(blob)) {
+    add("/book");
+    add("/booking");
+    add("/appointments");
+  }
+  if (/\bmenu\b/.test(blob)) add("/menu");
+  if (/shop|store|product/.test(blob)) {
+    add("/shop");
+    add("/store");
+    add("/products");
+  }
+
+  const skip = /^(about|subscribe|newsletter|home|welcome|contact|follow|instagram|facebook|copyright|privacy|terms)$/i;
+  for (const heading of headings) {
+    const slug = slugifyPath(heading);
+    if (!slug || skip.test(slug) || slug.split("-").length > 8) continue;
+    add(`/${slug}`);
+    const trimmed = slug.replace(/-(packages?|rentals?|services?|plans?|pricing|rates?|offers?)$/i, "");
+    if (trimmed && trimmed !== slug) {
+      add(`/${trimmed}`);
+      if (!trimmed.endsWith("s")) add(`/${trimmed}s`);
+    }
+  }
+
+  const urls: string[] = [];
+  for (const path of paths) {
+    try {
+      urls.push(new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString().replace(/\/$/, ""));
+    } catch {
+      /* skip */
+    }
+  }
+  return urls;
+}
+
+function slugifyPath(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+export function extractEmbeddedPaths(html: string) {
+  const paths: string[] = [];
+  for (const match of html.matchAll(/"pageUriSEO"\s*:\s*"([^"]+)"/gi)) {
+    const value = (match[1] ?? "").replace(/^\/+/, "");
+    if (value && !/[\s<>]/.test(value)) paths.push(`/${value}`);
+  }
+  for (const match of html.matchAll(/"(?:url|href|link|path|route)"\s*:\s*"(\/[^"?#"]+)"/gi)) {
+    const value = match[1] ?? "";
+    if (value.length > 1 && value.length < 80 && !/^\/(_|api|_api)/i.test(value) && !/\.(js|css|png|jpe?g|gif|svg|woff2?)$/i.test(value)) {
+      paths.push(value);
+    }
+  }
+  return unique(paths);
+}
+
 export function chunkText(text: string, size = 1200, overlap = 120) {
-  const clean = collapse(text);
-  if (!clean) return [];
-  if (clean.length <= size) return [clean];
+  const sections = text
+    .split(/\n(?=PRICES AND ITEMS FROM THIS PAGE:)|(?:\n{2,})/)
+    .map((section) => section.replace(/[ \t]+/g, " ").trim())
+    .filter((section) => section.length > 24);
+
+  if (!sections.length) {
+    const clean = collapse(text);
+    return clean ? windowChunks(clean, size, overlap) : [];
+  }
+
+  const chunks: string[] = [];
+  let current = "";
+  for (const section of sections) {
+    if (section.length > size) {
+      if (current) {
+        chunks.push(current);
+        current = "";
+      }
+      chunks.push(...windowChunks(collapse(section), size, overlap));
+      continue;
+    }
+    const next = current ? `${current}\n\n${section}` : section;
+    if (next.length > size) {
+      chunks.push(current);
+      current = section;
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks.slice(0, 14);
+}
+
+function windowChunks(text: string, size: number, overlap: number) {
+  if (text.length <= size) return [text];
   const chunks: string[] = [];
   let start = 0;
-  while (start < clean.length) {
-    const end = Math.min(clean.length, start + size);
-    chunks.push(clean.slice(start, end));
-    if (end >= clean.length) break;
+  while (start < text.length) {
+    const end = Math.min(text.length, start + size);
+    chunks.push(text.slice(start, end));
+    if (end >= text.length) break;
     start = end - overlap;
   }
-  return chunks.slice(0, 14);
+  return chunks;
 }
 
 function attrMatch(html: string, attr: string, name: string) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyPage,
   extractPage,
+  guessServiceUrls,
   isSafeHttpUrl,
   parseSitemapUrls,
   sameSite,
@@ -29,6 +30,7 @@ describe("scan scope", () => {
 
   it("prioritizes pricing URLs ahead of generic pages", () => {
     expect(pathPriority("https://x.com/pricing")).toBeLessThan(pathPriority("https://x.com/blog/hello"));
+    expect(pathPriority("https://x.com/services")).toBeLessThan(pathPriority("https://x.com/blog/hello"));
   });
 });
 
@@ -104,5 +106,15 @@ describe("site extraction", () => {
     expect(page.contentType).toBe("SERVICE");
     expect(page.text).toContain("PRICES AND ITEMS");
     expect(page.text).toMatch(/\$19/);
+  });
+
+  it("guesses service URLs from homepage headings", () => {
+    const urls = guessServiceUrls(
+      "https://harbor.example.com",
+      ["Deep Clean Packages", "Window Washing"],
+      "Residential cleaning packages and pricing",
+    );
+    expect(urls.some((url) => url.includes("/deep-clean"))).toBe(true);
+    expect(urls.some((url) => url.includes("/packages") || url.includes("/pricing"))).toBe(true);
   });
 });

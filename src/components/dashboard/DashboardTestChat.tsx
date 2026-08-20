@@ -7,6 +7,10 @@ export function DashboardTestChat({
   name,
   greeting,
   primaryColor,
+  useGradient,
+  gradientTo,
+  textColor,
+  messageColor,
   position,
   avatarUrl,
   template,
@@ -16,6 +20,10 @@ export function DashboardTestChat({
   name: string;
   greeting: string;
   primaryColor: string;
+  useGradient?: boolean;
+  gradientTo?: string;
+  textColor?: string;
+  messageColor?: string;
   position: "BOTTOM_RIGHT" | "BOTTOM_LEFT";
   avatarUrl?: string | null;
   template?: WidgetTemplate | null;
@@ -31,11 +39,15 @@ export function DashboardTestChat({
           Type a visitor question here. This is the same chat bubble customers see on the live site.
         </p>
       </div>
-      <div className="relative min-h-[560px] overflow-hidden rounded-[32px] bg-slate-200">
+      <div className="relative min-h-[min(62dvh,480px)] overflow-hidden rounded-[32px] bg-slate-200">
         <ChatWidget
           name={name}
           greeting={greeting}
           primaryColor={primaryColor}
+          useGradient={useGradient}
+          gradientTo={gradientTo}
+          textColor={textColor}
+          messageColor={messageColor}
           position={position}
           avatarUrl={avatarUrl}
           preview

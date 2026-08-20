@@ -7,6 +7,7 @@ import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import {
   chunkText,
   extractPage,
+  guessServiceUrls,
   isSafeHttpUrl,
   parseRobotsSitemaps,
   parseSitemapIndex,
@@ -16,6 +17,8 @@ import {
 } from "@/modules/knowledge/extract";
 import { harvestWixApis } from "@/modules/knowledge/wix-sources";
 import { understandSite, type SiteUnderstanding } from "@/modules/knowledge/understand";
+import { contentHash, factsFromPage, factsFromProduct } from "@/modules/knowledge/structured";
+import { persistSiteFacts } from "@/modules/knowledge/fact-store";
 import { getAIProvider } from "@/modules/ai/factory";
 import { detectWixCapabilities } from "@/modules/wix/capabilities";
 import type { ScanResult, ScanStage } from "@/modules/knowledge/types";
@@ -144,13 +147,23 @@ export async function scanOrganizationSite(input: {
     pages,
     products,
     knowledgeLimit: entitlements.knowledgeLimit,
+    pagesDiscovered: pages.length,
+    pagesFailed: warnings.filter((item) => /could not be crawled/i.test(item)).length,
   });
   stages.push({
     key: "knowledge",
     label: "Wrote verified knowledge for the AI employee",
     status: "done",
-    detail: `${persisted.documents} documents · ${persisted.chunks} passages`,
+    detail: `${persisted.documents} documents · ${persisted.chunks} passages · ${persisted.facts} facts`,
   });
+  if (persisted.conflicts) {
+    stages.push({
+      key: "conflicts",
+      label: "Knowledge conflicts",
+      status: "failed",
+      detail: `${persisted.conflicts} facts disagree across pages — review them in Knowledge before the AI states a number`,
+    });
+  }
 
   return {
     ok: true,
@@ -165,6 +178,8 @@ export async function scanOrganizationSite(input: {
       faqs: pages.filter((page) => page.contentType === "FAQ").length,
       policies: pages.filter((page) => page.contentType === "POLICY").length,
       chunks: persisted.chunks,
+      facts: persisted.facts,
+      conflicts: persisted.conflicts,
     },
     sources: [
       ...pages.map((page) => ({ title: page.title, url: page.url, type: page.contentType })),
@@ -188,6 +203,8 @@ async function persistScan(input: {
   pages: ExtractedPage[];
   products: { name: string; description?: string; price?: string; id?: string; url?: string; data?: Prisma.InputJsonValue }[];
   knowledgeLimit: number;
+  pagesDiscovered?: number;
+  pagesFailed?: number;
 }) {
   await prisma.businessProfile.upsert({
     where: { organizationId: input.organizationId },
@@ -290,6 +307,7 @@ async function persistScan(input: {
 
   const embeddingByIndex = new Map(embeddings.map((item) => [item.index, item.vector]));
 
+  const createdDocs: { id: string; sourceUrl: string | null }[] = [];
   for (const [docIndex, doc] of docs.entries()) {
     const document = await prisma.knowledgeDocument.create({
       data: {
@@ -300,8 +318,11 @@ async function persistScan(input: {
         sourceUrl: doc.sourceUrl,
         cleanedContent: doc.cleanedContent.slice(0, 20000),
         metadata: { origin: "site-scan" } as Prisma.InputJsonValue,
+        contentHash: contentHash(doc.cleanedContent),
+        extractionMethod: "http",
       },
     });
+    createdDocs.push({ id: document.id, sourceUrl: document.sourceUrl });
 
     const pieces = chunkPayloads
       .map((item, index) => ({ ...item, index }))
@@ -356,10 +377,33 @@ async function persistScan(input: {
   const source = await prisma.knowledgeSource.findFirst({
     where: { organizationId: input.organizationId, siteId: input.siteId, type: "site-scan" },
   });
+  const extractedFacts = [
+    ...input.pages.flatMap((page) => factsFromPage(page)),
+    ...input.products.flatMap((product) => factsFromProduct({ name: product.name, price: product.price, url: product.url, description: product.description })),
+  ];
+  const crawlVersion = (source?.crawlVersion ?? 0) + 1;
+  const storedFacts = await persistSiteFacts({
+    organizationId: input.organizationId,
+    siteId: input.siteId,
+    facts: extractedFacts,
+    documents: createdDocs,
+    crawlVersion,
+  });
+
   if (source) {
     await prisma.knowledgeSource.update({
       where: { id: source.id },
-      data: { status: "ready", lastSyncedAt: new Date(), url: input.pages[0]?.url, title: input.understanding.name },
+      data: {
+        status: "ready",
+        lastSyncedAt: new Date(),
+        url: input.pages[0]?.url,
+        title: input.understanding.name,
+        pagesDiscovered: input.pagesDiscovered ?? input.pages.length,
+        pagesCrawled: createdDocs.length,
+        pagesFailed: input.pagesFailed ?? 0,
+        crawlVersion,
+        lastError: null,
+      },
     });
   } else {
     await prisma.knowledgeSource.create({
@@ -371,6 +415,10 @@ async function persistScan(input: {
         title: input.understanding.name,
         status: "ready",
         lastSyncedAt: new Date(),
+        pagesDiscovered: input.pagesDiscovered ?? input.pages.length,
+        pagesCrawled: createdDocs.length,
+        pagesFailed: input.pagesFailed ?? 0,
+        crawlVersion,
       },
     });
   }
@@ -380,7 +428,7 @@ async function persistScan(input: {
     data: { lastSyncedAt: new Date() },
   });
 
-  return { documents: docs.length, chunks };
+  return { documents: docs.length, chunks, facts: storedFacts.facts, conflicts: storedFacts.conflicts };
 }
 
 function pricesCatalogPage(
@@ -392,7 +440,9 @@ function pricesCatalogPage(
     .map((page) => {
       const start = page.text.indexOf("PRICES AND ITEMS FROM THIS PAGE:");
       if (start < 0) return "";
-      return `${page.title} (${page.url})\n${page.text.slice(start, start + 2200)}`;
+      const block = page.text.slice(start, start + 2200);
+      if (!/\$|USD|EUR|GBP|PKR|£|€/.test(block)) return "";
+      return `${page.title} (${page.url})\n${block}`;
     })
     .filter(Boolean);
   const fromProducts = products
@@ -410,6 +460,7 @@ function pricesCatalogPage(
     phones: [],
     links: pages.map((page) => page.url).slice(0, 20),
     contentType: "SERVICE",
+    jsonLd: [],
   };
 }
 
@@ -482,6 +533,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
     const page = extractPage(homepage.text, homeUrl, scope.maxCharsPerPage);
     pages.push(page);
     for (const link of page.links) enqueue(link);
+    for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
     stages.push({ key: "homepage", label: "Read homepage and metadata", status: "done", detail: page.title });
   }
 
@@ -497,6 +549,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
       pages.push(page);
       if (seen.size < scope.maxPages * 8) {
         for (const link of page.links) enqueue(link);
+        for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
       }
     }
   }
@@ -555,7 +608,7 @@ function emptyResult(
     scopeNote: scope.depthNote,
     siteUrl,
     understanding: null,
-    counts: { pages: 0, products: 0, faqs: 0, policies: 0, chunks: 0 },
+    counts: { pages: 0, products: 0, faqs: 0, policies: 0, chunks: 0, facts: 0, conflicts: 0 },
     sources: [],
     stages,
     skipped,

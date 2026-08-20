@@ -45,17 +45,29 @@ export function cmsCollectionAllowed(collectionId: string, scope: Pick<ScanScope
   return true;
 }
 
+/** Generic page types every kind of site may use. Never put product or brand names here. */
 export const PRIORITY_PATHS = [
   /pric/,
   /plan/,
   /package/,
   /service/,
   /rate/,
+  /rental/,
+  /offer/,
+  /book/,
+  /appoint/,
   /menu/,
   /shop/,
   /store/,
   /product/,
-  /book/,
+  /catalog/,
+  /collection/,
+  /membership/,
+  /class/,
+  /lesson/,
+  /tour/,
+  /experience/,
+  /treatment/,
   /faq/,
   /about/,
   /contact/,

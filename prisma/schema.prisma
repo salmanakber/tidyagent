@@ -81,6 +81,32 @@ enum KnowledgeContentType {
   SERVICE
 }
 
+enum KnowledgeFactKind {
+  BUSINESS
+  SERVICE
+  PRODUCT
+  PACKAGE
+  PRICE
+  CONTACT
+  HOURS
+  LOCATION
+  POLICY
+  FAQ
+  BOOKING
+}
+
+enum KnowledgeConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum KnowledgeConflictStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+}
+
 enum ConversationStatus {
   OPEN
   RESOLVED
@@ -139,6 +165,8 @@ model Organization {
   knowledgeSources  KnowledgeSource[]
   knowledgeDocuments KnowledgeDocument[]
   knowledgeChunks   KnowledgeChunk[]
+  knowledgeFacts    KnowledgeFact[]
+  knowledgeConflicts KnowledgeConflict[]
   agents            Agent[]
   customers         Customer[]
   conversations     Conversation[]
@@ -306,6 +334,11 @@ model KnowledgeSource {
   title          String?
   status         String   @default("pending")
   lastSyncedAt   DateTime?
+  pagesDiscovered Int     @default(0)
+  pagesCrawled   Int      @default(0)
+  pagesFailed    Int      @default(0)
+  crawlVersion   Int      @default(0)
+  lastError      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -313,6 +346,7 @@ model KnowledgeSource {
   documents      KnowledgeDocument[]
 
   @@index([organizationId])
+  @@index([organizationId, siteId])
 }
 
 model KnowledgeDocument {
@@ -325,6 +359,8 @@ model KnowledgeDocument {
   sourceUrl      String?
   rawContent     String?
   cleanedContent String?
+  contentHash    String?
+  extractionMethod String @default("http")
   metadata       Json     @default("{}")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -332,9 +368,12 @@ model KnowledgeDocument {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   source         KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   chunks         KnowledgeChunk[]
+  facts          KnowledgeFact[]
 
   @@index([organizationId])
+  @@index([organizationId, siteId])
   @@index([contentType])
+  @@index([sourceUrl])
 }
 
 model KnowledgeChunk {
@@ -360,6 +399,49 @@ model KnowledgeChunk {
   @@index([documentId])
 }
 
+model KnowledgeFact {
+  id               String              @id @default(cuid())
+  organizationId   String
+  siteId           String
+  documentId       String?
+  kind             KnowledgeFactKind
+  entity           String
+  entityKey        String
+  value            String
+  sourceUrl        String?
+  extractionMethod String              @default("html")
+  confidence       KnowledgeConfidence @default(MEDIUM)
+  crawlVersion     Int                 @default(1)
+  metadata         Json                @default("{}")
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document         KnowledgeDocument?  @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, siteId, kind])
+  @@index([organizationId, entityKey])
+}
+
+model KnowledgeConflict {
+  id             String                   @id @default(cuid())
+  organizationId String
+  siteId         String
+  kind           KnowledgeFactKind
+  entity         String
+  entityKey      String
+  values         Json
+  status         KnowledgeConflictStatus  @default(OPEN)
+  resolvedValue  String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, siteId, kind, entityKey])
+  @@index([organizationId, status])
+}
+
 model Agent {
   id                  String         @id @default(cuid())
   organizationId      String
@@ -373,6 +455,10 @@ model Agent {
   goals               Json           @default("[]")
   publishedAt         DateTime?
   widgetPrimaryColor  String         @default("#1F3A5F")
+  widgetUseGradient   Boolean        @default(false)
+  widgetGradientTo    String         @default("#4F8CFF")
+  widgetTextColor     String         @default("#FFFFFF")
+  widgetMessageColor  String         @default("#1E293B")
   widgetAvatarUrl     String?
   widgetPosition      WidgetPosition @default(BOTTOM_RIGHT)
   widgetGreeting      String         @default("Hi! How can I help you today?")

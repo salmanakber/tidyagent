@@ -74,16 +74,25 @@ export async function harvestWixApis(input: {
         status: cmsPages.length ? "done" : "skipped",
         detail: cmsPages.length
           ? `${cmsPages.length} CMS records in ${input.scope.planLabel} scope`
-          : "No readable CMS collections on this site",
+          : "No CMS collections listed on this site",
       });
     } catch (error) {
-      stages.push({
-        key: "wix-cms",
-        label: "Read Wix CMS collections",
-        status: "failed",
-        detail: error instanceof Error ? error.message : "CMS unavailable",
-      });
-      warnings.push(cmsWarning(error));
+      if (looksLikePermissionError(error)) {
+        stages.push({
+          key: "wix-cms",
+          label: "Read Wix CMS collections",
+          status: "failed",
+          detail: error instanceof Error ? error.message : "CMS unavailable",
+        });
+        warnings.push(cmsWarning(error));
+      } else {
+        stages.push({
+          key: "wix-cms",
+          label: "Read Wix CMS collections",
+          status: "skipped",
+          detail: "CMS collections were not listed; live pages were still indexed",
+        });
+      }
     }
   } else {
     skipped.push("CMS reading is included on paid plans.");
@@ -185,24 +194,38 @@ async function readCmsCollections(
 }
 
 async function listCollections(client: ReturnType<typeof createWixAppClient>, scope: ScanScope) {
-  const limit = Math.max(scope.maxCmsCollections * 2, 20);
-  try {
-    const listed = await client.cmsCollections.listDataCollections({ paging: { limit } });
-    const collections = (listed as { collections?: { _id?: string; id?: string; displayName?: string; name?: string }[] }).collections ?? [];
-    return collections.map((row) => ({
-      id: String(row._id || row.id || ""),
-      name: String(row.displayName || row.name || row._id || "Collection"),
-    }));
-  } catch {
-    const query = (client.cmsCollections as unknown as { queryDataCollections?: (input: unknown) => Promise<{ collections?: { _id?: string; id?: string; displayName?: string }[] }> })
-      .queryDataCollections;
-    if (!query) throw new Error("CMS list API unavailable");
-    const listed = await query({ paging: { limit } });
-    return (listed.collections ?? []).map((row) => ({
-      id: String(row._id || row.id || ""),
-      name: String(row.displayName || row._id || "Collection"),
-    }));
+  const limit = Math.min(100, Math.max(scope.maxCmsCollections * 2, 20));
+  const attempts: Array<() => Promise<{ id: string; name: string }[]>> = [
+    async () => mapCollections(await client.cmsCollections.listDataCollections({ paging: { limit } })),
+    async () => mapCollections(await client.cmsCollections.listDataCollections({})),
+    async () => {
+      const query = (client.cmsCollections as unknown as { queryDataCollections?: (input?: unknown) => Promise<unknown> }).queryDataCollections;
+      if (!query) return [];
+      return mapCollections(await query({ paging: { limit } }));
+    },
+  ];
+  let permissionError: unknown = null;
+  let listedOk = false;
+  for (const attempt of attempts) {
+    try {
+      const rows = await attempt();
+      listedOk = true;
+      if (rows.length) return rows;
+    } catch (error) {
+      if (looksLikePermissionError(error)) permissionError = error;
+    }
   }
+  if (permissionError && !listedOk) throw permissionError;
+  return [];
+}
+
+function mapCollections(listed: unknown) {
+  const collections =
+    (listed as { collections?: { _id?: string; id?: string; displayName?: string; name?: string }[] }).collections ?? [];
+  return collections.map((row) => ({
+    id: String(row._id || row.id || ""),
+    name: String(row.displayName || row.name || row._id || "Collection"),
+  }));
 }
 
 async function queryCollectionItems(
@@ -238,18 +261,29 @@ async function queryCollectionItems(
   }
 
   if (typeof api.queryDataItems === "function") {
-    const result = await api.queryDataItems({ dataCollectionId: collectionId, paging: { limit } });
-    const fromData = (result.dataItems ?? []).map((row) => row.data ?? {}).filter((row) => Object.keys(row).length);
-    if (fromData.length) return fromData.slice(0, limit);
-    return (result.items ?? []).slice(0, limit);
+    const pageSize = Math.min(100, Math.max(limit, 1));
+    const items: Record<string, unknown>[] = [];
+    let offset = 0;
+    while (items.length < limit) {
+      const take = Math.min(pageSize, limit - items.length);
+      const result = await api.queryDataItems({
+        dataCollectionId: collectionId,
+        paging: { limit: take, offset },
+      });
+      const fromData = (result.dataItems ?? []).map((row) => row.data ?? {}).filter((row) => Object.keys(row).length);
+      const batch = fromData.length ? fromData : (result.items ?? []);
+      items.push(...batch);
+      if (batch.length < take) break;
+      offset += batch.length;
+    }
+    return items.slice(0, limit);
   }
 
   return [];
 }
 
 async function readStores(client: ReturnType<typeof createWixAppClient>, siteUrl: string, scope: ScanScope) {
-  const productResult = await client.products.queryProducts().limit(scope.maxProducts).find();
-  const productItems = itemsOf(productResult);
+  const productItems = await queryStoreProducts(client, scope.maxProducts);
   const products = productItems.map((product) => {
     const priceData = product.priceData as { formatted?: { price?: string; discountPrice?: string }; price?: number; currency?: string } | undefined;
     const price = product.price as { formatted?: { price?: string } } | undefined;
@@ -300,12 +334,35 @@ function toPage(title: string, url: string, text: string, contentType: Knowledge
     phones: [],
     links: [],
     contentType,
+    jsonLd: [],
   };
 }
 
 function itemsOf(result: unknown) {
   const row = result as { items?: Record<string, unknown>[]; products?: Record<string, unknown>[]; collections?: Record<string, unknown>[] };
   return row.items ?? row.products ?? row.collections ?? [];
+}
+
+async function queryStoreProducts(client: ReturnType<typeof createWixAppClient>, max: number) {
+  const pageSize = 100;
+  const products: Record<string, unknown>[] = [];
+  let skip = 0;
+  while (products.length < max) {
+    const take = Math.min(pageSize, max - products.length);
+    const root = client.products.queryProducts() as {
+      skip?: (n: number) => unknown;
+      limit: (n: number) => { find: () => Promise<unknown> };
+      find?: () => Promise<unknown>;
+    };
+    const skipped = skip > 0 && typeof root.skip === "function" ? (root.skip(skip) as typeof root) : root;
+    const limited = typeof skipped.limit === "function" ? skipped.limit(take) : skipped;
+    const batch = itemsOf(await (limited as { find: () => Promise<unknown> }).find());
+    products.push(...batch);
+    if (batch.length < take) break;
+    if (typeof root.skip !== "function") break;
+    skip += batch.length;
+  }
+  return products;
 }
 
 function flattenValue(value: unknown, depth = 0): string {

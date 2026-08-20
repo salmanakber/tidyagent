@@ -41,6 +41,10 @@ export default async function DashboardPage() {
             name={data.agent.name}
             greeting={data.agent.widgetGreeting}
             primaryColor={data.agent.widgetPrimaryColor}
+            useGradient={data.agent.widgetUseGradient}
+            gradientTo={data.agent.widgetGradientTo}
+            textColor={data.agent.widgetTextColor}
+            messageColor={data.agent.widgetMessageColor}
             position={data.agent.widgetPosition}
             avatarUrl={data.agent.widgetAvatarUrl}
             template={data.agent.widgetTemplate}

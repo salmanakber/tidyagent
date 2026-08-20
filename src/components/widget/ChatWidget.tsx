@@ -9,6 +9,10 @@ export type WidgetProps = {
   name: string;
   greeting: string;
   primaryColor: string;
+  useGradient?: boolean;
+  gradientTo?: string;
+  textColor?: string;
+  messageColor?: string;
   position?: "BOTTOM_RIGHT" | "BOTTOM_LEFT";
   avatarUrl?: string | null;
   preview?: boolean;
@@ -28,6 +32,10 @@ export function ChatWidget({
   name,
   greeting,
   primaryColor,
+  useGradient = false,
+  gradientTo = "#4F8CFF",
+  textColor = "#FFFFFF",
+  messageColor = "#1E293B",
   position = "BOTTOM_RIGHT",
   avatarUrl,
   preview = false,
@@ -53,7 +61,19 @@ export function ChatWidget({
   const ttsAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
 
-  const bubbleStyle = useMemo(() => ({ backgroundColor: primaryColor }), [primaryColor]);
+  const brandStyle = useMemo(
+    () => brandFill(primaryColor, useGradient, gradientTo),
+    [primaryColor, useGradient, gradientTo],
+  );
+  const headerStyle = useMemo(
+    () => ({
+      ...(template === "CLASSIC" || useGradient ? brandStyle : {}),
+      color: textColor,
+    }),
+    [brandStyle, template, useGradient, textColor],
+  );
+  const visitorStyle = useMemo(() => ({ ...brandStyle, color: textColor }), [brandStyle, textColor]);
+  const replyColor = template === "MINIMAL" && messageColor.toUpperCase() === "#1E293B" ? "#E8EDF5" : messageColor;
 
   useEffect(() => {
     setAgent({ name, avatarUrl, role: "Online", voiceId });
@@ -185,10 +205,10 @@ export function ChatWidget({
   }
 
   const shell = {
-    CLASSIC: "rounded-[26px] bg-white",
-    SOFT: "rounded-[36px] bg-[#f7f1e6]",
-    BAR: "rounded-t-[22px] rounded-b-none bg-white",
-    MINIMAL: "rounded-[18px] bg-[#101826] text-white",
+    CLASSIC: "rounded-[22px] bg-white",
+    SOFT: "rounded-[28px] bg-[#f7f1e6]",
+    BAR: "rounded-t-[20px] rounded-b-none bg-white",
+    MINIMAL: "rounded-[16px] bg-[#101826] text-white",
   }[template];
   const head = {
     CLASSIC: "text-white",
@@ -204,15 +224,25 @@ export function ChatWidget({
   }[template];
 
   return (
-    <div className={cn("flex flex-col", preview ? "relative min-h-[560px]" : "pointer-events-none fixed inset-0")}>
-      <div className={cn("pointer-events-auto absolute bottom-3 flex w-[min(100%,400px)] flex-col gap-3", left ? "left-3 items-start" : "right-3 items-end")}>
+    <div className={cn("flex touch-manipulation flex-col", preview ? "relative min-h-[min(62dvh,480px)]" : "pointer-events-none fixed inset-0")}>
+      <div
+        className={cn(
+          "pointer-events-auto absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] flex w-[min(100%,340px)] max-w-[calc(100vw-1rem)] flex-col gap-2",
+          left ? "left-[max(0.5rem,env(safe-area-inset-left))] items-start" : "right-[max(0.5rem,env(safe-area-inset-right))] items-end",
+        )}
+      >
         {open ? (
-          <div className={cn("relative flex h-[min(72dvh,560px)] w-full flex-col overflow-hidden border border-black/10 shadow-panel", shell)}>
-            <div className={cn("flex items-center gap-2 px-3 py-3", head)} style={template === "CLASSIC" ? bubbleStyle : undefined}>
-              <button type="button" className="rounded-xl bg-white/10 p-2" onClick={() => setInboxOpen((value) => !value)} aria-label="History">
+          <div
+            className={cn(
+              "relative flex h-[min(58dvh,440px)] max-h-[calc(100dvh-5rem)] w-full min-h-[260px] flex-col overflow-hidden border border-black/10 shadow-panel",
+              shell,
+            )}
+          >
+            <div className={cn("flex shrink-0 items-center gap-1.5 px-2 py-2 sm:gap-2 sm:px-3 sm:py-2.5", head)} style={headerStyle}>
+              <button type="button" className="shrink-0 rounded-xl bg-white/10 p-1.5 sm:p-2" onClick={() => setInboxOpen((value) => !value)} aria-label="History">
                 <History className="h-4 w-4" />
               </button>
-              <Face name={agent.name} url={agent.avatarUrl} />
+              <Face name={agent.name} url={agent.avatarUrl} small />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{agent.name}</p>
                 <p className="text-[11px] opacity-80">{agent.role || "Online"}</p>
@@ -228,7 +258,7 @@ export function ChatWidget({
                         return next;
                       });
                     }}
-                    className={cn("rounded-xl p-2", voiceOn ? "bg-white text-slate-900" : "bg-white/10")}
+                    className={cn("shrink-0 rounded-xl p-1.5 sm:p-2", voiceOn ? "bg-white text-slate-900" : "bg-white/10")}
                     aria-label={voiceOn ? "Voice replies on" : "Voice replies off"}
                     title={voiceOn ? "Voice replies on" : "Voice replies off"}
                   >
@@ -238,7 +268,7 @@ export function ChatWidget({
                     <button
                       type="button"
                       onClick={stopSpeech}
-                      className="rounded-xl bg-white p-2 text-rose-600"
+                      className="shrink-0 rounded-xl bg-white p-1.5 text-rose-600 sm:p-2"
                       aria-label="Stop listening"
                       title="Stop listening"
                     >
@@ -247,17 +277,17 @@ export function ChatWidget({
                   ) : null}
                 </>
               ) : null}
-              <button type="button" onClick={() => { stopSpeech(); setOpen(false); }} className="rounded-xl p-2" aria-label="Close">
+              <button type="button" onClick={() => { stopSpeech(); setOpen(false); }} className="shrink-0 rounded-xl p-1.5 sm:p-2" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
             {inboxOpen ? (
-              <div className="absolute inset-x-0 bottom-0 top-14 z-10 bg-white p-4 text-sm text-slate-600">
+              <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-white p-4 text-sm text-slate-600">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="font-semibold text-slate-900">Your chats</p>
                   <button
-                    className="rounded-full px-3 py-1 text-xs text-white"
-                    style={bubbleStyle}
+                    className="rounded-full px-3 py-1 text-xs"
+                    style={visitorStyle}
                     onClick={() => {
                       setConversationId(null);
                       setInboxOpen(false);
@@ -270,7 +300,7 @@ export function ChatWidget({
                 <p>Saved threads appear here on the live widget after visitors return.</p>
               </div>
             ) : null}
-            <div className={cn("flex-1 space-y-3 overflow-y-auto p-4", thread)}>
+            <div className={cn("min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-4", thread)}>
               {lines.map((line, index) =>
                 line.kind === "xfer" ? (
                   <div key={index} className="mx-auto w-[min(260px,100%)] rounded-2xl bg-white px-4 py-4 text-center shadow-sm">
@@ -284,7 +314,7 @@ export function ChatWidget({
                     </p>
                     <p className="mt-1 text-[11px] text-slate-500">{line.to.role || "Specialist"} · 2s</p>
                     <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-slate-200">
-                      <div className="h-full w-2/3" style={bubbleStyle} />
+                      <div className="h-full w-2/3" style={brandStyle} />
                     </div>
                   </div>
                 ) : line.kind === "joined" ? (
@@ -295,13 +325,17 @@ export function ChatWidget({
                     <span className="h-px flex-1 bg-slate-300" />
                   </div>
                 ) : (
-                  <div key={index} className={cn("flex max-w-[90%] gap-2", line.role === "customer" ? "ml-auto flex-row-reverse" : "")}>
+                  <div key={index} className={cn("flex max-w-[min(90%,18rem)] gap-2", line.role === "customer" ? "ml-auto flex-row-reverse" : "")}>
                     {line.role === "agent" ? <Face name={line.agent?.name || agent.name} url={line.agent?.avatarUrl || agent.avatarUrl} small /> : null}
-                    <div className={cn("space-y-1", line.role === "customer" ? "items-end text-right" : "")}>
+                    <div className={cn("min-w-0 space-y-1", line.role === "customer" ? "items-end text-right" : "")}>
                       {line.role === "agent" ? <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">{line.agent?.name || agent.name}</p> : null}
                       <div
-                        className={cn("rounded-2xl px-3 py-2 text-sm leading-6", line.role === "agent" ? "rounded-tl-md bg-white text-slate-800 shadow-sm" : "rounded-tr-md text-white")}
-                        style={line.role === "customer" ? bubbleStyle : undefined}
+                        className={cn(
+                          "break-words rounded-2xl px-3 py-2 text-[13px] leading-5 sm:text-sm sm:leading-6",
+                          line.role === "agent" ? "rounded-tl-md bg-white shadow-sm" : "rounded-tr-md",
+                          template === "MINIMAL" && line.role === "agent" ? "bg-[#1a2436]" : "",
+                        )}
+                        style={line.role === "customer" ? visitorStyle : { color: replyColor }}
                       >
                         {line.role === "agent" ? <AgentRichText text={line.text} /> : line.text}
                       </div>
@@ -312,9 +346,9 @@ export function ChatWidget({
               )}
               {thinking ? <p className="text-xs text-slate-400">Checking that for you…</p> : null}
             </div>
-            <div className={cn("flex items-center gap-2 border-t p-3", template === "MINIMAL" ? "border-white/10" : "border-slate-100")}>
+            <div className={cn("flex shrink-0 items-center gap-2 border-t p-2.5 sm:p-3", template === "MINIMAL" ? "border-white/10" : "border-slate-100")}>
               {voiceEnabled ? (
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-slate-900 text-white">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white sm:h-10 sm:w-10">
                   <Mic className="h-4 w-4" />
                 </span>
               ) : null}
@@ -325,9 +359,12 @@ export function ChatWidget({
                   if (event.key === "Enter") void send();
                 }}
                 placeholder="Write a message"
-                className={cn("flex-1 rounded-full px-4 py-2 text-sm outline-none", template === "MINIMAL" ? "bg-[#1a2436] text-white" : "bg-slate-100 text-slate-800")}
+                className={cn(
+                  "min-w-0 flex-1 rounded-full px-3 py-2 text-base outline-none sm:px-4 sm:text-sm",
+                  template === "MINIMAL" ? "bg-[#1a2436] text-white" : "bg-slate-100 text-slate-800",
+                )}
               />
-              <button type="button" onClick={() => void send()} className="grid h-10 w-10 place-items-center rounded-full text-white" style={bubbleStyle}>
+              <button type="button" onClick={() => void send()} className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10" style={visitorStyle}>
                 <Send className="h-4 w-4" />
               </button>
             </div>
@@ -335,7 +372,7 @@ export function ChatWidget({
         ) : teaserOn && template !== "MINIMAL" ? (
           <button
             type="button"
-            className={cn("relative flex max-w-[260px] items-start gap-2 bg-white px-3 py-3 pr-8 text-left shadow-lg", left ? "rounded-[18px_18px_18px_6px]" : "rounded-[18px_18px_6px_18px]")}
+            className={cn("relative flex max-w-[min(240px,calc(100vw-5.5rem))] items-start gap-2 bg-white px-3 py-3 pr-8 text-left shadow-lg", left ? "rounded-[18px_18px_18px_6px]" : "rounded-[18px_18px_6px_18px]")}
             onClick={() => setOpen(true)}
           >
             <span className="absolute right-2 top-1 text-slate-400" onClick={(event) => { event.stopPropagation(); setTeaserOn(false); }}>×</span>
@@ -346,14 +383,15 @@ export function ChatWidget({
             </span>
           </button>
         ) : null}
+        {open ? null : (
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => setOpen(true)}
           className={cn(
-            "relative flex items-center overflow-hidden rounded-full text-white shadow-lg",
-            template === "MINIMAL" ? "h-12 gap-2 bg-slate-950 pr-4" : avatarUrl ? "h-16 w-16 bg-transparent p-0" : "h-16 w-16",
+            "relative flex items-center overflow-hidden rounded-full shadow-lg",
+            template === "MINIMAL" ? "h-11 gap-2 bg-slate-950 pr-4" : avatarUrl ? "h-14 w-14 bg-transparent p-0" : "h-14 w-14",
           )}
-          style={template === "MINIMAL" || avatarUrl ? undefined : bubbleStyle}
+          style={template === "MINIMAL" || avatarUrl ? { color: textColor } : visitorStyle}
           aria-label="Open chat"
         >
           <span className={cn("overflow-hidden rounded-full", template === "MINIMAL" ? "ml-1 h-9 w-9" : "h-full w-full")}>
@@ -361,9 +399,20 @@ export function ChatWidget({
           </span>
           {template === "MINIMAL" ? <span className="text-sm font-semibold">Chat</span> : null}
         </button>
+        )}
       </div>
     </div>
   );
+}
+
+function brandFill(primary: string, useGradient: boolean, gradientTo: string) {
+  if (useGradient && gradientTo) {
+    return {
+      backgroundImage: `linear-gradient(135deg, ${primary} 0%, ${gradientTo} 100%)`,
+      backgroundColor: primary,
+    };
+  }
+  return { backgroundColor: primary };
 }
 
 function Face({ name, url, small }: { name: string; url?: string | null; small?: boolean }) {
