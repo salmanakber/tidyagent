@@ -34,15 +34,26 @@ export function decryptSecret(value: string) {
   if (!value.startsWith("enc:")) return value;
   const [, ivHex, tagHex, dataHex] = value.split(":");
   if (!ivHex || !tagHex || !dataHex) return "";
-  const decipher = createDecipheriv("aes-256-gcm", keyMaterial(), Buffer.from(ivHex, "hex"));
-  decipher.setAuthTag(Buffer.from(tagHex, "hex"));
-  return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf8");
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", keyMaterial(), Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf8");
+  } catch {
+    /* SESSION_SECRET changed, or the stored blob is corrupt */
+    return "";
+  }
 }
 
 export async function getSetting(key: string, fallback = "") {
   const row = await prisma.platformSetting.findUnique({ where: { key } });
   if (!row?.value) return fallback;
-  return row.secret ? decryptSecret(row.value) : row.value;
+  if (!row.secret) return row.value;
+  const plain = decryptSecret(row.value);
+  if (plain) return plain;
+  if (row.value.startsWith("enc:")) {
+    console.error(`Could not decrypt platform setting "${key}". SESSION_SECRET may have changed. Re-save the key in Admin → Settings.`);
+  }
+  return fallback;
 }
 
 export async function setSetting(key: string, value: string) {
