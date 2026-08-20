@@ -11,6 +11,7 @@ export type WixApiHarvest = {
     description?: string;
     price?: string;
     id?: string;
+    url?: string;
     data?: Prisma.InputJsonValue;
   }[];
   stages: ScanStage[];
@@ -70,8 +71,10 @@ export async function harvestWixApis(input: {
       stages.push({
         key: "wix-cms",
         label: "Read Wix CMS collections",
-        status: "done",
-        detail: cmsPages.length ? `${cmsPages.length} CMS records in ${input.scope.planLabel} scope` : "No readable CMS collections",
+        status: cmsPages.length ? "done" : "skipped",
+        detail: cmsPages.length
+          ? `${cmsPages.length} CMS records in ${input.scope.planLabel} scope`
+          : "No readable CMS collections on this site",
       });
     } catch (error) {
       stages.push({
@@ -80,7 +83,7 @@ export async function harvestWixApis(input: {
         status: "failed",
         detail: error instanceof Error ? error.message : "CMS unavailable",
       });
-      warnings.push("CMS data needs the Wix Data permission. Pages from the live domain were still read.");
+      warnings.push(cmsWarning(error));
     }
   } else {
     skipped.push("CMS reading is included on paid plans.");
@@ -88,13 +91,13 @@ export async function harvestWixApis(input: {
 
   if (input.scope.includeStores) {
     try {
-      const catalog = await readStores(client, input.scope);
+      const catalog = await readStores(client, input.siteUrl, input.scope);
       products.push(...catalog.products);
       pages.push(...catalog.collections);
       stages.push({
         key: "wix-stores",
         label: "Read Wix Stores catalog",
-        status: "done",
+        status: catalog.products.length ? "done" : "skipped",
         detail: `${catalog.products.length} products · ${catalog.collections.length} collections`,
       });
     } catch (error) {
@@ -104,7 +107,7 @@ export async function harvestWixApis(input: {
         status: "failed",
         detail: error instanceof Error ? error.message : "Stores API unavailable",
       });
-      warnings.push("Stores catalog could not be read. Page and CMS content was still indexed.");
+      warnings.push(storesWarning(error));
     }
   } else {
     skipped.push("Wix Stores catalog is included on Business and Pro.");
@@ -117,6 +120,27 @@ export async function harvestWixApis(input: {
   }
 
   return { pages, products, stages, skipped, warnings };
+}
+
+function looksLikePermissionError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /permission|forbidden|not authorized|403|ACCESS_DENIED|insufficient/i.test(message);
+}
+
+function cmsWarning(error: unknown) {
+  if (looksLikePermissionError(error)) {
+    return "CMS data needs the Wix Data permission (Permissions → Wix Data: Read collections and items). Pages from the live domain were still read.";
+  }
+  const message = error instanceof Error ? error.message.slice(0, 140) : "CMS unavailable";
+  return `CMS collections could not be read (${message}). Pages from the live domain were still indexed.`;
+}
+
+function storesWarning(error: unknown) {
+  if (looksLikePermissionError(error)) {
+    return "Stores catalog needs the Read Stores permission. Page and CMS content was still indexed.";
+  }
+  const message = error instanceof Error ? error.message.slice(0, 140) : "Stores unavailable";
+  return `Stores catalog could not be read (${message}). Page and CMS content was still indexed.`;
 }
 
 async function readSiteProperties(client: ReturnType<typeof createWixAppClient>, siteUrl: string) {
@@ -133,26 +157,52 @@ async function readCmsCollections(
   siteUrl: string,
   scope: ScanScope,
 ) {
-  const listed = await client.cmsCollections.listDataCollections({
-    paging: { limit: Math.max(scope.maxCmsCollections * 2, 20) },
-  });
-  const collections = ((listed as { collections?: { _id?: string; displayName?: string }[] }).collections ?? [])
-    .map((row) => ({ id: String(row._id || ""), name: String(row.displayName || row._id || "Collection") }))
+  const listed = await listCollections(client, scope);
+  const collections = listed
+    .map((row) => ({ id: String(row.id || ""), name: String(row.name || row.id || "Collection") }))
     .filter((row) => row.id && cmsCollectionAllowed(row.id, scope))
     .slice(0, scope.maxCmsCollections);
 
   const pages: ExtractedPage[] = [];
   for (const collection of collections) {
-    const items = await queryCollectionItems(client, collection.id, scope.maxCmsItemsPerCollection);
-    for (const item of items) {
-      const title = String(item.title || item.name || item.headline || `${collection.name} item`);
-      const text = flattenValue(item);
-      if (text.length < 24) continue;
-      const url = typeof item.url === "string" && item.url.startsWith("http") ? item.url : `${siteUrl.replace(/\/$/, "")}/cms/${encodeURIComponent(collection.id)}`;
-      pages.push(toPage(`${collection.name}: ${title}`.slice(0, 180), url, text, classifyPage(url, title, text)));
+    try {
+      const items = await queryCollectionItems(client, collection.id, scope.maxCmsItemsPerCollection);
+      for (const item of items) {
+        const title = String(item.title || item.name || item.headline || `${collection.name} item`);
+        const text = flattenValue(item);
+        if (text.length < 24) continue;
+        const url =
+          (typeof item.url === "string" && item.url.startsWith("http") && item.url) ||
+          (typeof item.link === "string" && item.link.startsWith("http") && item.link) ||
+          `${siteUrl.replace(/\/$/, "")}/cms/${encodeURIComponent(collection.id)}`;
+        pages.push(toPage(`${collection.name}: ${title}`.slice(0, 180), url, text, classifyPage(url, title, text)));
+      }
+    } catch {
+      /* skip one collection, keep the rest */
     }
   }
   return pages;
+}
+
+async function listCollections(client: ReturnType<typeof createWixAppClient>, scope: ScanScope) {
+  const limit = Math.max(scope.maxCmsCollections * 2, 20);
+  try {
+    const listed = await client.cmsCollections.listDataCollections({ paging: { limit } });
+    const collections = (listed as { collections?: { _id?: string; id?: string; displayName?: string; name?: string }[] }).collections ?? [];
+    return collections.map((row) => ({
+      id: String(row._id || row.id || ""),
+      name: String(row.displayName || row.name || row._id || "Collection"),
+    }));
+  } catch {
+    const query = (client.cmsCollections as unknown as { queryDataCollections?: (input: unknown) => Promise<{ collections?: { _id?: string; id?: string; displayName?: string }[] }> })
+      .queryDataCollections;
+    if (!query) throw new Error("CMS list API unavailable");
+    const listed = await query({ paging: { limit } });
+    return (listed.collections ?? []).map((row) => ({
+      id: String(row._id || row.id || ""),
+      name: String(row.displayName || row._id || "Collection"),
+    }));
+  }
 }
 
 async function queryCollectionItems(
@@ -160,33 +210,66 @@ async function queryCollectionItems(
   collectionId: string,
   limit: number,
 ) {
-  const query = client.cmsItems.query as unknown as (
-    id: string,
-  ) => { limit?: (n: number) => { find: () => Promise<{ items?: Record<string, unknown>[] }> }; find?: () => Promise<{ items?: Record<string, unknown>[] }> };
-  const builder = query(collectionId);
-  const result =
-    builder && typeof builder.limit === "function"
-      ? await builder.limit(limit).find()
-      : builder && typeof builder.find === "function"
-        ? await builder.find()
-        : { items: [] };
-  return (result.items ?? []).slice(0, limit);
+  const api = client.cmsItems as unknown as {
+    query?: (id: string) => {
+      limit?: (n: number) => { find: () => Promise<{ items?: Record<string, unknown>[] }> };
+      find?: () => Promise<{ items?: Record<string, unknown>[] }>;
+    };
+    queryDataItems?: (input: { dataCollectionId: string; paging?: { limit: number } }) => Promise<{
+      dataItems?: { data?: Record<string, unknown> }[];
+      items?: Record<string, unknown>[];
+    }>;
+  };
+
+  if (typeof api.query === "function") {
+    try {
+      const builder = api.query(collectionId);
+      const result =
+        builder && typeof builder.limit === "function"
+          ? await builder.limit(limit).find()
+          : builder && typeof builder.find === "function"
+            ? await builder.find()
+            : { items: [] };
+      const items = result.items ?? [];
+      if (items.length) return items.slice(0, limit);
+    } catch {
+      /* try queryDataItems */
+    }
+  }
+
+  if (typeof api.queryDataItems === "function") {
+    const result = await api.queryDataItems({ dataCollectionId: collectionId, paging: { limit } });
+    const fromData = (result.dataItems ?? []).map((row) => row.data ?? {}).filter((row) => Object.keys(row).length);
+    if (fromData.length) return fromData.slice(0, limit);
+    return (result.items ?? []).slice(0, limit);
+  }
+
+  return [];
 }
 
-async function readStores(client: ReturnType<typeof createWixAppClient>, scope: ScanScope) {
+async function readStores(client: ReturnType<typeof createWixAppClient>, siteUrl: string, scope: ScanScope) {
   const productResult = await client.products.queryProducts().limit(scope.maxProducts).find();
   const productItems = itemsOf(productResult);
   const products = productItems.map((product) => {
-    const priceData = product.priceData as { formatted?: { price?: string }; price?: number } | undefined;
+    const priceData = product.priceData as { formatted?: { price?: string; discountPrice?: string }; price?: number; currency?: string } | undefined;
     const price = product.price as { formatted?: { price?: string } } | undefined;
+    const pageUrl = product.productPageUrl as { base?: string; path?: string; url?: string } | undefined;
+    const url =
+      (typeof product.url === "string" && product.url) ||
+      pageUrl?.url ||
+      [pageUrl?.base, pageUrl?.path].filter(Boolean).join("") ||
+      (typeof product.slug === "string" ? `${siteUrl.replace(/\/$/, "")}/product-page/${product.slug}` : undefined);
+    const formatted =
+      priceData?.formatted?.discountPrice ||
+      priceData?.formatted?.price ||
+      price?.formatted?.price ||
+      (priceData?.price != null ? `${priceData.currency ? `${priceData.currency} ` : ""}${priceData.price}` : undefined);
     return {
       id: String(product._id ?? product.id ?? ""),
       name: String(product.name || "Product"),
       description: product.description ? stripTags(String(product.description)).slice(0, 1500) : undefined,
-      price:
-        priceData?.formatted?.price ||
-        price?.formatted?.price ||
-        (priceData?.price != null ? String(priceData.price) : undefined),
+      price: formatted,
+      url,
       data: product as Prisma.InputJsonValue,
     };
   });

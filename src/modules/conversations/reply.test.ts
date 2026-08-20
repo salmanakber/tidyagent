@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCasualOpener } from "@/modules/conversations/reply";
+import { isCasualOpener, isPriceQuestion } from "@/modules/conversations/reply";
 
 describe("visitor openers", () => {
   it("treats hi/hello as greetings, not missing knowledge", () => {
@@ -8,5 +8,11 @@ describe("visitor openers", () => {
     expect(isCasualOpener("Good morning")).toBe(true);
     expect(isCasualOpener("Do you deliver on Friday?")).toBe(false);
     expect(isCasualOpener("What are your hours?")).toBe(false);
+  });
+
+  it("detects price questions", () => {
+    expect(isPriceQuestion("what is the price of deep clean?")).toBe(true);
+    expect(isPriceQuestion("How much does it cost")).toBe(true);
+    expect(isPriceQuestion("Do you deliver on Friday?")).toBe(false);
   });
 });

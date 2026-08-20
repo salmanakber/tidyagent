@@ -7,7 +7,7 @@ import {
   sameSite,
   stripHtml,
 } from "@/modules/knowledge/extract";
-import { cmsCollectionAllowed, scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { cmsCollectionAllowed, pathPriority, scanScopeForPlan } from "@/modules/knowledge/scan-scope";
 import { heuristicUnderstanding } from "@/modules/knowledge/understand";
 
 describe("scan scope", () => {
@@ -25,6 +25,10 @@ describe("scan scope", () => {
     expect(cmsCollectionAllowed("TeamBios", starter)).toBe(true);
     expect(cmsCollectionAllowed("Members/PrivateMembersData", starter)).toBe(false);
     expect(cmsCollectionAllowed("Stores/Products", scanScopeForPlan("GROWTH"))).toBe(true);
+  });
+
+  it("prioritizes pricing URLs ahead of generic pages", () => {
+    expect(pathPriority("https://x.com/pricing")).toBeLessThan(pathPriority("https://x.com/blog/hello"));
   });
 });
 
@@ -58,6 +62,7 @@ describe("site extraction", () => {
     expect(page.links.some((link) => link.includes("/faq"))).toBe(true);
     expect(page.links.some((link) => link.includes("evil.example"))).toBe(false);
     expect(classifyPage("https://harbor.example.com/faq", "FAQ", "help")).toBe("FAQ");
+    expect(classifyPage("https://harbor.example.com/pricing", "Rates", "our plans")).toBe("SERVICE");
   });
 
   it("parses sitemap URLs for the same host only", () => {
@@ -88,5 +93,16 @@ describe("site extraction", () => {
     expect(understanding.name.toLowerCase()).toContain("northline");
     expect(understanding.summary.toLowerCase()).not.toContain("fashion");
     expect(stripHtml("<script>alert(1)</script><p>Hello   world</p>", 40)).toBe("Hello world");
+  });
+
+  it("indexes visible prices onto the page text", () => {
+    const page = extractPage(
+      `<title>Pricing</title><p>Starter is $19 / month. Pro is $99 per month.</p>`,
+      "https://harbor.example.com/pricing",
+      4000,
+    );
+    expect(page.contentType).toBe("SERVICE");
+    expect(page.text).toContain("PRICES AND ITEMS");
+    expect(page.text).toMatch(/\$19/);
   });
 });

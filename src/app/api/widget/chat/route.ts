@@ -57,6 +57,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This AI employee is not published yet." }, { status: 403, headers: corsHeaders() });
   }
 
+  if (!parsed.preview) {
+    const { refreshKnowledgeIfStale } = await import("@/modules/knowledge/refresh");
+    void refreshKnowledgeIfStale({
+      organizationId: agent.organizationId,
+      siteId: agent.siteId,
+      wixInstanceId: agent.site.wixInstanceId,
+    }).catch((error) => {
+      console.error("[knowledge-refresh]", error instanceof Error ? error.message : error);
+    });
+  }
+
   try {
     const result = await replyToVisitor({
       agent,

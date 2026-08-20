@@ -1,5 +1,6 @@
 import type { KnowledgeContentType } from "@prisma/client";
 import { pathPriority } from "@/modules/knowledge/scan-scope";
+import { pageFactsBlock } from "@/modules/knowledge/facts";
 
 export type ExtractedPage = {
   url: string;
@@ -47,7 +48,7 @@ export function classifyPage(url: string, title: string, text: string): Knowledg
   if (/privacy|terms|refund|return|shipping|delivery|cookie/.test(hay)) return "POLICY";
   if (/\bfaq\b|frequently asked|help centre|help center/.test(hay)) return "FAQ";
   if (/\/product|\/item\//.test(url.toLowerCase())) return "PRODUCT";
-  if (/service|booking|appointment|menu/.test(hay)) return "SERVICE";
+  if (/pric|plan|package|service|booking|appointment|menu|rate/.test(hay)) return "SERVICE";
   return "PAGE";
 }
 
@@ -123,10 +124,24 @@ export function extractContacts(text: string) {
 export function parseSitemapUrls(xml: string, siteHost: string, limit: number) {
   const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((item) => collapse(item[1] ?? ""));
   return unique(
-    locs.filter((url) => isSafeHttpUrl(url) && sameSite(url, siteHost)),
+    locs.filter((url) => isSafeHttpUrl(url) && sameSite(url, siteHost) && !/\.xml(\?|$)/i.test(url)),
   )
     .sort((a, b) => pathPriority(a) - pathPriority(b) || a.length - b.length)
     .slice(0, limit);
+}
+
+export function parseSitemapIndex(xml: string, siteHost: string, limit = 8) {
+  if (!/<sitemapindex/i.test(xml) && !/<sitemap>/i.test(xml)) return [];
+  const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((item) => collapse(item[1] ?? ""));
+  return unique(locs.filter((url) => isSafeHttpUrl(url) && sameSite(url, siteHost) && /\.xml(\?|$)/i.test(url))).slice(
+    0,
+    limit,
+  );
+}
+
+export function parseRobotsSitemaps(robots: string, siteHost: string) {
+  const locs = [...robots.matchAll(/^sitemap:\s*(\S+)/gim)].map((item) => collapse(item[1] ?? ""));
+  return unique(locs.filter((url) => isSafeHttpUrl(url) && sameSite(url, siteHost)));
 }
 
 export function extractPage(html: string, url: string, maxChars: number): ExtractedPage {
@@ -135,18 +150,20 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
     extractMeta(html, "og:description") || extractMeta(html, "description") || "";
   const headings = extractHeadings(html);
   const text = stripHtml(html, maxChars);
-  const { emails, phones } = extractContacts(`${description}\n${text}`);
+  const facts = pageFactsBlock(html, `${description}\n${headings.join(" ")}\n${text}`);
+  const combined = [facts, description, headings.join("\n"), text].filter(Boolean).join("\n\n").slice(0, maxChars + 2500);
+  const { emails, phones } = extractContacts(`${description}\n${combined}`);
   const links = extractLinks(html, url);
   return {
     url,
     title,
     description: collapse(description).slice(0, 320),
     headings,
-    text,
+    text: combined,
     emails,
     phones,
     links,
-    contentType: classifyPage(url, title, `${description} ${text}`),
+    contentType: classifyPage(url, title, `${description} ${combined}`),
   };
 }
 
@@ -162,7 +179,7 @@ export function chunkText(text: string, size = 1200, overlap = 120) {
     if (end >= clean.length) break;
     start = end - overlap;
   }
-  return chunks.slice(0, 8);
+  return chunks.slice(0, 14);
 }
 
 function attrMatch(html: string, attr: string, name: string) {

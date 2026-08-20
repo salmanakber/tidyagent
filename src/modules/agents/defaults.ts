@@ -26,7 +26,7 @@ export async function seedDefaultAgent(input: {
       status: "DRAFT",
       isPrimary: true,
       specialty: "GENERAL",
-      knowledgeScopes: ["PAGE", "FAQ", "POLICY", "CUSTOM"],
+      knowledgeScopes: ["PAGE", "FAQ", "POLICY", "CUSTOM", "SERVICE"],
       widgetTemplate: "CLASSIC",
       voiceEnabled: true,
       voiceId: "en-US-Neural2-F",

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, History, Mic, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
+import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
 
 export type WidgetProps = {
   name: string;
@@ -98,7 +99,8 @@ export function ChatWidget({
   }
 
   async function speak(text: string, nextVoice?: string | null) {
-    if (!voiceEnabled || !voiceOn || !text) return;
+    const spoken = stripForVoice(text);
+    if (!voiceEnabled || !voiceOn || !spoken) return;
     stopSpeech();
     const gen = speakGenRef.current;
     const controller = new AbortController();
@@ -107,7 +109,7 @@ export function ChatWidget({
       const response = await fetch("/api/widget/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.slice(0, 600), preview: true, voiceId: nextVoice || voiceId }),
+        body: JSON.stringify({ text: spoken.slice(0, 600), preview: true, voiceId: nextVoice || voiceId }),
         signal: controller.signal,
       });
       if (gen !== speakGenRef.current) return;
@@ -301,7 +303,7 @@ export function ChatWidget({
                         className={cn("rounded-2xl px-3 py-2 text-sm leading-6", line.role === "agent" ? "rounded-tl-md bg-white text-slate-800 shadow-sm" : "rounded-tr-md text-white")}
                         style={line.role === "customer" ? bubbleStyle : undefined}
                       >
-                        {line.text}
+                        {line.role === "agent" ? <AgentRichText text={line.text} /> : line.text}
                       </div>
                       <p className="px-1 text-[10px] text-slate-400">{formatTime(line.at)}</p>
                     </div>

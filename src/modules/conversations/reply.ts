@@ -17,6 +17,10 @@ export function isCasualOpener(text: string) {
   return OPENER.test(text.trim().replace(/[^\w\s'!?]/g, ""));
 }
 
+export function isPriceQuestion(text: string) {
+  return /price|pricing|cost|how much|fee|rate|package|plan|charge|quote|\$/.test(text.toLowerCase());
+}
+
 export async function replyToVisitor(input: {
   agent: ResolvedWidgetAgent;
   message: string;
@@ -143,6 +147,12 @@ export async function replyToVisitor(input: {
   const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
     on("shopping") ? true : item !== "PRODUCT",
   );
+  if (isPriceQuestion(message)) {
+    if (!assignedScopes.includes("SERVICE")) assignedScopes.push("SERVICE");
+    if (scope.includeStores && on("shopping") && !assignedScopes.includes("PRODUCT")) {
+      assignedScopes.push("PRODUCT");
+    }
+  }
   const evidence = greetingTurn
     ? []
     : await gatherEvidence({
@@ -304,7 +314,12 @@ async function gatherEvidence(input: {
     .split(/\s+/)
     .map((word) => word.replace(/[^\w'-]/g, ""))
     .filter((word) => word.length >= 3)
-    .slice(0, 6);
+    .slice(0, 8);
+  if (isPriceQuestion(input.question)) {
+    for (const extra of ["price", "pricing", "cost", "package", "plan", "service"]) {
+      if (!terms.includes(extra)) terms.push(extra);
+    }
+  }
 
   const keywordHits =
     terms.length === 0
@@ -319,7 +334,7 @@ async function gatherEvidence(input: {
               { title: { contains: term, mode: "insensitive" as const } },
             ]),
           },
-          take: 8,
+          take: 12,
           select: { content: true, title: true, sourceUrl: true, contentType: true },
         });
 
@@ -365,7 +380,12 @@ async function gatherEvidence(input: {
       },
     ).list;
 
-  if (merged.length) return merged.slice(0, 8);
+  if (merged.length) {
+    const ranked = isPriceQuestion(input.question)
+      ? [...merged].sort((a, b) => Number(isPriceChunk(b)) - Number(isPriceChunk(a)))
+      : merged;
+    return ranked.slice(0, 10);
+  }
 
   return prisma.knowledgeChunk.findMany({
     where: {
@@ -420,12 +440,17 @@ async function generateReply(input: {
       .map((row) => `${row.role === "CUSTOMER" ? "Visitor" : "Agent"}: ${row.content}`)
       .join("\n");
     const result = await ai.generate({
-      temperature: input.greeting ? 0.4 : 0.2,
-      maxTokens: 420,
+      temperature: input.greeting ? 0.4 : 0.15,
+      maxTokens: 700,
       system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
 Specialty: ${input.specialty}. Stay inside that specialty and the evidence. If the question belongs to another team, say you are connecting them.
 You are a real customer-service employee for this Wix business, not a generic chatbot.
 Never invent prices, policies, hours, or products. Use only the business profile and evidence.
+When evidence includes prices, named items, or packages, present them clearly:
+- Put each distinct item on its own line as a short bullet.
+- Bold the item name and the exact price with **double asterisks**.
+- If a source URL is in the evidence, add a markdown link: [View details](https://...).
+Do not dump raw field names like "priceData". Write the way a person at the front desk would.
 ${intro}
 ${hoursNote}
 If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
@@ -442,14 +467,19 @@ ${historyBlock}
 
 Visitor just said: ${input.question}
 
-Reply in 1-4 short sentences.`,
+Answer the question. Prefer a short intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence.`,
     });
     const text = result.text.trim();
-    if (text) return text.slice(0, 1600);
+    if (text) return text.slice(0, 2800);
   } catch {
     /* use fallback */
   }
   return fallback;
+}
+
+function isPriceChunk(row: { content: string; title: string | null; sourceUrl: string | null; contentType: string }) {
+  const hay = `${row.title ?? ""} ${row.sourceUrl ?? ""} ${row.content}`.toLowerCase();
+  return /price|pricing|offer|package|plan|\$|usd|pkr|eur|gbp/.test(hay) || row.contentType === "SERVICE" || row.contentType === "PRODUCT";
 }
 
 function answerFromEvidence(question: string, evidence: { content: string; title: string | null }[]) {
