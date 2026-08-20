@@ -214,8 +214,9 @@ Do not add unused “manage” scopes.
 Keep this live for as long as the app is in the Market:
 
 1. A **published** Wix premium/dev site with tidyAgent installed and the chat bubble visible.
-2. Reviewer login for the tidyAgent dashboard (email + password), **or** tell them to open **Dashboard → tidyAgent** (auto session from `instance`).
-3. Optional: in Platform admin → Access, grant that site a complimentary **Pro** seat so they can test voice and specialists without buying.
+2. Reviewer login below — **Pro is already granted**. They do not need to buy a plan.
+3. While `WIX_REVIEW_MODE=true` on production, anyone who installs from Wix during review also gets a complimentary Pro seat (so iframe review is not stuck on billing). Turn that flag off after approval.
+
 4. App Review notes (paste into the submit form):
 
 ```
@@ -223,11 +224,15 @@ tidyAgent is a self-hosted dashboard + site widget. Open it from the Wix dashboa
 
 Test site: [PASTE PUBLISHED SITE URL]
 Dashboard: https://agent.tidyflowapp.com/login
-Reviewer email: [PASTE]
-Reviewer password: [PASTE]
+Reviewer email: wix-reviewer@tidyflowapp.com
+Reviewer password: WixReview-tidyAgent-2026
+
+This login is a complimentary Pro seat. Reviewers do not need to purchase a plan or enter a card.
+
+If you install tidyAgent on a Wix site instead, open Dashboard → tidyAgent. During App Market review, unpaid installs are unlocked at Pro so you can test onboarding, the widget, specialists, and voice without checkout.
 
 Widget: publish the site; Editor preview often hides the embedded script.
-Plans: Starter / Business / Pro via Wix checkout only. Unpaid installs see billing until a plan or trial starts.
+Plans: Starter / Business / Pro via Wix checkout for real customers.
 Voice (Pro): spoken replies in the widget. Specialists (Business+): add a team member on AI Agent.
 Terms: https://agent.tidyflowapp.com/terms
 Privacy: https://agent.tidyflowapp.com/privacy

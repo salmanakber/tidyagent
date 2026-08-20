@@ -14,6 +14,7 @@ import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "
 import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
+import { reviewComplimentaryPlan } from "@/modules/auth/reviewer";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -208,17 +209,25 @@ async function upsertSubscriptionFromWix(input: {
 }
 
 export async function entitlementsForOrganization(organizationId: string): Promise<Entitlements> {
-  const [subscription, organization, scopes] = await Promise.all([
+  const [subscription, organization, scopes, site] = await Promise.all([
     prisma.subscription.findFirst({
       where: { organizationId },
       orderBy: { createdAt: "desc" },
     }),
     prisma.organization.findUnique({ where: { id: organizationId } }),
     getAllPlanScopes(),
+    prisma.wixSite.findFirst({
+      where: { organizationId },
+      select: { ownerEmail: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   const suspended = organization?.accessStatus === "suspended";
-  const grant = organization?.compPlanKey ?? null;
+  const grant = reviewComplimentaryPlan({
+    storedGrant: organization?.compPlanKey,
+    ownerEmail: site?.ownerEmail,
+  });
 
   const base = !subscription
     ? withComplimentaryGrant(
