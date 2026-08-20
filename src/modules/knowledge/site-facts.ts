@@ -35,9 +35,9 @@ export function knowledgeCardsForSite(input: {
   conflicts?: number;
 }) {
   const cards: { label: string; value: number; hint: string }[] = [
-    { label: "Website", value: input.pages, hint: "pages actually read" },
+    { label: "Website", value: input.pages, hint: "pages actually crawled" },
   ];
-  if (input.hasStores) cards.push({ label: "Products", value: input.products, hint: "catalog items" });
+  if (input.hasStores) cards.push({ label: "Products", value: input.products, hint: "from Wix Stores" });
   if (input.faqs > 0) cards.push({ label: "FAQs", value: input.faqs, hint: "from the live site" });
   if (input.policies > 0) cards.push({ label: "Policies", value: input.policies, hint: "from the live site" });
   cards.push({ label: "Facts", value: input.facts ?? 0, hint: "structured business facts" });

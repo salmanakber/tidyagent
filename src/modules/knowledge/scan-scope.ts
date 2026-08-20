@@ -16,6 +16,8 @@ export type ScanScope = {
   includeBookings: boolean;
   includeDomainCrawl: boolean;
   depthNote: string;
+  /** Per-scan option. When true, keep crawling discovered URLs instead of stopping at priority paths. */
+  fullSiteCrawl?: boolean;
 };
 
 export function scanScopeFromConfig(planKey: PlanKey, config?: PlanScopeConfig): ScanScope {

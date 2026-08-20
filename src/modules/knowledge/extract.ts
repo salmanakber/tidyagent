@@ -136,7 +136,7 @@ export function parseSitemapUrls(xml: string, siteHost: string, limit: number) {
     .slice(0, limit);
 }
 
-export function parseSitemapIndex(xml: string, siteHost: string, limit = 8) {
+export function parseSitemapIndex(xml: string, siteHost: string, limit = 40) {
   if (!/<sitemapindex/i.test(xml) && !/<sitemap>/i.test(xml)) return [];
   const locs = [...xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)].map((item) => collapse(item[1] ?? ""));
   return unique(locs.filter((url) => isSafeHttpUrl(url) && sameSite(url, siteHost) && /\.xml(\?|$)/i.test(url))).slice(

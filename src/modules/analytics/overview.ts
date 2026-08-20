@@ -165,7 +165,7 @@ export async function getDashboardOverview(session: AppSession) {
       visitorMessages: customerMessages.length,
     },
     knowledge: {
-      pages: knowledgeByType.PAGE ?? 0,
+      pages: (knowledgeByType.PAGE ?? 0) + (knowledgeByType.SERVICE ?? 0),
       products: knowledgeByType.PRODUCT ?? 0,
       faqs: knowledgeByType.FAQ ?? 0,
       policies: knowledgeByType.POLICY ?? 0,

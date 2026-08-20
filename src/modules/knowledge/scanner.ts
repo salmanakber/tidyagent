@@ -21,15 +21,18 @@ import { contentHash, factsFromPage, factsFromProduct } from "@/modules/knowledg
 import { persistSiteFacts } from "@/modules/knowledge/fact-store";
 import { getAIProvider } from "@/modules/ai/factory";
 import { detectWixCapabilities } from "@/modules/wix/capabilities";
-import type { ScanResult, ScanStage } from "@/modules/knowledge/types";
+import type { CrawlItem, ScanResult, ScanStage } from "@/modules/knowledge/types";
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_BYTES = 900_000;
+const CRAWL_BUDGET_MS = 90_000;
+const DISCOVERY_CAP = 4000;
 
 export async function scanOrganizationSite(input: {
   organizationId: string;
   siteId: string;
   wixInstanceId: string;
+  fullSite?: boolean;
 }): Promise<ScanResult> {
   const stages: ScanStage[] = [];
   const warnings: string[] = [];
@@ -40,7 +43,10 @@ export async function scanOrganizationSite(input: {
     throw new Error("A purchased plan is required before the site can be read.");
   }
   const planScope = await getPlanScope(entitlements.planKey);
-  const scope = scanScopeFromConfig(entitlements.planKey, planScope);
+  const scope: ScanScope = {
+    ...scanScopeFromConfig(entitlements.planKey, planScope),
+    fullSiteCrawl: input.fullSite !== false,
+  };
   const site = await prisma.wixSite.findFirst({
     where: { id: input.siteId, organizationId: input.organizationId },
   });
@@ -96,10 +102,12 @@ export async function scanOrganizationSite(input: {
   const homeUrl = origin ? origin.toString().replace(/\/$/, "") : siteUrl || "wix://site";
   const host = origin?.hostname ?? "";
   const pages: ExtractedPage[] = [];
+  const crawl: CrawlItem[] = [];
 
   if (scope.includeDomainCrawl && origin && host) {
     const crawled = await crawlDomain(origin, host, scope);
     pages.push(...crawled.pages);
+    crawl.push(...crawled.crawl);
     stages.push(...crawled.stages);
     warnings.push(...crawled.warnings);
   } else if (!scope.includeDomainCrawl) {
@@ -116,6 +124,22 @@ export async function scanOrganizationSite(input: {
   stages.push(...apiHarvest.stages);
   skipped.push(...apiHarvest.skipped);
   warnings.push(...apiHarvest.warnings);
+  crawl.push(
+    ...apiHarvest.pages.map((page) => ({
+      url: page.url,
+      title: page.title,
+      contentType: page.contentType,
+      status: "crawled" as const,
+      origin: page.url.includes("/cms/") ? ("wix-cms" as const) : ("wix-site" as const),
+    })),
+    ...products.map((product) => ({
+      url: product.url || `${homeUrl}/product/${product.id || product.name}`,
+      title: product.price ? `${product.name} — ${product.price}` : product.name,
+      contentType: "PRODUCT",
+      status: "crawled" as const,
+      origin: "wix-store" as const,
+    })),
+  );
 
   const pricesDoc = pricesCatalogPage(pages, products, homeUrl);
   if (pricesDoc) pages.unshift(pricesDoc);
@@ -147,8 +171,10 @@ export async function scanOrganizationSite(input: {
     pages,
     products,
     knowledgeLimit: entitlements.knowledgeLimit,
-    pagesDiscovered: pages.length,
-    pagesFailed: warnings.filter((item) => /could not be crawled/i.test(item)).length,
+    crawl,
+    pagesDiscovered: crawl.filter((item) => item.origin === "website").length,
+    pagesCrawled: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
+    pagesFailed: crawl.filter((item) => item.status === "failed").length,
   });
   stages.push({
     key: "knowledge",
@@ -173,7 +199,7 @@ export async function scanOrganizationSite(input: {
     siteUrl: homeUrl,
     understanding,
     counts: {
-      pages: pages.filter((page) => page.contentType === "PAGE" || page.contentType === "SERVICE").length,
+      pages: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
       products: products.length,
       faqs: pages.filter((page) => page.contentType === "FAQ").length,
       policies: pages.filter((page) => page.contentType === "POLICY").length,
@@ -185,10 +211,11 @@ export async function scanOrganizationSite(input: {
       ...pages.map((page) => ({ title: page.title, url: page.url, type: page.contentType })),
       ...products.map((product) => ({
         title: product.name,
-        url: homeUrl,
+        url: product.url || homeUrl,
         type: "PRODUCT" as const,
       })),
-    ].slice(0, 40),
+    ],
+    crawl,
     stages,
     skipped,
     warnings,
@@ -203,7 +230,9 @@ async function persistScan(input: {
   pages: ExtractedPage[];
   products: { name: string; description?: string; price?: string; id?: string; url?: string; data?: Prisma.InputJsonValue }[];
   knowledgeLimit: number;
+  crawl: CrawlItem[];
   pagesDiscovered?: number;
+  pagesCrawled?: number;
   pagesFailed?: number;
 }) {
   await prisma.businessProfile.upsert({
@@ -250,28 +279,24 @@ async function persistScan(input: {
   });
   const budget = Math.max(0, input.knowledgeLimit - customCount);
 
-  const docs: {
-    title: string;
-    contentType: KnowledgeContentType;
-    sourceUrl: string;
-    cleanedContent: string;
-  }[] = [
-    ...input.pages.map((page) => ({
-      title: page.title.slice(0, 180),
-      contentType: page.contentType,
-      sourceUrl: page.url,
-      cleanedContent: [page.description, page.headings.join("\n"), page.text].filter(Boolean).join("\n\n"),
-    })),
-    ...input.products.map((product) => ({
-      title: product.price ? `${product.name} — ${product.price}`.slice(0, 180) : product.name.slice(0, 180),
-      contentType: "PRODUCT" as const,
-      sourceUrl: (product as { url?: string }).url || input.pages[0]?.url || "",
-      cleanedContent: [product.name, product.price ? `Price: ${product.price}` : "", (product as { url?: string }).url, product.description]
-        .filter(Boolean)
-        .join("\n"),
-    })),
-  ]
-    .filter((doc) => doc.cleanedContent.trim().length > 40)
+  const pageDocs = input.pages.map((page) => ({
+    title: page.title.slice(0, 180),
+    contentType: page.contentType,
+    sourceUrl: page.url,
+    cleanedContent: [page.description, page.headings.join("\n"), page.text].filter(Boolean).join("\n\n"),
+    extractionMethod: "http",
+  }));
+  const productDocs = input.products.map((product) => ({
+    title: product.price ? `${product.name} — ${product.price}`.slice(0, 180) : product.name.slice(0, 180),
+    contentType: "PRODUCT" as const,
+    sourceUrl: product.url || input.pages[0]?.url || "",
+    cleanedContent: [product.name, product.price ? `Price: ${product.price}` : "", product.url, product.description]
+      .filter(Boolean)
+      .join("\n"),
+    extractionMethod: "wix-api",
+  }));
+  const docs = [...productDocs, ...pageDocs]
+    .filter((doc) => doc.cleanedContent.trim().length > (doc.contentType === "PRODUCT" ? 2 : 24))
     .slice(0, budget);
 
   let chunks = 0;
@@ -294,7 +319,8 @@ async function persistScan(input: {
   try {
     const ai = await getAIProvider();
     const batchSize = 16;
-    for (let i = 0; i < chunkPayloads.length; i += batchSize) {
+    const embedLimit = Math.min(chunkPayloads.length, 400);
+    for (let i = 0; i < embedLimit; i += batchSize) {
       const slice = chunkPayloads.slice(i, i + batchSize);
       const embedded = await ai.embed({ texts: slice.map((item) => item.content.slice(0, 4000)) });
       embedded.embeddings.forEach((vector, offset) => {
@@ -317,9 +343,9 @@ async function persistScan(input: {
         contentType: doc.contentType,
         sourceUrl: doc.sourceUrl,
         cleanedContent: doc.cleanedContent.slice(0, 20000),
-        metadata: { origin: "site-scan" } as Prisma.InputJsonValue,
+        metadata: { origin: doc.extractionMethod === "wix-api" ? "wix-store" : "site-scan" } as Prisma.InputJsonValue,
         contentHash: contentHash(doc.cleanedContent),
-        extractionMethod: "http",
+        extractionMethod: doc.extractionMethod,
       },
     });
     createdDocs.push({ id: document.id, sourceUrl: document.sourceUrl });
@@ -398,11 +424,12 @@ async function persistScan(input: {
         lastSyncedAt: new Date(),
         url: input.pages[0]?.url,
         title: input.understanding.name,
-        pagesDiscovered: input.pagesDiscovered ?? input.pages.length,
-        pagesCrawled: createdDocs.length,
+        pagesDiscovered: input.pagesDiscovered ?? input.crawl.filter((item) => item.origin === "website").length,
+        pagesCrawled: input.pagesCrawled ?? input.crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
         pagesFailed: input.pagesFailed ?? 0,
         crawlVersion,
         lastError: null,
+        metadata: { crawl: input.crawl } as Prisma.InputJsonValue,
       },
     });
   } else {
@@ -415,10 +442,11 @@ async function persistScan(input: {
         title: input.understanding.name,
         status: "ready",
         lastSyncedAt: new Date(),
-        pagesDiscovered: input.pagesDiscovered ?? input.pages.length,
-        pagesCrawled: createdDocs.length,
+        pagesDiscovered: input.pagesDiscovered ?? input.crawl.filter((item) => item.origin === "website").length,
+        pagesCrawled: input.pagesCrawled ?? input.crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
         pagesFailed: input.pagesFailed ?? 0,
         crawlVersion,
+        metadata: { crawl: input.crawl } as Prisma.InputJsonValue,
       },
     });
   }
@@ -469,9 +497,14 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
   const stages: ScanStage[] = [];
   const warnings: string[] = [];
   const seen = new Set<string>();
+  const failed = new Map<string, string>();
   const queue: string[] = [];
+  const fullSite = scope.fullSiteCrawl !== false;
+  const discoveryCap = Math.min(DISCOVERY_CAP, Math.max(scope.maxPages * 20, 400));
+  const started = Date.now();
 
   const enqueue = (raw: string) => {
+    if (seen.size >= discoveryCap) return;
     if (!isSafeHttpUrl(raw) || !sameSite(raw, host)) return;
     let url = raw;
     try {
@@ -506,14 +539,14 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
   for (const seed of unique(sitemapSeeds)) {
     const xml = await fetchText(seed, host);
     if (!xml.ok) continue;
-    const nested = parseSitemapIndex(xml.text, host, 8);
+    const nested = parseSitemapIndex(xml.text, host, 40);
     for (const child of nested) {
       const childXml = await fetchText(child, host);
       if (!childXml.ok) continue;
-      for (const url of parseSitemapUrls(childXml.text, host, scope.maxPages * 4)) enqueue(url);
+      for (const url of parseSitemapUrls(childXml.text, host, discoveryCap)) enqueue(url);
       sitemapCount += 1;
     }
-    for (const url of parseSitemapUrls(xml.text, host, scope.maxPages * 4)) enqueue(url);
+    for (const url of parseSitemapUrls(xml.text, host, discoveryCap)) enqueue(url);
     sitemapCount += 1;
   }
   stages.push({
@@ -527,6 +560,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
 
   const homepage = await fetchText(homeUrl, host);
   if (!homepage.ok) {
+    failed.set(homeUrl, homepage.reason);
     warnings.push(`Homepage could not be crawled (${homepage.reason}). Continuing with Wix APIs and other pages.`);
     stages.push({ key: "homepage", label: "Read homepage and metadata", status: "failed", detail: homepage.reason });
   } else {
@@ -537,31 +571,49 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
     stages.push({ key: "homepage", label: "Read homepage and metadata", status: "done", detail: page.title });
   }
 
-  while (queue.length && pages.length < scope.maxPages) {
-    queue.sort((a, b) => pathPriority(a) - pathPriority(b) || a.length - b.length);
+  while (queue.length && pages.length < scope.maxPages && Date.now() - started < CRAWL_BUDGET_MS) {
+    if (!fullSite) {
+      queue.sort((a, b) => pathPriority(a) - pathPriority(b) || a.length - b.length);
+    }
     const batchUrls = queue.splice(0, 5).filter((url) => !pages.some((page) => page.url === url));
     if (!batchUrls.length) continue;
     const batch = await Promise.all(batchUrls.map(async (url) => ({ url, result: await fetchText(url, host) })));
     for (const item of batch) {
       if (pages.length >= scope.maxPages) break;
-      if (!item.result.ok) continue;
+      if (!item.result.ok) {
+        failed.set(item.url, item.result.reason);
+        continue;
+      }
       const page = extractPage(item.result.text, item.url, scope.maxCharsPerPage);
       pages.push(page);
-      if (seen.size < scope.maxPages * 8) {
-        for (const link of page.links) enqueue(link);
-        for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
-      }
+      for (const link of page.links) enqueue(link);
+      for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
     }
   }
 
-  stages.push({
-    key: "pages",
-    label: `Crawled ${pages.length} page${pages.length === 1 ? "" : "s"} in ${scope.planLabel} scope`,
-    status: "done",
-    detail: seen.size > pages.length ? `${seen.size} discovered, ${pages.length} readable` : pages.map((page) => page.title).slice(0, 6).join(" · "),
+  const crawled = new Map(pages.map((page) => [page.url, page]));
+  const crawl: CrawlItem[] = [...seen].map((url) => {
+    const page = crawled.get(url);
+    if (page) {
+      return { url, title: page.title, contentType: page.contentType, status: "crawled", origin: "website" };
+    }
+    if (failed.has(url)) {
+      return { url, title: url, contentType: "PAGE", status: "failed", origin: "website" };
+    }
+    return { url, title: url, contentType: "PAGE", status: "discovered", origin: "website" };
   });
 
-  return { pages, stages, warnings };
+  const leftover = crawl.filter((item) => item.status !== "crawled").length;
+  stages.push({
+    key: "pages",
+    label: `Crawled ${pages.length} of ${seen.size} discovered page${seen.size === 1 ? "" : "s"}`,
+    status: "done",
+    detail: leftover
+      ? `${leftover} found but not read yet (plan cap or time). They are listed in Knowledge.`
+      : pages.map((page) => page.title).slice(0, 6).join(" · "),
+  });
+
+  return { pages, crawl, stages, warnings };
 }
 
 async function fetchText(
@@ -610,6 +662,7 @@ function emptyResult(
     understanding: null,
     counts: { pages: 0, products: 0, faqs: 0, policies: 0, chunks: 0, facts: 0, conflicts: 0 },
     sources: [],
+    crawl: [],
     stages,
     skipped,
     warnings,

@@ -238,7 +238,7 @@ async function queryCollectionItems(
       limit?: (n: number) => { find: () => Promise<{ items?: Record<string, unknown>[] }> };
       find?: () => Promise<{ items?: Record<string, unknown>[] }>;
     };
-    queryDataItems?: (input: { dataCollectionId: string; paging?: { limit: number } }) => Promise<{
+    queryDataItems?: (input: { dataCollectionId: string; paging?: { limit: number; offset?: number } }) => Promise<{
       dataItems?: { data?: Record<string, unknown> }[];
       items?: Record<string, unknown>[];
     }>;
@@ -310,7 +310,7 @@ async function readStores(client: ReturnType<typeof createWixAppClient>, siteUrl
 
   let collections: ExtractedPage[] = [];
   try {
-    const catalogResult = await client.storeCatalogs.queryCollections().limit(40).find();
+    const catalogResult = await client.storeCatalogs.queryCollections().limit(100).find();
     collections = itemsOf(catalogResult).map((row) => {
       const name = String(row.name || "Collection");
       const text = flattenValue(row);
@@ -343,26 +343,47 @@ function itemsOf(result: unknown) {
   return row.items ?? row.products ?? row.collections ?? [];
 }
 
+type ProductQueryResult = {
+  items?: Record<string, unknown>[];
+  products?: Record<string, unknown>[];
+  hasNext?: () => boolean | Promise<boolean>;
+  next?: () => Promise<ProductQueryResult>;
+};
+
 async function queryStoreProducts(client: ReturnType<typeof createWixAppClient>, max: number) {
   const pageSize = 100;
   const products: Record<string, unknown>[] = [];
   let skip = 0;
+  let page: ProductQueryResult | null = null;
+
   while (products.length < max) {
     const take = Math.min(pageSize, max - products.length);
-    const root = client.products.queryProducts() as {
-      skip?: (n: number) => unknown;
-      limit: (n: number) => { find: () => Promise<unknown> };
-      find?: () => Promise<unknown>;
-    };
-    const skipped = skip > 0 && typeof root.skip === "function" ? (root.skip(skip) as typeof root) : root;
-    const limited = typeof skipped.limit === "function" ? skipped.limit(take) : skipped;
-    const batch = itemsOf(await (limited as { find: () => Promise<unknown> }).find());
+    const canPage =
+      Boolean(page && typeof page.next === "function") &&
+      (typeof page?.hasNext !== "function" || Boolean(await page.hasNext()));
+    try {
+      if (canPage && page?.next) {
+        page = await page.next();
+      } else {
+        if (page && typeof page.hasNext === "function" && !(await page.hasNext())) break;
+        const root = client.products.queryProducts() as unknown as {
+          skip?: (n: number) => { limit: (n: number) => { find: () => Promise<ProductQueryResult> } };
+          limit: (n: number) => { find: () => Promise<ProductQueryResult> };
+        };
+        if (skip > 0 && typeof root.skip !== "function") break;
+        const skipped = skip > 0 && typeof root.skip === "function" ? root.skip(skip) : root;
+        page = await skipped.limit(take).find();
+      }
+    } catch {
+      break;
+    }
+    const batch = itemsOf(page);
+    if (!batch.length) break;
     products.push(...batch);
+    skip = products.length;
     if (batch.length < take) break;
-    if (typeof root.skip !== "function") break;
-    skip += batch.length;
   }
-  return products;
+  return products.slice(0, max);
 }
 
 function flattenValue(value: unknown, depth = 0): string {

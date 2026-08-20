@@ -23,6 +23,14 @@ export type ScanStage = {
   detail: string;
 };
 
+export type CrawlItem = {
+  url: string;
+  title: string;
+  contentType: string;
+  status: "crawled" | "discovered" | "failed";
+  origin: "website" | "wix-store" | "wix-cms" | "wix-site";
+};
+
 export type ScanResult = {
   ok: boolean;
   planKey: PlanKey;
@@ -32,6 +40,7 @@ export type ScanResult = {
   understanding: SiteUnderstanding | null;
     counts: { pages: number; products: number; faqs: number; policies: number; chunks: number; facts?: number; conflicts?: number };
   sources: { title: string; url: string; type: KnowledgeContentType }[];
+  crawl: CrawlItem[];
   stages: ScanStage[];
   skipped: string[];
   warnings: string[];

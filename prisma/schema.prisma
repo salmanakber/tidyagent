@@ -339,6 +339,7 @@ model KnowledgeSource {
   pagesFailed    Int      @default(0)
   crawlVersion   Int      @default(0)
   lastError      String?
+  metadata       Json     @default("{}")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

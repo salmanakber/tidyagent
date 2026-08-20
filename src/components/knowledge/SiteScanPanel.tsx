@@ -8,9 +8,8 @@ import { cn } from "@/lib/utils";
 
 const LIVE_STAGES = [
   "Confirming the Wix site",
-  "Reading the homepage",
-  "Mapping pages and policies",
-  "Indexing catalog in plan scope",
+  "Reading every public page",
+  "Loading the Wix Stores catalog",
   "Writing a business understanding",
 ];
 
@@ -31,6 +30,7 @@ export function SiteScanPanel({
   const [result, setResult] = useState<ScanResult | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [fullSite, setFullSite] = useState(true);
 
   function run() {
     setError(null);
@@ -38,7 +38,7 @@ export function SiteScanPanel({
     const timer = window.setInterval(() => setTick((value) => value + 1), 1400);
     startTransition(async () => {
       try {
-        const next = await runSiteScan();
+        const next = await runSiteScan({ fullSite });
         setResult(next);
         onComplete?.(next);
       } catch (err) {
@@ -61,6 +61,21 @@ export function SiteScanPanel({
         ) : (
           <p className="mt-2 text-xs text-rose-200">No public URL yet — publish the Wix site, then scan.</p>
         )}
+        <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={fullSite}
+            onChange={(event) => setFullSite(event.target.checked)}
+            disabled={pending}
+          />
+          <span>
+            Crawl every public page we can find
+            <span className="mt-1 block text-xs text-navy-400">
+              Sitemap, on-site links, and Wix data. Uncheck to read only common pages like pricing, services, and FAQ.
+            </span>
+          </span>
+        </label>
       </div>
 
       {pending ? (
@@ -103,6 +118,7 @@ function ScanSummary({
   result: ScanResult;
   understanding?: SiteUnderstanding | null;
 }) {
+  const leftover = (result.crawl ?? []).filter((item) => item.origin === "website" && item.status !== "crawled").length;
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -117,10 +133,10 @@ function ScanSummary({
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {result.counts.pages > 0 ? <Stat label="Pages" value={result.counts.pages} /> : null}
-        {result.counts.products > 0 ? <Stat label="Products" value={result.counts.products} /> : null}
+        {result.counts.pages > 0 ? <Stat label="Pages crawled" value={result.counts.pages} /> : null}
+        {result.counts.products > 0 ? <Stat label="Store products" value={result.counts.products} /> : null}
+        {leftover > 0 ? <Stat label="Found, not yet read" value={leftover} /> : null}
         {result.counts.faqs > 0 ? <Stat label="FAQs" value={result.counts.faqs} /> : null}
-        {result.counts.policies > 0 ? <Stat label="Policies" value={result.counts.policies} /> : null}
       </div>
       {understanding ? (
         <div className="rounded-2xl border border-white/10 p-4">

@@ -260,7 +260,7 @@ export async function resolveKnowledgeConflict(conflictId: string, value: string
   revalidatePath("/knowledge");
 }
 
-export async function runSiteScan() {
+export async function runSiteScan(input?: { fullSite?: boolean }) {
   const session = await requireSession();
   await requirePaidSeat(session);
   const { scanOrganizationSite } = await import("@/modules/knowledge/scanner");
@@ -268,6 +268,7 @@ export async function runSiteScan() {
     organizationId: session.organizationId,
     siteId: session.siteId,
     wixInstanceId: session.wixInstanceId,
+    fullSite: input?.fullSite !== false,
   });
   if (result.ok) {
     await prisma.organization.update({

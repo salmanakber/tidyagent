@@ -96,7 +96,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     depthNote: "Purchase Starter, Business, or Pro to read the site and go live.",
   },
   STARTER: {
-    maxPages: 48,
+    maxPages: 200,
     maxProducts: 0,
     maxCharsPerPage: 10000,
     maxCmsCollections: 12,
@@ -106,11 +106,11 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: false,
     includeBookings: false,
     includeDomainCrawl: true,
-    depthNote: "Wix site profile, pages, CMS collections, and a deep domain crawl. Store catalog stays on Business and Pro.",
+    depthNote: "Reads every public page we can find (sitemap and on-site links), plus Wix site profile and CMS. The Wix Stores catalog is on Business and Pro.",
   },
   GROWTH: {
-    maxPages: 110,
-    maxProducts: 220,
+    maxPages: 500,
+    maxProducts: 5000,
     maxCharsPerPage: 12000,
     maxCmsCollections: 24,
     maxCmsItemsPerCollection: 100,
@@ -119,11 +119,11 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: true,
     includeDomainCrawl: true,
-    depthNote: "Site profile, pages, CMS, Wix Stores catalog, and bookings data — plus a live domain crawl.",
+    depthNote: "Full website crawl, CMS, the complete Wix Stores product list, and bookings data.",
   },
   PRO: {
-    maxPages: 220,
-    maxProducts: 500,
+    maxPages: 1000,
+    maxProducts: 20000,
     maxCharsPerPage: 14000,
     maxCmsCollections: 50,
     maxCmsItemsPerCollection: 180,
@@ -132,8 +132,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: true,
     includeDomainCrawl: true,
-    depthNote:
-      "Deep Wix APIs (pages, CMS, catalog) and a full-domain crawl so the employee answers from this business.",
+    depthNote: "Full-domain crawl plus Wix APIs: every store product, CMS, and bookings this site exposes.",
   },
 };
 
@@ -180,6 +179,7 @@ export function mergePlanScope(planKey: PlanKey, raw: unknown): PlanScopeConfig 
   return {
     ...fallback,
     ...next,
+    knowledgeLimit: Math.max(fallback.knowledgeLimit, next.knowledgeLimit ?? 0),
     automations: { ...fallback.automations, ...next.automations },
     scan: {
       ...fallback.scan,

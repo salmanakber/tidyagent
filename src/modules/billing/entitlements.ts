@@ -49,7 +49,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
   },
   STARTER: {
     conversationLimit: 1000,
-    knowledgeLimit: 250,
+    knowledgeLimit: 400,
     voiceEnabled: false,
     advancedToolsEnabled: false,
     automationEnabled: true,
@@ -58,7 +58,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
   },
   GROWTH: {
     conversationLimit: 5000,
-    knowledgeLimit: 1000,
+    knowledgeLimit: 8000,
     voiceEnabled: false,
     advancedToolsEnabled: true,
     automationEnabled: true,
@@ -67,7 +67,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
   },
   PRO: {
     conversationLimit: 25000,
-    knowledgeLimit: 5000,
+    knowledgeLimit: 25000,
     voiceEnabled: true,
     advancedToolsEnabled: true,
     automationEnabled: true,
