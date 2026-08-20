@@ -5,12 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/security/passwords";
 import { signInUser } from "@/modules/auth/workspace";
 import { clearSessionCookie } from "@/lib/security/session";
-import {
-  ensureReviewerWorkspace,
-  isReviewerEmail,
-  reviewerPassword,
-  signInReviewer,
-} from "@/modules/auth/reviewer";
+import { ensureReviewerWorkspace, getReviewerConfig, signInReviewer } from "@/modules/auth/reviewer";
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -46,7 +41,8 @@ export async function loginWithEmail(formData: FormData) {
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const password = String(formData.get("password") ?? "");
 
-  if (isReviewerEmail(email) && password && password === reviewerPassword()) {
+  const reviewer = await getReviewerConfig();
+  if (reviewer.emails.includes(email) && password && password === reviewer.password) {
     const user = await ensureReviewerWorkspace();
     await signInReviewer(user);
     redirect("/dashboard");

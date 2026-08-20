@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { savePlatformSettings, testAIProviders } from "@/app/actions/settings";
+import { savePlatformSettings, testAIProviders, openReviewerDashboard } from "@/app/actions/settings";
 import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
 
 export function PlatformSettingsForm({
@@ -20,6 +20,10 @@ export function PlatformSettingsForm({
   planPriceCurrency,
   planTrialDays,
   googleTtsVoice,
+  reviewMode,
+  reviewerEmail,
+  reviewerEmails,
+  reviewerPasswordSet,
 }: {
   failoverEnabled: boolean;
   order: string;
@@ -52,6 +56,10 @@ export function PlatformSettingsForm({
   planPriceCurrency: string;
   planTrialDays: string;
   googleTtsVoice: string;
+  reviewMode: boolean;
+  reviewerEmail: string;
+  reviewerEmails: string;
+  reviewerPasswordSet: boolean;
 }) {
   const [state, formAction, saving] = useActionState(savePlatformSettings, null);
   const [pending, startTransition] = useTransition();
@@ -103,6 +111,64 @@ export function PlatformSettingsForm({
             Confirm password
             <input className="field mt-2" name="platform_admin_password_confirm" type="password" autoComplete="new-password" />
           </label>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">App Market testing</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          Turn this on while Wix reviews the app. Unpaid installs get a complimentary Pro seat, and the owner
+          dashboard shows a Test AI button so reviewers can talk to the employee without buying a plan. Turn it
+          off after approval.
+        </p>
+        <div className="mt-5 grid gap-4">
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="wix_review_mode" defaultChecked={reviewMode} className="mt-1" />
+            <span>
+              <span className="text-white">Enable testing mode</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Dashboard Test AI + complimentary Pro for Wix installs. Does not require a .env restart.
+              </span>
+            </span>
+          </label>
+          <label className="text-sm text-navy-300">
+            Reviewer email
+            <input
+              className="field mt-2"
+              name="wix_reviewer_email"
+              type="email"
+              defaultValue={reviewerEmail}
+              placeholder="wix-reviewer@tidyflowapp.com"
+            />
+          </label>
+          <label className="text-sm text-navy-300">
+            Extra reviewer emails
+            <input
+              className="field mt-2"
+              name="wix_reviewer_emails"
+              defaultValue={reviewerEmails}
+              placeholder="qa@wix.com"
+            />
+            <span className="mt-1 block text-xs text-navy-400">Comma-separated. These emails also get a Pro seat.</span>
+          </label>
+          <label className="text-sm text-navy-300">
+            Reviewer password{" "}
+            {reviewerPasswordSet ? <span className="text-emerald-300">(saved)</span> : <span className="text-amber-300">(not set yet)</span>}
+            <input className="field mt-2" name="wix_reviewer_password" type="password" autoComplete="new-password" />
+            <span className="mt-1 block text-xs text-navy-400">Leave blank to keep the current password. Required the first time you enable testing mode.</span>
+          </label>
+          <button
+            type="button"
+            className="btn-secondary w-fit"
+            disabled={saving || pending}
+            onClick={() =>
+              startTransition(async () => {
+                await openReviewerDashboard();
+              })
+            }
+          >
+            Open reviewer dashboard
+          </button>
         </div>
       </div>
 

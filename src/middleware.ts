@@ -4,10 +4,13 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/api/wix/webhooks/" || pathname === "/api/wix/webhook") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/api/wix/webhooks";
-    return NextResponse.rewrite(url);
+  const webhookPath = pathname.replace(/\/+$/, "") || "/";
+  if (webhookPath === "/api/wix/webhooks" || webhookPath === "/api/wix/webhook") {
+    if (pathname !== "/api/wix/webhooks") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/api/wix/webhooks";
+      return NextResponse.rewrite(url);
+    }
   }
 
   // Trigger test sometimes POSTs the JWT to the app URL instead of the webhook path.

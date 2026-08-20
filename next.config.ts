@@ -4,6 +4,8 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Wix Trigger test POSTs do not follow 308 trailing-slash redirects.
+  skipTrailingSlashRedirect: true,
   outputFileTracingRoot: path.resolve(process.cwd()),
 
   eslint: {

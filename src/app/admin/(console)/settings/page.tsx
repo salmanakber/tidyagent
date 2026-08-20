@@ -10,7 +10,7 @@ export default async function AdminSettingsPage() {
       <PageHeader
         eyebrow="Platform"
         title="API & login settings"
-        description="Operator login, AI keys, Google OAuth, Cloudinary, and voice. The console password lives here — not in .env. Package limits and feature switches live under Plans."
+        description="Operator login, App Market testing, AI keys, Google OAuth, Cloudinary, and voice. Testing mode lives here — not in .env. Package limits and feature switches live under Plans."
       />
       <PlatformSettingsForm
         failoverEnabled={settings.failoverEnabled}
@@ -28,6 +28,10 @@ export default async function AdminSettingsPage() {
         planPriceCurrency={settings.planPriceCurrency}
         planTrialDays={settings.planTrialDays}
         googleTtsVoice={settings.googleTtsVoice}
+        reviewMode={settings.reviewMode}
+        reviewerEmail={settings.reviewerEmail}
+        reviewerEmails={settings.reviewerEmails}
+        reviewerPasswordSet={settings.reviewerPasswordSet}
       />
     </div>
   );

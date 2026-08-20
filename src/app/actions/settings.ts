@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminSession } from "@/lib/security/admin-session";
+import { redirect } from "next/navigation";
+import { requireAdminSession, setImpersonationFlag } from "@/lib/security/admin-session";
 import { getAIRuntimeConfig, getCloudinaryConfig, getSetting, setSetting, settingExists } from "@/lib/security/settings";
 import { getAIProvider } from "@/modules/ai/factory";
 import { hashPassword } from "@/lib/security/passwords";
@@ -10,6 +11,7 @@ import { GEMINI_MODELS, GROQ_MODELS, OPENAI_MODELS } from "@/modules/ai/models";
 import type { PlanKey } from "@prisma/client";
 import { saveAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
+import { ensureReviewerWorkspace, getReviewerConfig, signInReviewer } from "@/modules/auth/reviewer";
 
 export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
@@ -40,6 +42,8 @@ export async function getPlatformSettingsView() {
   const planPriceCurrency = await getSetting("plan_price_currency", "USD");
   const planTrialDays = await getSetting("plan_trial_days", "7");
   const googleTtsVoice = await getSetting("google_tts_voice", env.GOOGLE_TTS_VOICE);
+  const reviewer = await getReviewerConfig();
+  const reviewerPasswordSet = await settingExists("wix_reviewer_password");
 
   return {
     failoverEnabled: config.failoverEnabled,
@@ -73,6 +77,10 @@ export async function getPlatformSettingsView() {
     planPriceCurrency,
     planTrialDays,
     googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
+    reviewMode: reviewer.reviewMode,
+    reviewerEmail: reviewer.emails[0] ?? env.WIX_REVIEWER_EMAIL,
+    reviewerEmails: reviewer.emails.slice(1).join(", "),
+    reviewerPasswordSet: reviewerPasswordSet || Boolean(env.WIX_REVIEWER_PASSWORD),
   };
 }
 
@@ -140,14 +148,46 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     if (awsRegion) await setSetting("aws_region", awsRegion);
     if (pollyVoice) await setSetting("polly_voice", pollyVoice);
 
+    const reviewMode = formData.get("wix_review_mode") === "on" ? "true" : "false";
+    const reviewerEmail = String(formData.get("wix_reviewer_email") ?? "").trim().toLowerCase();
+    const reviewerEmails = String(formData.get("wix_reviewer_emails") ?? "").trim().toLowerCase();
+    const reviewerPassword = String(formData.get("wix_reviewer_password") ?? "");
+    if (reviewerEmail) await setSetting("wix_reviewer_email", reviewerEmail);
+    await setSetting("wix_reviewer_emails", reviewerEmails);
+    if (reviewerPassword) {
+      if (reviewerPassword.length < 8) {
+        return { ok: false, error: "Reviewer password must be at least 8 characters." };
+      }
+      await setSetting("wix_reviewer_password", reviewerPassword);
+    }
+    await setSetting("wix_review_mode", reviewMode);
+    if (reviewMode === "true") {
+      try {
+        await ensureReviewerWorkspace();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not create the reviewer workspace.";
+        return { ok: false, error: message };
+      }
+    }
+
     revalidatePath("/admin/settings");
     revalidatePath("/admin/access");
     revalidatePath("/pricing");
+    revalidatePath("/dashboard");
+    revalidatePath("/billing");
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save settings.";
     return { ok: false, error: message };
   }
+}
+
+export async function openReviewerDashboard() {
+  const admin = await requireAdminSession("SUPER");
+  const user = await ensureReviewerWorkspace();
+  await signInReviewer(user);
+  await setImpersonationFlag(admin.email);
+  redirect("/dashboard");
 }
 
 export async function testAIProviders() {

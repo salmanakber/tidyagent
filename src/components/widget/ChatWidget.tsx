@@ -11,6 +11,7 @@ export type WidgetProps = {
   position?: "BOTTOM_RIGHT" | "BOTTOM_LEFT";
   avatarUrl?: string | null;
   preview?: boolean;
+  startOpen?: boolean;
   template?: "CLASSIC" | "SOFT" | "BAR" | "MINIMAL";
   voiceEnabled?: boolean;
   voiceId?: string | null;
@@ -29,12 +30,13 @@ export function ChatWidget({
   position = "BOTTOM_RIGHT",
   avatarUrl,
   preview = false,
+  startOpen = false,
   template = "CLASSIC",
   voiceEnabled = false,
   voiceId,
 }: WidgetProps) {
   const left = position === "BOTTOM_LEFT";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(startOpen));
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function ChatWidget({
     setTyped("");
     setTeaserOn(template !== "MINIMAL");
     setVoiceOn(voiceEnabled);
-    setOpen(false);
+    setOpen(Boolean(startOpen));
     if (template === "MINIMAL") return;
     let i = 0;
     const max = Math.min(greeting.length, 92);
@@ -68,7 +70,7 @@ export function ChatWidget({
       if (i >= max) window.clearInterval(id);
     }, 22);
     return () => window.clearInterval(id);
-  }, [greeting, name, template, voiceEnabled, avatarUrl, voiceId]);
+  }, [greeting, name, template, voiceEnabled, avatarUrl, voiceId, startOpen]);
 
   function unlock() {
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;

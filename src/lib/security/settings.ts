@@ -15,6 +15,7 @@ const SECRET_KEYS = new Set([
   "google_tts_api_key",
   "aws_access_key_id",
   "aws_secret_access_key",
+  "wix_reviewer_password",
 ]);
 
 function keyMaterial() {

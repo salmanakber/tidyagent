@@ -6,7 +6,7 @@ import { seedDefaultAgent } from "@/modules/agents/defaults";
 import type { WixInstancePayload } from "@/lib/security/instance";
 import type { WixSiteSnapshot } from "@/services/wix/client";
 import type { AppSession } from "@/lib/security/session";
-import { isReviewerEmail } from "@/modules/auth/reviewer";
+import { getReviewerConfig } from "@/modules/auth/reviewer";
 
 type ProvisionInput = {
   instance: WixInstancePayload;
@@ -184,7 +184,9 @@ export async function provisionTenantFromWix(input: ProvisionInput): Promise<App
   const { embedSiteWidget } = await import("@/modules/wix/embed");
   await embedSiteWidget(instanceId, false);
 
-  if (isReviewerEmail(snapshot?.site.ownerEmail)) {
+  const reviewer = await getReviewerConfig();
+  const ownerEmail = snapshot?.site.ownerEmail?.trim().toLowerCase();
+  if (ownerEmail && reviewer.emails.includes(ownerEmail)) {
     await prisma.organization.update({
       where: { id: organizationId },
       data: {

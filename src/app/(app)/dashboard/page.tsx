@@ -1,8 +1,10 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
+import { isWixReviewMode } from "@/modules/auth/reviewer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { DashboardTestChat } from "@/components/dashboard/DashboardTestChat";
 import { formatNumber } from "@/lib/utils";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -10,7 +12,7 @@ import { redirect } from "next/navigation";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/");
-  const data = await getDashboardOverview(session);
+  const [data, testingMode] = await Promise.all([getDashboardOverview(session), isWixReviewMode()]);
 
   return (
     <div className="space-y-8">
@@ -24,12 +26,28 @@ export default async function DashboardPage() {
             <Link href="/onboarding" className="btn-secondary">
               Setup wizard
             </Link>
-            {/* <Link href="/agent" className="btn-primary">
-              Test AI
-            </Link> */}
+            {testingMode ? (
+              <a href="#test-ai" className="btn-primary">
+                Test AI
+              </a>
+            ) : null}
           </>
         }
       />
+
+      {testingMode && data.agent ? (
+        <div id="test-ai">
+          <DashboardTestChat
+            name={data.agent.name}
+            greeting={data.agent.widgetGreeting}
+            primaryColor={data.agent.widgetPrimaryColor}
+            position={data.agent.widgetPosition}
+            avatarUrl={data.agent.widgetAvatarUrl}
+            template={data.agent.widgetTemplate}
+            voiceEnabled={data.entitlements.voiceEnabled && data.agent.voiceEnabled}
+          />
+        </div>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Conversations" value={formatNumber(data.metrics.conversations)} hint="All conversations" />

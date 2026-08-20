@@ -1,32 +1,52 @@
 import type { PlanKey, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getEnv } from "@/lib/env";
 import { hashPassword } from "@/lib/security/passwords";
+import { getSetting } from "@/lib/security/settings";
 import { setSessionCookie } from "@/lib/security/session";
 import { seedDefaultAgent } from "@/modules/agents/defaults";
 import { PLAN_RANK } from "@/modules/billing/entitlements";
 
 const REVIEW_INSTANCE = "reviewer:wix-app-market";
 
-export function reviewerEmails() {
-  const extra = (process.env.WIX_REVIEWER_EMAILS ?? "")
+export type ReviewerConfig = {
+  reviewMode: boolean;
+  emails: string[];
+  password: string;
+};
+
+export function parseReviewerEmails(primary?: string | null, extras?: string | null) {
+  const extra = (extras ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  const primary = process.env.WIX_REVIEWER_EMAIL?.trim().toLowerCase();
-  return [...(primary ? [primary] : []), ...extra];
+  const first = primary?.trim().toLowerCase();
+  return [...(first ? [first] : []), ...extra.filter((email) => email !== first)];
 }
 
-export function isWixReviewMode() {
-  return process.env.WIX_REVIEW_MODE === "true";
+export async function getReviewerConfig(): Promise<ReviewerConfig> {
+  const env = getEnv();
+  const [mode, email, password, extras] = await Promise.all([
+    getSetting("wix_review_mode", env.WIX_REVIEW_MODE),
+    getSetting("wix_reviewer_email", env.WIX_REVIEWER_EMAIL),
+    getSetting("wix_reviewer_password", env.WIX_REVIEWER_PASSWORD),
+    getSetting("wix_reviewer_emails", env.WIX_REVIEWER_EMAILS),
+  ]);
+  return {
+    reviewMode: mode === "true",
+    emails: parseReviewerEmails(email, extras),
+    password,
+  };
 }
 
-export function isReviewerEmail(email?: string | null) {
+export async function isWixReviewMode() {
+  return (await getReviewerConfig()).reviewMode;
+}
+
+export async function isReviewerEmail(email?: string | null) {
   if (!email) return false;
-  return reviewerEmails().includes(email.trim().toLowerCase());
-}
-
-export function reviewerPassword() {
-  return process.env.WIX_REVIEWER_PASSWORD ?? "";
+  const config = await getReviewerConfig();
+  return config.emails.includes(email.trim().toLowerCase());
 }
 
 export function pickHigherPlan(current: PlanKey | null | undefined, grant: PlanKey): PlanKey {
@@ -37,19 +57,23 @@ export function pickHigherPlan(current: PlanKey | null | undefined, grant: PlanK
 export function reviewComplimentaryPlan(input: {
   storedGrant?: PlanKey | null;
   ownerEmail?: string | null;
+  reviewMode: boolean;
+  reviewerEmails: string[];
 }) {
   const stored = input.storedGrant && input.storedGrant !== "FREE" ? input.storedGrant : null;
-  if (isWixReviewMode()) return pickHigherPlan(stored, "PRO");
-  if (isReviewerEmail(input.ownerEmail)) return pickHigherPlan(stored, "PRO");
+  if (input.reviewMode) return pickHigherPlan(stored, "PRO");
+  const owner = input.ownerEmail?.trim().toLowerCase();
+  if (owner && input.reviewerEmails.includes(owner)) return pickHigherPlan(stored, "PRO");
   return stored;
 }
 
 /** Creates the App Market reviewer login (Pro seat, no Wix checkout). Idempotent. */
 export async function ensureReviewerWorkspace() {
-  const email = reviewerEmails()[0];
-  const password = reviewerPassword();
+  const config = await getReviewerConfig();
+  const email = config.emails[0];
+  const password = config.password;
   if (!email || password.length < 8) {
-    throw new Error("Set WIX_REVIEWER_EMAIL and WIX_REVIEWER_PASSWORD (min 8 characters).");
+    throw new Error("Set a reviewer email and password (min 8 characters) in Admin → Settings.");
   }
 
   const passwordHash = await hashPassword(password);

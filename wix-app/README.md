@@ -27,6 +27,8 @@ If the iframe is blank: publish a new app version, then on the test site open **
 
 `https://<tidyagent-host>/api/wix/webhooks`
 
+Same URL for every event. No trailing slash.
+
 - App Instance Installed
 - App Instance Removed
 - Paid Plan Purchased
@@ -74,12 +76,12 @@ Wix permissions are requested **once for the whole app**, not per paid plan.
 
 Ask for:
 
-- Manage Your App
-- Manage Embedded Scripts
+- Manage Your App *(already added)*
+- Manage Embedded Scripts *(already added)*
 - Read Site Owner Email
-- Read site, business, and email details (site properties)
+- Read site / business properties
 - Wix Data: Read collections and items
-- Stores: Read Products, Read Orders (used by Business and Pro)
+- Stores: Read Products (and Read Orders if it is a separate checkbox)
 
 tidyAgent then **gates** features per plan in the backend:
 

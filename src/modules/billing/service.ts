@@ -14,7 +14,7 @@ import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "
 import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
-import { reviewComplimentaryPlan } from "@/modules/auth/reviewer";
+import { getReviewerConfig, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -224,9 +224,12 @@ export async function entitlementsForOrganization(organizationId: string): Promi
   ]);
 
   const suspended = organization?.accessStatus === "suspended";
+  const reviewer = await getReviewerConfig();
   const grant = reviewComplimentaryPlan({
     storedGrant: organization?.compPlanKey,
     ownerEmail: site?.ownerEmail,
+    reviewMode: reviewer.reviewMode,
+    reviewerEmails: reviewer.emails,
   });
 
   const base = !subscription

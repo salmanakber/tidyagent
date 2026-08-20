@@ -186,26 +186,30 @@ Limits can be tuned later in **Platform admin → Plans**. Listing copy above ma
 
 `https://agent.tidyflowapp.com/api/wix/webhooks`
 
+Same URL for every event. **No trailing slash.** A slash makes Wix get HTTP 308 and show “The webhook server returned an error.”
+
 - App Instance Installed  
 - App Instance Removed  
 - Paid Plan Purchased  
 - Paid Plan Changed  
 - Paid Plan Auto Renewal Cancelled  
 
-Return HTTP 200. Use **Trigger test** in the dashboard.
+Return HTTP 200. Use **Trigger test** in the dashboard. Signature logs can still say unverified — that is the sample JWT, not the test result.
 
 ### Permissions (minimum needed)
 
-Ask only for what the product uses:
+In **Permissions → Add Permission**, search and enable only these:
 
-- Manage Your App  
-- Manage Embedded Scripts  
-- Read Site Owner Email  
-- Read site, business, and email details (site properties)  
-- Wix Data: Read collections and items  
-- Stores: Read Products, Read Orders (Business / Pro knowledge)  
+| Search for | Enable |
+| --- | --- |
+| *(already on)* | **Manage Your App** |
+| *(already on)* | **Manage Embedded Scripts** |
+| Site Owner Email | **Read Site Owner Email** |
+| Site Properties / Business | **Read** site properties / business info (display name, locale, currency, contact) |
+| Data / CMS | **Wix Data: Read collections and items** |
+| Stores | **Read Stores** (includes Read Products; Read Orders if listed separately) |
 
-Do not add unused “manage” scopes.
+Do not add Bookings manage, Contacts, Payments, or other unused “manage” scopes. When a webhook screen asks to add permissions for that event, accept only **Manage Your App**.
 
 ---
 
@@ -215,7 +219,7 @@ Keep this live for as long as the app is in the Market:
 
 1. A **published** Wix premium/dev site with tidyAgent installed and the chat bubble visible.
 2. Reviewer login below — **Pro is already granted**. They do not need to buy a plan.
-3. While `WIX_REVIEW_MODE=true` on production, anyone who installs from Wix during review also gets a complimentary Pro seat (so iframe review is not stuck on billing). Turn that flag off after approval.
+3. In **Platform admin → Settings → App Market testing**, turn **Enable testing mode** on. Unpaid Wix installs get complimentary Pro, and the owner dashboard shows **Test AI**. Turn it off after approval. (Optional env fallbacks: `WIX_REVIEW_MODE`, `WIX_REVIEWER_EMAIL`, `WIX_REVIEWER_PASSWORD`.)
 
 4. App Review notes (paste into the submit form):
 
@@ -229,7 +233,7 @@ Reviewer password: WixReview-tidyAgent-2026
 
 This login is a complimentary Pro seat. Reviewers do not need to purchase a plan or enter a card.
 
-If you install tidyAgent on a Wix site instead, open Dashboard → tidyAgent. During App Market review, unpaid installs are unlocked at Pro so you can test onboarding, the widget, specialists, and voice without checkout.
+If you install tidyAgent on a Wix site instead, open Dashboard → tidyAgent. Turn on App Market testing in platform admin so unpaid installs are unlocked at Pro. Use the Test AI button on the dashboard to talk to the employee without checkout.
 
 Widget: publish the site; Editor preview often hides the embedded script.
 Plans: Starter / Business / Pro via Wix checkout for real customers.
