@@ -28,6 +28,9 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional().default(""),
   CLOUDINARY_API_SECRET: z.string().optional().default(""),
   REDIS_URL: z.string().optional().default(""),
+  PIPER_URL: z.string().optional().default("http://127.0.0.1:5510"),
+  PIPER_VOICE: z.string().optional().default("en_US-lessac-medium"),
+  PIPER_DATA_DIR: z.string().optional().default(""),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

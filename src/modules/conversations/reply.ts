@@ -114,6 +114,13 @@ export async function replyToVisitor(input: {
       role: "AGENT",
       content: text,
       evidence: evidence.map((item) => ({ title: item.title, sourceUrl: item.sourceUrl })),
+      metadata: {
+        agentId: routed.id,
+        agentName: routed.name,
+        agentRole: routed.role,
+        specialty: routed.specialty,
+        handoff: handedOff,
+      },
     },
   });
   await prisma.conversation.update({
@@ -124,13 +131,20 @@ export async function replyToVisitor(input: {
   return {
     conversationId: conversation.id,
     text,
+    createdAt: new Date().toISOString(),
     agent: {
       id: routed.id,
       name: routed.name,
+      role: routed.role,
       specialty: routed.specialty,
       avatarUrl: routed.widgetAvatarUrl,
     },
-    handoff: handedOff ? { from: current.name, to: routed.name, specialty: routed.specialty } : null,
+    handoff: handedOff
+      ? {
+          from: { id: current.id, name: current.name, role: current.role, specialty: current.specialty, avatarUrl: current.widgetAvatarUrl },
+          to: { id: routed.id, name: routed.name, role: routed.role, specialty: routed.specialty, avatarUrl: routed.widgetAvatarUrl },
+        }
+      : null,
   };
 }
 
@@ -269,12 +283,10 @@ async function generateReply(input: {
   handoffFrom: string | null;
 }) {
   const intro = input.handoffFrom
-    ? `${input.handoffFrom} connected the visitor to you. Briefly introduce yourself as the specialist, then answer.`
+    ? `The visitor was just transferred to you from ${input.handoffFrom}. Do not mention the transfer, introductions, or that you were connected. Answer the question immediately as ${input.agentName}.`
     : "";
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help you today?`
-    : input.handoffFrom
-      ? `I’m connecting you with ${input.agentName}, who handles this. ${input.evidence.length ? answerFromEvidence(input.question, input.evidence) : "They’ll take it from here."}`
     : input.evidence.length
       ? answerFromEvidence(input.question, input.evidence)
       : `I don’t have that on file for ${input.businessName} yet. I can connect you with the team to confirm.`;

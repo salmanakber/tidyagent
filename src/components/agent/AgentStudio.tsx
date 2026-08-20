@@ -150,8 +150,10 @@ export function AgentStudio({
           {voiceOnPlan ? (
             <label className="mt-5 flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
               <span>
-                <span className="block text-white">Voice (Puter.js)</span>
-                <span className="text-xs text-navy-400">Mic + spoken replies on the customer chat. On by default for Pro.</span>
+                <span className="block text-white">Voice (Piper, local)</span>
+                <span className="text-xs text-navy-400">
+                  Spoken replies use OHF Piper on this server. Mic uses the browser. On by default for Pro.
+                </span>
               </span>
               <input type="checkbox" checked={voiceOn} onChange={(event) => setVoiceOn(event.target.checked)} />
             </label>

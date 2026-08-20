@@ -24,9 +24,9 @@ export default async function DashboardPage() {
             <Link href="/onboarding" className="btn-secondary">
               Setup wizard
             </Link>
-            <Link href="/agent" className="btn-primary">
+            {/* <Link href="/agent" className="btn-primary">
               Test AI
-            </Link>
+            </Link> */}
           </>
         }
       />

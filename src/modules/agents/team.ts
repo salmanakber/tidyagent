@@ -4,22 +4,22 @@ export const WIDGET_TEMPLATES = [
   {
     key: "CLASSIC" as const,
     label: "Classic",
-    note: "Rounded card above the launcher — the default look.",
+    note: "Intercom-style card. Large avatar header, stacked bubbles, timestamps.",
   },
   {
     key: "SOFT" as const,
-    label: "Soft",
-    note: "Larger corners and a calmer header. Good for lifestyle brands.",
+    label: "Atelier",
+    note: "Warm paper, oversized photos, boutique spacing. For lifestyle brands.",
   },
   {
     key: "BAR" as const,
-    label: "Bar",
-    note: "Full-width bottom sheet on mobile; compact card on desktop.",
+    label: "Dock",
+    note: "WhatsApp-like bottom sheet with a grabber. Dense, familiar messaging.",
   },
   {
     key: "MINIMAL" as const,
-    label: "Minimal",
-    note: "Launcher only until opened. No greeting bubble on the page.",
+    label: "Noir",
+    note: "Dark glass, slim pill launcher, no page teaser. Product-site look.",
   },
 ];
 

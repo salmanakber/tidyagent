@@ -44,3 +44,8 @@ next-env.d.ts
 
 # vercel
 .vercel
+
+# piper voices / venv
+/voices/piper/*.onnx
+/voices/piper/*.onnx.json
+/.venv-piper

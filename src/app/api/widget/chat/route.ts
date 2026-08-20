@@ -4,6 +4,7 @@ import { getSession } from "@/lib/security/session";
 import { resolveWidgetAgent } from "@/modules/widget/resolve";
 import { replyToVisitor } from "@/modules/conversations/reply";
 import { entitlementsForOrganization } from "@/modules/billing/service";
+import { personPayload } from "@/modules/widget/avatar";
 
 function corsHeaders() {
   return {
@@ -64,7 +65,21 @@ export async function POST(request: Request) {
       visitorId: parsed.visitorId,
       preview: Boolean(parsed.preview),
     });
-    return NextResponse.json(result, { headers: corsHeaders() });
+    return NextResponse.json(
+      {
+        conversationId: result.conversationId,
+        text: result.text,
+        createdAt: result.createdAt,
+        agent: result.agent ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl }) : undefined,
+        handoff: result.handoff
+          ? {
+              from: personPayload({ ...result.handoff.from, widgetAvatarUrl: result.handoff.from.avatarUrl }),
+              to: personPayload({ ...result.handoff.to, widgetAvatarUrl: result.handoff.to.avatarUrl }),
+            }
+          : null,
+      },
+      { headers: corsHeaders() },
+    );
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Reply failed" },

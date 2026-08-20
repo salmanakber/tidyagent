@@ -14,7 +14,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx --tsconfig tsconfig.json prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "voice:piper": "bash scripts/start-piper.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
