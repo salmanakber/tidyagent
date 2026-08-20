@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const webhookPath = pathname.replace(/\/+$/, "") || "/";
-  if (webhookPath === "/api/wix/webhooks" || webhookPath === "/api/wix/webhook") {
+  if (webhookPath === "/api/wix/webhooks" || webhookPath === "/api/wix/webhook" || webhookPath === "/webhook") {
     if (pathname !== "/api/wix/webhooks") {
       const url = request.nextUrl.clone();
       url.pathname = "/api/wix/webhooks";

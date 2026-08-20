@@ -16,11 +16,11 @@ function corsHeaders() {
   };
 }
 
-/** Wix Trigger test fails unless POST is HTTP 200 within 1250ms. Never wait on JWT/DB. */
+/** Wix Trigger test fails unless POST is HTTP 200 within 1250ms. Empty body matches their sample. */
 function received() {
-  return new NextResponse("ok", {
+  return new NextResponse(null, {
     status: 200,
-    headers: { ...corsHeaders(), "Content-Type": "text/plain; charset=utf-8" },
+    headers: { ...corsHeaders(), "Content-Length": "0" },
   });
 }
 
