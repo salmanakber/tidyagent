@@ -45,5 +45,5 @@ export async function enterDevWorkspace() {
 
 export async function logout() {
   await clearSessionCookie();
-  redirect("/");
+  redirect("/login?disconnected=1");
 }

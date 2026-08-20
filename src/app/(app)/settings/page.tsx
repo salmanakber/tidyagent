@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
+import { logout } from "@/app/actions/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { planLabel } from "@/modules/billing/catalog";
@@ -32,6 +33,13 @@ export default async function SettingsPage() {
               </dd>
             </div>
           </dl>
+          <form action={logout} className="mt-6">
+            <button className="btn-secondary">Disconnect this site</button>
+          </form>
+          <p className="mt-3 text-xs leading-5 text-navy-400">
+            Clears this browser session. Reopen tidyAgent from Wix, or use Reconnect with Wix on the sign-in page, to
+            authenticate again.
+          </p>
         </div>
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Subscription (server-side)</h2>

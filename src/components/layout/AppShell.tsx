@@ -134,7 +134,7 @@ export function AppShell({
                 ))}
               </nav>
               <form action={logout} className="mt-6">
-                <button className="btn-secondary w-full">Sign out</button>
+                <button className="btn-secondary w-full">Disconnect</button>
               </form>
             </div>
           </div>
@@ -171,7 +171,7 @@ export function AppShell({
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <form action={logout} className="hidden lg:block">
-                <button className="btn-secondary px-3 py-1.5 text-xs">Sign out</button>
+                <button className="btn-secondary px-3 py-1.5 text-xs">Disconnect</button>
               </form>
             </div>
           </header>

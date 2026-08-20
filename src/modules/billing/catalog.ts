@@ -86,6 +86,26 @@ export function wixUpgradeUrl(instanceId: string) {
   return `https://www.wix.com/apps/upgrade/${appId}?appInstanceId=${encodeURIComponent(instanceId)}`;
 }
 
+/** Opens Wix site selector, then the installed app, so we get a fresh signed instance. */
+export function wixReconnectUrl() {
+  const appId = process.env.WIX_APP_ID;
+  if (!appId) return "https://manage.wix.com/";
+  const actionUrl = `https://www.wix.com/dashboard/{{metaSiteId}}/app/${appId}`;
+  const params = new URLSearchParams({
+    title: "Select a site to open tidyAgent",
+    buttonText: "Open tidyAgent",
+    autoSelectOnSingleSite: "true",
+    actionUrl,
+  });
+  return `https://www.wix.com/my-account/site-selector/?${params.toString()}`;
+}
+
+export function wixInstallUrl() {
+  const appId = process.env.WIX_APP_ID;
+  if (!appId) return null;
+  return `https://www.wix.com/app-market/add-app/${appId}`;
+}
+
 export function wixProductIdForPlan(planKey: PlanKey) {
   return catalogFromEnv()[planKey] || null;
 }
