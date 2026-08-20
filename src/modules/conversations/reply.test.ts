@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEvidenceAnswer, isCasualOpener, isPriceQuestion, subjectTerms } from "@/modules/conversations/reply";
+import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isPriceQuestion, subjectTerms } from "@/modules/conversations/reply";
 
 describe("visitor openers", () => {
   it("treats hi/hello as greetings, not missing knowledge", () => {
@@ -34,5 +34,20 @@ describe("visitor openers", () => {
     ]);
     expect(priced).toMatch(/\$149/);
     expect(priced.toLowerCase()).toContain("deep");
+    expect(priced).toContain("\n\n- **");
+  });
+
+  it("strips SEO titles and duplicate marketing lines from a price list", () => {
+    const reply = formatFactsAnswer("prices", [
+      { entity: "Offerings Flyboard Rentals", value: "$250", kind: "PRICE" },
+      { entity: "Flyboard Rentals | 406watersports (https://www.406watersports.com/flyboard)", value: "$250", kind: "PRICE" },
+      { entity: "Prices And Offerings", value: "$250", kind: "PRICE" },
+      { entity: "Rental Enjoy 24 Hours Of Pontooning Allowing", value: "$1500", kind: "PRICE" },
+    ]);
+    expect(reply.toLowerCase()).not.toContain("https://");
+    expect(reply.toLowerCase()).not.toContain("prices and offerings");
+    expect(reply.toLowerCase()).not.toContain("enjoy");
+    expect((reply.match(/\$250/g) || []).length).toBe(1);
+    expect(reply).toMatch(/\$1500|\$1,500/);
   });
 });

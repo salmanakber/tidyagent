@@ -9,6 +9,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { WIDGET_TEMPLATES } from "@/modules/agents/team";
 import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
 import { DEFAULT_VOICE_ID } from "@/modules/voice/voices";
+import { GRADIENT_ANGLES } from "@/modules/widget/gradient";
 import type { AgentSpecialty, KnowledgeContentType, PlanKey, WidgetTemplate } from "@prisma/client";
 
 type AgentView = {
@@ -20,6 +21,7 @@ type AgentView = {
   widgetPrimaryColor: string;
   widgetUseGradient?: boolean;
   widgetGradientTo?: string;
+  widgetGradientAngle?: string;
   widgetTextColor?: string;
   widgetMessageColor?: string;
   widgetGreeting: string;
@@ -68,6 +70,7 @@ export function AgentStudio({
   const [color, setColor] = useState(agent.widgetPrimaryColor);
   const [useGradient, setUseGradient] = useState(Boolean(agent.widgetUseGradient));
   const [gradientTo, setGradientTo] = useState(agent.widgetGradientTo || "#4F8CFF");
+  const [gradientAngle, setGradientAngle] = useState(agent.widgetGradientAngle || "to-bottom-right");
   const [textColor, setTextColor] = useState(agent.widgetTextColor || "#FFFFFF");
   const [messageColor, setMessageColor] = useState(agent.widgetMessageColor || "#1E293B");
   const [greeting, setGreeting] = useState(agent.widgetGreeting);
@@ -88,6 +91,7 @@ export function AgentStudio({
         widgetPrimaryColor: color,
         widgetUseGradient: useGradient,
         widgetGradientTo: gradientTo,
+        widgetGradientAngle: gradientAngle,
         widgetTextColor: textColor,
         widgetMessageColor: messageColor,
         widgetGreeting: greeting,
@@ -162,7 +166,21 @@ export function AgentStudio({
               </span>
               <input type="checkbox" checked={useGradient} onChange={(event) => setUseGradient(event.target.checked)} />
             </label>
-            {useGradient ? <ColorField label="Second color" value={gradientTo} onChange={setGradientTo} /> : null}
+            {useGradient ? (
+              <>
+                <ColorField label="Second color" value={gradientTo} onChange={setGradientTo} />
+                <label className="text-sm text-navy-300">
+                  Gradient direction
+                  <select className="field mt-2" value={gradientAngle} onChange={(event) => setGradientAngle(event.target.value)}>
+                    {GRADIENT_ANGLES.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
           </div>
           <div className="mt-5">
             <p className="text-sm text-navy-300">Chat template</p>
@@ -279,13 +297,14 @@ export function AgentStudio({
       </div>
       <div className="panel overflow-hidden p-4">
         <p className="mb-3 px-2 text-sm text-navy-300">Live widget preview — owner brand, not tidyAgent amber/navy</p>
-        <div className="relative min-h-[min(62dvh,480px)] overflow-hidden rounded-[32px] bg-slate-200">
+        <div className="relative min-h-[min(72dvh,580px)] overflow-hidden rounded-[32px] bg-slate-200">
           <ChatWidget
             name={name}
             greeting={greeting}
             primaryColor={color}
             useGradient={useGradient}
             gradientTo={gradientTo}
+            gradientAngle={gradientAngle}
             textColor={textColor}
             messageColor={messageColor}
             position={position}

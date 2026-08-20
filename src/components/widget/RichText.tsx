@@ -51,19 +51,28 @@ export function AgentRichText({ text }: { text: string }) {
     <div className="space-y-2 text-left">
       {blocks.map((block, index) => {
         const lines = block.split("\n");
-        const list = lines.length > 1 && lines.every((line) => /^\s*[-*•]|\s*\d+[.)]\s+/.test(line) || !line.trim());
-        if (list) {
+        const listStart = lines.findIndex((line) => /^\s*[-*•]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line));
+        if (listStart >= 0) {
+          const intro = lines.slice(0, listStart).join("\n").trim();
+          const items = lines
+            .slice(listStart)
+            .map((line) => line.replace(/^\s*[-*•]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
+            .filter(Boolean);
           return (
-            <ul key={index} className="list-disc space-y-1 pl-4">
-              {lines
-                .map((line) => line.replace(/^\s*[-*•]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
-                .filter(Boolean)
-                .map((line, item) => (
+            <div key={index} className="space-y-2">
+              {intro ? (
+                <p>
+                  <Inline text={intro} />
+                </p>
+              ) : null}
+              <ul className="list-disc space-y-1.5 pl-4">
+                {items.map((line, item) => (
                   <li key={item}>
                     <Inline text={line} />
                   </li>
                 ))}
-            </ul>
+              </ul>
+            </div>
           );
         }
         return (

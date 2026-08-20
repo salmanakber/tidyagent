@@ -6,7 +6,7 @@ import { entitlementsForOrganization } from "@/modules/billing/service";
 import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { lookupBusinessFacts } from "@/modules/knowledge/lookup";
-import { extractLabeledPrices } from "@/modules/knowledge/facts";
+import { extractLabeledPrices, cleanOfferName } from "@/modules/knowledge/facts";
 import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team";
 import { isWorkflowOn, type AutomationKey, automationAllowedForEntitlements } from "@/modules/automations/catalog";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
@@ -473,18 +473,18 @@ async function generateReply(input: {
   const handoffLine = input.offerHuman
     ? "If the question needs facts you do not have, say so plainly and offer a human handoff."
     : "If the question needs facts you do not have, say so plainly. Do not offer a human transfer.";
-  const factBlock = input.structured.facts.length
-    ? input.structured.facts
-        .map((fact) => `- ${fact.kind} ${fact.entity} = ${fact.value}${fact.sourceUrl ? ` (${fact.sourceUrl})` : ""} [${fact.confidence}${fact.conflicted ? ", CONFLICT" : ""}]`)
-        .join("\n")
+  const cleanedFacts = cleanedPriceFacts(input.structured.facts.filter((fact) => !fact.conflicted));
+  const factBlock = cleanedFacts.length
+    ? cleanedFacts.map((fact) => `- ${fact.entity}: ${fact.value}`).join("\n")
     : "(none)";
   const conflictBlock = input.structured.conflicts.length
     ? input.structured.conflicts.map((row) => `- ${row.entity}: ${JSON.stringify(row.values)}`).join("\n")
     : "none";
+  const fromFacts = formatFactsAnswer(input.question, input.structured.facts.filter((fact) => !fact.conflicted));
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help you today?`
-    : input.structured.facts.filter((fact) => !fact.conflicted).length
-      ? formatFactsAnswer(input.question, input.structured.facts.filter((fact) => !fact.conflicted))
+    : fromFacts
+      ? fromFacts
       : input.structured.conflicts.length
         ? `I have more than one listed value for that, so I don’t want to guess. I can connect you with the team to confirm.`
         : input.evidence.length
@@ -514,7 +514,8 @@ When evidence includes prices for the asked item, present them clearly:
 - Each distinct item on its own bullet.
 - Bold the item name and the exact price with **double asterisks**.
 - If a source URL is in the evidence, add one markdown link: [View details](https://...).
-Never paste page titles, meta descriptions, "Prices and offerings", "PRICES AND ITEMS FROM THIS PAGE", raw field names, or concatenated SEO text.
+Never paste page titles, meta descriptions, "Prices and offerings", "PRICES AND ITEMS FROM THIS PAGE", raw field names, URLs, or concatenated SEO text.
+Never add filler like "Anything else I can help with?"
 If the evidence does not contain the asked item's prices, say that plainly. Do not dump unrelated page text.
 If the visitor misspells a product or service name, match it to the closest name in the verified facts or evidence.
 ${intro}
@@ -573,32 +574,70 @@ export function formatFactsAnswer(
   question: string,
   facts: { entity: string; value: string; kind: string }[],
 ) {
-  const priced = facts.filter((fact) => fact.kind === "PRICE" || /\$\s*\d/.test(fact.value));
-  const use = priced.length ? priced : facts;
-  if (!use.length) return formatEvidenceAnswer(question, []);
-  return `Here is what I have from the site:\n${use
-    .slice(0, 8)
-    .map((fact) => `- **${fact.entity}** — **${fact.value}**`)
-    .join("\n")}`;
+  const lines = cleanedPriceFacts(facts).map((fact) => `${fact.entity} — ${fact.value}`);
+  return formatPriceList(question, lines);
 }
 
 export function formatEvidenceAnswer(question: string, evidence: { content: string; title: string | null }[]) {
-  const terms = subjectTerms(question).filter((term) => !["price", "prices", "pricing", "cost", "list"].includes(term));
-  const lines = uniqueTerms(evidence.flatMap((item) => priceLinesFrom(item.content)));
-  const matched = lines.filter((line) => !terms.length || terms.some((term) => line.toLowerCase().includes(term)));
-  const use = matched.length ? matched : [];
-  if (use.length) {
-    const topic = terms[0] ? `${terms[0]} ` : "";
-    return `Here are the ${topic}prices from the site:\n${use
-      .slice(0, 8)
-      .map((line) => {
-        const [name, price] = line.split(/\s+[—-]\s+/);
-        return price ? `- **${name.trim()}** — **${price.trim()}**` : `- **${line}**`;
-      })
-      .join("\n")}`;
+  const lines = uniqueTerms(evidence.flatMap((item) => priceLinesFrom(item.content)))
+    .map((line) => tidyPriceLine(line))
+    .filter(Boolean);
+  return formatPriceList(question, lines);
+}
+
+function formatPriceList(question: string, lines: string[]) {
+  const terms = subjectTerms(question).filter((term) => !["price", "prices", "pricing", "cost", "list", "how", "much"].includes(term));
+  const uniqueLines = dedupePriceLines(lines);
+  const matched = uniqueLines.filter((line) => !terms.length || terms.some((term) => line.toLowerCase().includes(term)));
+  const use = matched.length ? matched : uniqueLines;
+  if (!use.length) return "";
+  return `Here are the prices from the site:\n\n${use
+    .slice(0, 8)
+    .map((line) => {
+      const [name, price] = splitPriceLine(line);
+      return price ? `- **${name}** — **${price}**` : `- **${line}**`;
+    })
+    .join("\n")}`;
+}
+
+function cleanedPriceFacts(facts: { entity: string; value: string; kind: string }[]) {
+  const priced = facts.filter((fact) => fact.kind === "PRICE" || /\$\s*\d/.test(fact.value));
+  return dedupePriceLines(
+    priced.map((fact) => {
+      const name = cleanOfferName(fact.entity);
+      return name ? `${name} — ${collapseReply(fact.value)}` : "";
+    }),
+  ).map((line) => {
+    const [entity, value] = splitPriceLine(line);
+    return { entity, value };
+  });
+}
+
+function tidyPriceLine(line: string) {
+  const [rawName, price] = splitPriceLine(line);
+  const name = cleanOfferName(rawName || line);
+  if (!name || !price) return "";
+  return `${name} — ${price}`;
+}
+
+function splitPriceLine(line: string): [string, string] {
+  const match = line.match(/^(.*?)\s+[—-]\s+(\$\s*[\d,]+(?:\.\d{1,2})?.*)$/);
+  if (match) return [collapseReply(match[1] ?? ""), collapseReply(match[2] ?? "")];
+  return [collapseReply(line), ""];
+}
+
+function dedupePriceLines(lines: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    const [name, price] = splitPriceLine(line);
+    if (!name) continue;
+    const key = `${name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}|${price.replace(/[^\d.]/g, "")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(price ? `${name} — ${price}` : name);
   }
-  if (!evidence.length) return "I don’t have that on file yet.";
-  return "I don’t have a specific price list for that item in the site pages I can see. Ask me about a named service, product, or package, or I can connect you with the team.";
+  return out;
 }
 
 function priceLinesFrom(content: string) {
@@ -617,7 +656,12 @@ function sanitizeReply(text: string) {
 }
 
 function looksLikeDump(text: string) {
-  return /PRICES AND ITEMS|Verified prices and named items|pageUriSEO/i.test(text) || (/\|/.test(text) && !/\$\s*\d/.test(text) && text.length > 180);
+  return (
+    /PRICES AND ITEMS|Verified prices and named items|pageUriSEO|Prices And Offerings/i.test(text) ||
+    (/https?:\/\//i.test(text) && /\$\s*\d/.test(text)) ||
+    (/\|\s*\S+/.test(text) && /\$\s*\d/.test(text)) ||
+    (/\|/.test(text) && !/\$\s*\d/.test(text) && text.length > 180)
+  );
 }
 
 function uniqueTerms(values: string[]) {

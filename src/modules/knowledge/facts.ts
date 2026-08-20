@@ -38,13 +38,12 @@ export function factsFromJsonLd(nodes: Record<string, unknown>[]): string[] {
   const lines: string[] = [];
   for (const node of nodes) {
     const type = String(node["@type"] || "").toLowerCase();
-    const name = asString(node.name);
-    const url = asString(node.url);
+    const name = cleanOfferName(asString(node.name));
     const price = offerPrice(node);
     const interesting =
       /product|service|offer|aggregateoffer|itemlist|event|menu|price/.test(type) || Boolean(price);
-    if (!interesting) continue;
-    const parts = [name, price, url].filter(Boolean);
+    if (!interesting || !name) continue;
+    const parts = [name, price].filter(Boolean);
     if (parts.length) lines.push(parts.join(" — "));
   }
   return unique(lines).slice(0, 40);
@@ -81,9 +80,9 @@ export function extractLabeledPrices(text: string): string[] {
   const hay = text.replace(/\s+/g, " ");
   const labeled: string[] = [];
   for (const match of hay.matchAll(OFFER_PATTERN)) {
-    const name = collapse(match[1] ?? "");
+    const name = cleanOfferName(match[1] ?? "");
     const price = collapse(match[2] ?? "");
-    if (name.length >= 4 && price) labeled.push(`${titleCase(name)} — ${price}`);
+    if (name && price) labeled.push(`${name} — ${price}`);
   }
 
   const headings = text
@@ -96,10 +95,45 @@ export function extractLabeledPrices(text: string): string[] {
     if (!/(hour|hr|day|night|rental|package|plan|session|tour|service|treatment|membership|class|lesson|offer|menu|product)/i.test(heading)) continue;
     const rest = text.slice(text.toLowerCase().indexOf(heading.toLowerCase()) + heading.length, text.toLowerCase().indexOf(heading.toLowerCase()) + heading.length + 280);
     const price = rest.match(PRICE_PATTERN)?.[0];
-    if (price) labeled.push(`${titleCase(heading)} — ${collapse(price)}`);
+    const name = cleanOfferName(heading);
+    if (name && price) labeled.push(`${name} — ${collapse(price)}`);
   }
 
   return unique(labeled).slice(0, 40);
+}
+
+const DROP_WORDS = /^(enjoy|allowing|exhilarating|fun|ride|lakes|click|learn|more|here|please|welcome)$/i;
+
+export function cleanOfferName(raw: string) {
+  let name = collapse(raw)
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/\(https?:\/\/[^)]+\)/gi, "")
+    .replace(/\bwww\.[^\s)]+/gi, "")
+    .split("|")[0]
+    .replace(/verified prices[^$]*/gi, "")
+    .replace(/\bprices and offerings\b/gi, "")
+    .replace(/^\s*offerings\s+/i, "")
+    .replace(/[()]/g, " ");
+  name = name
+    .split(/\s+/)
+    .filter((word) => word && !DROP_WORDS.test(word))
+    .join(" ")
+    .replace(/\b(of|on|with|the|a)\s+(of|on|with|the|a)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!isUsefulOfferName(name)) return "";
+  return titleCase(name);
+}
+
+export function isUsefulOfferName(name: string) {
+  const n = collapse(name);
+  if (n.length < 3 || n.length > 56) return false;
+  const words = n.split(/\s+/);
+  if (words.length < 1 || words.length > 7) return false;
+  if (/https?:|www\.|\|/i.test(n)) return false;
+  if (/prices and offerings|verified prices|from this page|pageuriseo|anything else/i.test(n)) return false;
+  if (/\b(enjoy|allowing|exhilarating|click here|learn more)\b/i.test(n)) return false;
+  return /[a-z]/i.test(n);
 }
 
 export function pageFactsBlock(html: string, visibleText: string): string {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, History, Mic, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
+import { widgetGradientCss } from "@/modules/widget/gradient";
 
 export type WidgetProps = {
   name: string;
@@ -11,6 +12,7 @@ export type WidgetProps = {
   primaryColor: string;
   useGradient?: boolean;
   gradientTo?: string;
+  gradientAngle?: string;
   textColor?: string;
   messageColor?: string;
   position?: "BOTTOM_RIGHT" | "BOTTOM_LEFT";
@@ -34,6 +36,7 @@ export function ChatWidget({
   primaryColor,
   useGradient = false,
   gradientTo = "#4F8CFF",
+  gradientAngle = "to-bottom-right",
   textColor = "#FFFFFF",
   messageColor = "#1E293B",
   position = "BOTTOM_RIGHT",
@@ -62,8 +65,8 @@ export function ChatWidget({
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
 
   const brandStyle = useMemo(
-    () => brandFill(primaryColor, useGradient, gradientTo),
-    [primaryColor, useGradient, gradientTo],
+    () => brandFill(primaryColor, useGradient, gradientTo, gradientAngle),
+    [primaryColor, useGradient, gradientTo, gradientAngle],
   );
   const headerStyle = useMemo(
     () => ({
@@ -224,17 +227,17 @@ export function ChatWidget({
   }[template];
 
   return (
-    <div className={cn("flex touch-manipulation flex-col", preview ? "relative min-h-[min(62dvh,480px)]" : "pointer-events-none fixed inset-0")}>
+    <div className={cn("flex touch-manipulation flex-col", preview ? "relative min-h-[min(72dvh,580px)]" : "pointer-events-none fixed inset-0")}>
       <div
         className={cn(
-          "pointer-events-auto absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] flex w-[min(100%,340px)] max-w-[calc(100vw-1rem)] flex-col gap-2",
+          "pointer-events-auto absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] flex w-[min(100%,400px)] max-w-[calc(100vw-1rem)] flex-col gap-2",
           left ? "left-[max(0.5rem,env(safe-area-inset-left))] items-start" : "right-[max(0.5rem,env(safe-area-inset-right))] items-end",
         )}
       >
         {open ? (
           <div
             className={cn(
-              "relative flex h-[min(58dvh,440px)] max-h-[calc(100dvh-5rem)] w-full min-h-[260px] flex-col overflow-hidden border border-black/10 shadow-panel",
+              "relative flex h-[min(72dvh,580px)] max-h-[calc(100dvh-5rem)] w-full min-h-[320px] flex-col overflow-hidden border border-black/10 shadow-panel",
               shell,
             )}
           >
@@ -325,7 +328,7 @@ export function ChatWidget({
                     <span className="h-px flex-1 bg-slate-300" />
                   </div>
                 ) : (
-                  <div key={index} className={cn("flex max-w-[min(90%,18rem)] gap-2", line.role === "customer" ? "ml-auto flex-row-reverse" : "")}>
+                  <div key={index} className={cn("flex max-w-[min(92%,22rem)] gap-2", line.role === "customer" ? "ml-auto flex-row-reverse" : "")}>
                     {line.role === "agent" ? <Face name={line.agent?.name || agent.name} url={line.agent?.avatarUrl || agent.avatarUrl} small /> : null}
                     <div className={cn("min-w-0 space-y-1", line.role === "customer" ? "items-end text-right" : "")}>
                       {line.role === "agent" ? <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">{line.agent?.name || agent.name}</p> : null}
@@ -405,10 +408,10 @@ export function ChatWidget({
   );
 }
 
-function brandFill(primary: string, useGradient: boolean, gradientTo: string) {
+function brandFill(primary: string, useGradient: boolean, gradientTo: string, angle: string) {
   if (useGradient && gradientTo) {
     return {
-      backgroundImage: `linear-gradient(135deg, ${primary} 0%, ${gradientTo} 100%)`,
+      backgroundImage: widgetGradientCss(primary, gradientTo, angle),
       backgroundColor: primary,
     };
   }

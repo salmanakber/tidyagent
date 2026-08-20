@@ -26,6 +26,7 @@
     const color = config.primaryColor || "#1F3A5F";
     const useGradient = Boolean(config.useGradient);
     const gradientTo = String(config.gradientTo || "#4F8CFF");
+    const gradientAngle = String(config.gradientAngle || "to-bottom-right");
     const textColor = String(config.textColor || "#FFFFFF");
     const messageColor = String(config.messageColor || "#1E293B");
     const greeting = String(config.greeting || "Hi! How can I help you today?");
@@ -45,7 +46,7 @@
 
     const shadow = root.attachShadow({ mode: "open" });
     shadow.innerHTML = `
-      <style>${widgetCss({ color, left, template, useGradient, gradientTo, textColor, messageColor })}</style>
+      <style>${widgetCss({ color, left, template, useGradient, gradientTo, gradientAngle, textColor, messageColor })}</style>
       <div class="ta ${left ? "left" : "right"} tpl-${template.toLowerCase()}">
         <div class="panel" hidden>
           <div class="head">
@@ -205,7 +206,7 @@
         "z-index:2147483646",
         "bottom:max(10px, calc(env(safe-area-inset-bottom, 0px) + 8px))",
         left ? "left:max(8px, env(safe-area-inset-left, 0px));right:auto" : "right:max(8px, env(safe-area-inset-right, 0px));left:auto",
-        "width:min(360px, calc(100vw - 16px))",
+        "width:min(400px, calc(100vw - 16px))",
         "max-width:calc(100vw - 16px)",
         "pointer-events:none",
       ].join(";");
@@ -264,7 +265,7 @@
       const person = extra.agent || currentAgent;
       if (role === "agent") {
         row.innerHTML = `<div class="ava sm${person.avatarUrl ? " has-photo" : ""}">${avatarMarkup(person.avatarUrl, person.initials || initialsOf(person.name))}</div>
-          <div class="stack"><div class="who">${escapeHtml(person.name || "")}</div><div class="msg">${escapeHtml(text)}</div><time>${formatTime(time)}</time></div>`;
+          <div class="stack"><div class="who">${escapeHtml(person.name || "")}</div><div class="msg">${formatAgentHtml(text)}</div><time>${formatTime(time)}</time></div>`;
       } else {
         row.innerHTML = `<div class="stack"><div class="msg">${escapeHtml(text)}</div><time>${formatTime(time)}</time></div>`;
       }
@@ -708,6 +709,29 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  function inlineMd(value) {
+    return escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
+  function formatAgentHtml(value) {
+    const raw = String(value || "").replace(/\r/g, "").trim();
+    if (!raw) return "";
+    return raw.split(/\n{2,}/).map((block) => {
+      const lines = block.split("\n");
+      const listStart = lines.findIndex((line) => /^\s*[-*•]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line));
+      if (listStart < 0) return `<p>${inlineMd(block).replace(/\n/g, "<br>")}</p>`;
+      const intro = lines.slice(0, listStart).join(" ").trim();
+      const items = lines
+        .slice(listStart)
+        .map((line) => line.replace(/^\s*[-*•]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
+        .filter(Boolean);
+      return `${intro ? `<p>${inlineMd(intro)}</p>` : ""}<ul>${items.map((item) => `<li>${inlineMd(item)}</li>`).join("")}</ul>`;
+    }).join("");
+  }
+  function gradientCss(from, to, angle) {
+    if (angle === "radial") return `radial-gradient(circle at 18% 18%, ${from} 0%, ${to} 82%)`;
+    const deg = angle === "to-right" ? "90deg" : angle === "to-bottom" ? "180deg" : angle === "to-bottom-left" ? "225deg" : "135deg";
+    return `linear-gradient(${deg}, ${from} 0%, ${to} 100%)`;
+  }
   function escapeAttr(value) {
     return escapeHtml(value).replace(/'/g, "&#39;");
   }
@@ -731,11 +755,11 @@
     return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
   }
 
-  function widgetCss({ color, left, template, useGradient, gradientTo, textColor, messageColor }) {
+  function widgetCss({ color, left, template, useGradient, gradientTo, gradientAngle, textColor, messageColor }) {
     const noir = template === "MINIMAL";
     const atelier = template === "SOFT";
     const dock = template === "BAR";
-    const fill = useGradient ? `linear-gradient(135deg, ${color} 0%, ${gradientTo} 100%)` : color;
+    const fill = useGradient ? gradientCss(color, gradientTo, gradientAngle) : color;
     const ink = noir && String(messageColor).toUpperCase() === "#1E293B" ? "#e8edf5" : messageColor;
     const paper = noir ? "#101826" : atelier ? "#f7f1e6" : "#fff";
     const threadBg = noir ? "#0b1220" : atelier ? "#efe6d6" : dock ? "#ece5dd" : "#f4f7fb";
@@ -776,7 +800,7 @@
       .teaser-text { margin:0; font:500 14px/1.45 ui-sans-serif,system-ui; }
       .panel {
         width: 100%;
-        height: min(440px, calc(100dvh - 24px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)));
+        height: min(580px, calc(100dvh - 24px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)));
         max-height: calc(100dvh - 20px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
         min-height: 260px;
         display:flex; flex-direction:column; border-radius:${radius}; overflow:hidden; position:relative;
@@ -801,12 +825,17 @@
       .icon-btn.on { background:#fff; color:${color}; }
       .icon-btn.voice-stop { background:#fff; color:#b42318; }
       .thread { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 12px 14px; background:${threadBg}; display:flex; flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
-      .row { display:flex; gap:8px; max-width:min(90%, 18rem); align-items:flex-end; animation: ta-msg 280ms ease both; }
+      .row { display:flex; gap:8px; max-width:min(92%, 22rem); align-items:flex-end; animation: ta-msg 280ms ease both; }
       .row.visitor { margin-left:auto; flex-direction:row-reverse; }
       .stack { display:flex; flex-direction:column; gap:4px; min-width:0; }
       .row.visitor .stack { align-items:flex-end; }
       .who { font:650 10px/1 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
       .msg { border-radius:18px; padding:9px 11px; font:500 13px/1.45 ui-sans-serif,system-ui; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow-wrap:anywhere; word-break:break-word; }
+      .msg p { margin:0; }
+      .msg p + ul, .msg p + p { margin-top:8px; }
+      .msg ul { margin:6px 0 0; padding-left:1.15rem; }
+      .msg li { margin:4px 0; }
+      .msg strong { font-weight:700; }
       .row.agent .msg { background:${noir ? "#1a2436" : "#fff"}; color:${ink}; border-radius:6px 18px 18px 18px; }
       .row.visitor .msg { background:${fill}; color:${textColor}; border-radius:18px 6px 18px 18px; }
       .tpl-soft .row.agent .msg { background:#fffaf2; border:1px solid rgba(44,36,28,.06); }
@@ -846,7 +875,7 @@
       @media (max-width: 640px) {
         .panel:not([hidden]) {
           width:100%;
-          height: min(62dvh, 460px);
+          height: min(70dvh, 560px);
           max-height: calc(100dvh - 16px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
           border-radius: 18px;
         }
@@ -857,7 +886,7 @@
         .teaser { max-width: min(220px, calc(100vw - 72px)); }
       }
       @media (max-width: 380px) {
-        .panel:not([hidden]) { height: min(58dvh, 400px); border-radius: 16px; }
+        .panel:not([hidden]) { height: min(64dvh, 480px); border-radius: 16px; }
         .msg { font-size: 13px; }
       }
       @media (max-height: 560px) {

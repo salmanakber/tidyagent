@@ -23,6 +23,7 @@ export default async function AgentPage() {
     widgetPrimaryColor: agent.widgetPrimaryColor,
     widgetUseGradient: agent.widgetUseGradient,
     widgetGradientTo: agent.widgetGradientTo,
+    widgetGradientAngle: agent.widgetGradientAngle,
     widgetTextColor: agent.widgetTextColor,
     widgetMessageColor: agent.widgetMessageColor,
     widgetGreeting: agent.widgetGreeting,

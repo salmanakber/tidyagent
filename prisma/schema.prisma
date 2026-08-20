@@ -458,6 +458,7 @@ model Agent {
   widgetPrimaryColor  String         @default("#1F3A5F")
   widgetUseGradient   Boolean        @default(false)
   widgetGradientTo    String         @default("#4F8CFF")
+  widgetGradientAngle String         @default("to-bottom-right")
   widgetTextColor     String         @default("#FFFFFF")
   widgetMessageColor  String         @default("#1E293B")
   widgetAvatarUrl     String?

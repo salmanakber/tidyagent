@@ -6,6 +6,7 @@ describe("structured page facts", () => {
     const html = `<script type="application/ld+json">{"@type":"Product","name":"Deep clean","offers":{"@type":"Offer","price":"149","priceCurrency":"USD"},"url":"https://example.com/deep-clean"}</script>`;
     const facts = factsFromJsonLd(extractJsonLdNodes(html));
     expect(facts.some((line) => /Deep clean/.test(line) && /149/.test(line))).toBe(true);
+    expect(facts.some((line) => /https:\/\//.test(line))).toBe(false);
   });
 
   it("builds a prices block from visible currency amounts", () => {

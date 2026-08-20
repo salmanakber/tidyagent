@@ -43,6 +43,7 @@ export default async function DashboardPage() {
             primaryColor={data.agent.widgetPrimaryColor}
             useGradient={data.agent.widgetUseGradient}
             gradientTo={data.agent.widgetGradientTo}
+            gradientAngle={data.agent.widgetGradientAngle}
             textColor={data.agent.widgetTextColor}
             messageColor={data.agent.widgetMessageColor}
             position={data.agent.widgetPosition}

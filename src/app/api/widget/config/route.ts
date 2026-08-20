@@ -53,6 +53,7 @@ export async function GET(request: Request) {
       primaryColor: agent.widgetPrimaryColor,
       useGradient: Boolean(agent.widgetUseGradient),
       gradientTo: agent.widgetGradientTo || "#4F8CFF",
+      gradientAngle: agent.widgetGradientAngle || "to-bottom-right",
       textColor: agent.widgetTextColor || "#FFFFFF",
       messageColor: agent.widgetMessageColor || "#1E293B",
       avatarUrl: avatar,
