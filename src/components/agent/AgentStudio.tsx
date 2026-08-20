@@ -9,7 +9,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { WIDGET_TEMPLATES } from "@/modules/agents/team";
 import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
 import { DEFAULT_VOICE_ID } from "@/modules/voice/voices";
-import { GRADIENT_ANGLES } from "@/modules/widget/gradient";
+import { GRADIENT_ANGLES, type GradientAngle } from "@/modules/widget/gradient";
 import type { AgentSpecialty, KnowledgeContentType, PlanKey, WidgetTemplate } from "@prisma/client";
 
 type AgentView = {
@@ -21,7 +21,7 @@ type AgentView = {
   widgetPrimaryColor: string;
   widgetUseGradient?: boolean;
   widgetGradientTo?: string;
-  widgetGradientAngle?: string;
+  widgetGradientAngle?: GradientAngle | string;
   widgetTextColor?: string;
   widgetMessageColor?: string;
   widgetGreeting: string;
@@ -70,7 +70,11 @@ export function AgentStudio({
   const [color, setColor] = useState(agent.widgetPrimaryColor);
   const [useGradient, setUseGradient] = useState(Boolean(agent.widgetUseGradient));
   const [gradientTo, setGradientTo] = useState(agent.widgetGradientTo || "#4F8CFF");
-  const [gradientAngle, setGradientAngle] = useState(agent.widgetGradientAngle || "to-bottom-right");
+  const [gradientAngle, setGradientAngle] = useState<GradientAngle>(
+    GRADIENT_ANGLES.some((item) => item.id === agent.widgetGradientAngle)
+      ? (agent.widgetGradientAngle as GradientAngle)
+      : "to-bottom-right",
+  );
   const [textColor, setTextColor] = useState(agent.widgetTextColor || "#FFFFFF");
   const [messageColor, setMessageColor] = useState(agent.widgetMessageColor || "#1E293B");
   const [greeting, setGreeting] = useState(agent.widgetGreeting);
@@ -171,7 +175,11 @@ export function AgentStudio({
                 <ColorField label="Second color" value={gradientTo} onChange={setGradientTo} />
                 <label className="text-sm text-navy-300">
                   Gradient direction
-                  <select className="field mt-2" value={gradientAngle} onChange={(event) => setGradientAngle(event.target.value)}>
+                  <select
+                    className="field mt-2"
+                    value={gradientAngle}
+                    onChange={(event) => setGradientAngle(event.target.value as GradientAngle)}
+                  >
                     {GRADIENT_ANGLES.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.label}
