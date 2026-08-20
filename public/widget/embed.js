@@ -46,7 +46,7 @@
         <div class="panel" hidden>
           <div class="head">
             <button type="button" class="icon-btn hist" aria-label="Chat history">${iconChats()}</button>
-            <div class="ava head-ava">${avatarMarkup(startAvatar, startInitials)}</div>
+          <div class="ava head-ava${startAvatar ? " has-photo" : ""}">${avatarMarkup(startAvatar, startInitials)}</div>
             <div class="meta">
               <p class="nm">${escapeHtml(startName)}</p>
               <p class="st"><span class="dot"></span> <span class="st-label">Online</span></p>
@@ -70,13 +70,13 @@
         </div>
         <div class="teaser" hidden>
           <button type="button" class="teaser-x" aria-label="Dismiss">${iconClose()}</button>
-          <div class="teaser-ava">${avatarMarkup(startAvatar, startInitials)}</div>
+          <div class="teaser-ava${startAvatar ? " has-photo" : ""}">${avatarMarkup(startAvatar, startInitials)}</div>
           <div>
             <p class="teaser-label">${escapeHtml(startName)}</p>
             <p class="teaser-text"></p>
           </div>
         </div>
-        <button type="button" class="launch" aria-label="Open chat" aria-expanded="false">
+        <button type="button" class="launch${startAvatar ? " has-photo" : ""}" aria-label="Open chat" aria-expanded="false">
           <span class="ring"></span>
           ${template === "MINIMAL" ? `<span class="launch-copy">Chat</span>` : ""}
           <span class="face">${avatarMarkup(startAvatar, startInitials)}</span>
@@ -109,7 +109,7 @@
     let voiceOn = voiceOffered;
     let listening = false;
     let recognition = null;
-    let currentAgent = { name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials };
+    let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials };
     let conversationId = readStore("conv") || "";
     let visitorId = readStore("vid");
     if (!visitorId) {
@@ -222,6 +222,7 @@
 
     function setHeader(person) {
       currentAgent = {
+        id: person.id || currentAgent.id || "",
         name: person.name || startName,
         avatarUrl: absoluteUrl(person.avatarUrl, origin) || startAvatar,
         role: person.role || person.specialty || "Assistant",
@@ -230,6 +231,7 @@
       nameEl.textContent = currentAgent.name;
       statusEl.textContent = currentAgent.role;
       headAva.innerHTML = avatarMarkup(currentAgent.avatarUrl, currentAgent.initials);
+      headAva.classList.toggle("has-photo", Boolean(currentAgent.avatarUrl));
     }
 
     function seedGreeting() {
@@ -243,7 +245,7 @@
       const time = extra.time ? new Date(extra.time) : new Date();
       const person = extra.agent || currentAgent;
       if (role === "agent") {
-        row.innerHTML = `<div class="ava sm">${avatarMarkup(person.avatarUrl, person.initials || initialsOf(person.name))}</div>
+        row.innerHTML = `<div class="ava sm${person.avatarUrl ? " has-photo" : ""}">${avatarMarkup(person.avatarUrl, person.initials || initialsOf(person.name))}</div>
           <div class="stack"><div class="who">${escapeHtml(person.name || "")}</div><div class="msg">${escapeHtml(text)}</div><time>${formatTime(time)}</time></div>`;
       } else {
         row.innerHTML = `<div class="stack"><div class="msg">${escapeHtml(text)}</div><time>${formatTime(time)}</time></div>`;
@@ -262,7 +264,7 @@
       box.disabled = true;
       const thinking = document.createElement("div");
       thinking.className = "row agent";
-      thinking.innerHTML = `<div class="ava sm">${avatarMarkup(currentAgent.avatarUrl, currentAgent.initials)}</div><div class="stack"><div class="msg dim">Checking that for you…</div></div>`;
+        thinking.innerHTML = `<div class="ava sm${currentAgent.avatarUrl ? " has-photo" : ""}">${avatarMarkup(currentAgent.avatarUrl, currentAgent.initials)}</div><div class="stack"><div class="msg dim">Checking that for you…</div></div>`;
       thread.appendChild(thinking);
       thread.scrollTop = thread.scrollHeight;
       try {
@@ -284,8 +286,13 @@
           conversationId = data.conversationId;
           writeStore("conv", conversationId);
         }
-        if (data.handoff?.to) {
-          await playHandoff(data.handoff);
+        const nextAgent = data.agent ? personFrom(data.agent) : currentAgent;
+        const switched =
+          Boolean(data.handoff?.to) ||
+          (nextAgent.name && nextAgent.name !== currentAgent.name) ||
+          (nextAgent.id && currentAgent.id && nextAgent.id !== currentAgent.id);
+        if (switched) {
+          await playHandoff(data.handoff || { from: currentAgent, to: nextAgent });
         } else if (data.agent?.name) {
           setHeader(data.agent);
         }
@@ -310,9 +317,9 @@
       card.className = "xfer";
       card.innerHTML = `
         <div class="xfer-faces">
-          <div class="ava">${avatarMarkup(from.avatarUrl, from.initials)}</div>
+          <div class="ava${from.avatarUrl ? " has-photo" : ""}">${avatarMarkup(from.avatarUrl, from.initials)}</div>
           <span class="xfer-dots"><i></i><i></i><i></i></span>
-          <div class="ava pulse">${avatarMarkup(to.avatarUrl, to.initials)}</div>
+          <div class="ava pulse${to.avatarUrl ? " has-photo" : ""}">${avatarMarkup(to.avatarUrl, to.initials)}</div>
         </div>
         <p class="xfer-title">Connecting you with <strong>${escapeHtml(to.name)}</strong></p>
         <p class="xfer-sub">${escapeHtml(to.role || "Specialist")} · <span class="xfer-sec">1s</span></p>
@@ -329,9 +336,13 @@
       window.clearInterval(tick);
       card.remove();
       setHeader(to);
+      renderJoined(to);
+    }
+
+    function renderJoined(to) {
       const joined = document.createElement("div");
       joined.className = "joined";
-      joined.innerHTML = `<span class="line"></span><div class="ava xs">${avatarMarkup(to.avatarUrl, to.initials)}</div><span>${escapeHtml(to.name)} joined</span><span class="line"></span>`;
+      joined.innerHTML = `<span class="line"></span><div class="ava xs${to.avatarUrl ? " has-photo" : ""}">${avatarMarkup(to.avatarUrl, to.initials)}</div><span>${escapeHtml(to.name)} joined</span><span class="line"></span>`;
       thread.appendChild(joined);
       thread.scrollTop = thread.scrollHeight;
     }
@@ -343,12 +354,28 @@
         if (!data.messages?.length) return;
         thread.innerHTML = "";
         if (data.agent) setHeader(data.agent);
+        let lastName = currentAgent.name;
         data.messages.forEach((item) => {
+          if (item.kind === "handoff") {
+            const to = personFrom(item.to || { name: item.agentName || item.text, avatarUrl: item.avatarUrl });
+            renderJoined(to);
+            setHeader(to);
+            lastName = to.name;
+            return;
+          }
+          const agentPerson = item.agentName
+            ? personFrom({ name: item.agentName, avatarUrl: item.avatarUrl || currentAgent.avatarUrl, role: item.agentRole })
+            : currentAgent;
+          if (item.role !== "visitor" && agentPerson.name && agentPerson.name !== lastName) {
+            renderJoined(agentPerson);
+            lastName = agentPerson.name;
+          }
           addMsg(item.role === "visitor" ? "visitor" : "agent", item.text, {
             time: item.createdAt,
-            agent: item.agentName ? { name: item.agentName, avatarUrl: currentAgent.avatarUrl, initials: initialsOf(item.agentName) } : currentAgent,
+            agent: agentPerson,
             silent: true,
           });
+          if (item.role !== "visitor" && agentPerson.name) lastName = agentPerson.name;
         });
       } catch {
         /* keep local */
@@ -392,7 +419,7 @@
       conversationId = "";
       writeStore("conv", "");
       inbox.setAttribute("hidden", "");
-      setHeader({ name: startName, avatarUrl: startAvatar, role: "Assistant" });
+      setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant" });
       seedGreeting();
     }
 
@@ -446,7 +473,12 @@
         const response = await fetch(`${origin}/api/widget/tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: String(text).slice(0, 600) }),
+          body: JSON.stringify({
+            text: String(text).slice(0, 600),
+            token,
+            instanceId: instance,
+            site,
+          }),
         });
         if (!response.ok) throw new Error("tts");
         const blob = await response.blob();
@@ -474,6 +506,7 @@
 
     function personFrom(row) {
       return {
+        id: row?.id || "",
         name: row?.name || startName,
         avatarUrl: absoluteUrl(row?.avatarUrl, origin),
         role: row?.role || row?.specialty || "Assistant",
@@ -641,10 +674,15 @@
       }
       .launch.in { animation: ta-in 480ms cubic-bezier(.22,1.2,.36,1) forwards; }
       .launch-copy { font:650 13px/1 ui-sans-serif,system-ui; padding-right:10px; letter-spacing:.04em; }
-      .face, .face img, .ava img { display:block; height:100%; width:100%; border-radius:999px; object-fit:cover; }
+      .launch.has-photo { background: transparent; padding: 0; }
+      .launch.has-photo .face { height: 100%; width: 100%; }
+      .face, .head-ava, .ava, .teaser-ava { position: relative; overflow: hidden; }
+      .face, .face img, .ava img, .head-ava img, .teaser-ava img { display:block; height:100%; width:100%; border-radius:999px; object-fit:cover; }
+      .face img, .ava img, .head-ava img, .teaser-ava img { position:absolute; inset:0; }
       .face { overflow:hidden; height:${noir ? "36px" : "64px"}; width:${noir ? "36px" : "64px"}; }
       .fallback { display:flex; height:100%; width:100%; align-items:center; justify-content:center; font:700 13px/1 ui-sans-serif,system-ui; }
       .ring { position:absolute; inset:-7px; border-radius:999px; border:2px solid ${color}; opacity:.4; animation:ta-pulse 2.4s ease-out infinite; pointer-events:none; ${noir ? "display:none;" : ""} }
+      .launch.has-photo .ring { inset:-6px; }
       .teaser {
         display:flex; gap:10px; align-items:flex-start; max-width:min(280px, calc(100vw - 84px));
         background:${atelier ? "#fffaf2" : "#fff"}; color:#122033; padding:12px 32px 12px 12px; cursor:pointer; position:relative;
@@ -667,6 +705,7 @@
       .head { display:flex; align-items:center; gap:10px; padding:12px; background:${headBg}; color:#fff; backdrop-filter: blur(16px); }
       .tpl-soft .head { padding:16px 14px 18px; }
       .head-ava, .ava { height:40px; width:40px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.18); flex:none; }
+      .head-ava.has-photo, .ava.has-photo, .face:has(img), .teaser-ava:has(img) { background: transparent; }
       .ava.sm { height:28px; width:28px; }
       .ava.xs { height:18px; width:18px; }
       .ava.pulse { box-shadow:0 0 0 0 rgba(255,255,255,.6); animation: ta-ava 1.2s ease-out infinite; }

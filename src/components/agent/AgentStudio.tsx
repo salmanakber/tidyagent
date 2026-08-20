@@ -33,6 +33,7 @@ export function AgentStudio({
   agents = [],
   planKey = "STARTER",
   voiceOnPlan = false,
+  allTemplates = false,
   hasStores = false,
   hasBookings = false,
   contentTypes = ["PAGE", "FAQ", "POLICY", "CUSTOM"],
@@ -42,6 +43,7 @@ export function AgentStudio({
   agents?: AgentView[];
   planKey?: PlanKey;
   voiceOnPlan?: boolean;
+  allTemplates?: boolean;
   hasStores?: boolean;
   hasBookings?: boolean;
   contentTypes?: KnowledgeContentType[];
@@ -61,6 +63,7 @@ export function AgentStudio({
   function save() {
     startTransition(async () => {
       await updateAgent({
+        agentId: agent.id,
         name,
         role,
         personality: personality as "friendly" | "professional" | "casual" | "custom",
@@ -77,7 +80,7 @@ export function AgentStudio({
   function saveAvatar(url: string | null) {
     setAvatarUrl(url);
     startTransition(async () => {
-      await updateAgent({ widgetAvatarUrl: url ?? "" });
+      await updateAgent({ agentId: agent.id, widgetAvatarUrl: url ?? "" });
     });
   }
 
@@ -134,25 +137,30 @@ export function AgentStudio({
           <div className="mt-5">
             <p className="text-sm text-navy-300">Chat template</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {WIDGET_TEMPLATES.map((item) => (
+              {WIDGET_TEMPLATES.map((item) => {
+                const locked = !allTemplates && item.key !== "CLASSIC";
+                return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => setTemplate(item.key)}
-                  className={`rounded-2xl border px-4 py-3 text-left ${template === item.key ? "border-amber-400/40 bg-amber-500/10" : "border-white/10"}`}
+                  onClick={() => {
+                    if (!locked) setTemplate(item.key);
+                  }}
+                  className={`rounded-2xl border px-4 py-3 text-left ${template === item.key ? "border-amber-400/40 bg-amber-500/10" : "border-white/10"} ${locked ? "opacity-50" : ""}`}
                 >
                   <p className="text-sm text-white">{item.label}</p>
-                  <p className="mt-1 text-xs text-navy-400">{item.note}</p>
+                  <p className="mt-1 text-xs text-navy-400">{locked ? "Business and Pro" : item.note}</p>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
           {voiceOnPlan ? (
             <label className="mt-5 flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
               <span>
-                <span className="block text-white">Voice (Piper, local)</span>
+                <span className="block text-white">Spoken replies</span>
                 <span className="text-xs text-navy-400">
-                  Spoken replies use OHF Piper on this server. Mic uses the browser. On by default for Pro.
+                  Google Cloud TTS first, Amazon Polly if Google is down. Mic uses the visitor’s browser.
                 </span>
               </span>
               <input type="checkbox" checked={voiceOn} onChange={(event) => setVoiceOn(event.target.checked)} />
@@ -168,7 +176,7 @@ export function AgentStudio({
               className="btn-secondary"
               onClick={() =>
                 startTransition(async () => {
-                  await updateAgent({ status: agent.status === "ACTIVE" ? "PAUSED" : "ACTIVE" });
+                  await updateAgent({ agentId: agent.id, status: agent.status === "ACTIVE" ? "PAUSED" : "ACTIVE" });
                 })
               }
             >
@@ -213,6 +221,7 @@ export function AgentStudio({
             specialty: row.specialty ?? "GENERAL",
             knowledgeScopes: row.knowledgeScopes ?? [],
             status: row.status,
+            widgetAvatarUrl: row.widgetAvatarUrl,
           }))}
           planKey={planKey}
           hasStores={hasStores}

@@ -10,7 +10,7 @@ export default async function AdminSettingsPage() {
       <PageHeader
         eyebrow="Platform"
         title="API & login settings"
-        description="Operator login, AI keys, Google OAuth, and Cloudinary. The console password lives here — not in .env."
+        description="Operator login, AI keys, Google OAuth, Cloudinary, and voice. The console password lives here — not in .env."
       />
       <PlatformSettingsForm
         failoverEnabled={settings.failoverEnabled}

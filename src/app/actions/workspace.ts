@@ -38,6 +38,9 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   if (data.voiceEnabled && !entitlements.voiceEnabled) {
     throw new Error("Voice is included on Pro.");
   }
+  if (data.widgetTemplate && data.widgetTemplate !== "CLASSIC" && !entitlements.allTemplates) {
+    throw new Error("Extra widget looks are included on Business and Pro.");
+  }
 
   const { widgetAvatarUrl, widgetEmbedMode, agentId: _id, ...rest } = data;
   await prisma.agent.update({
@@ -218,4 +221,42 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
   }
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");
+}
+
+export async function toggleWorkflow(key: string, enabled: boolean) {
+  const session = await requireSession();
+  const entitlements = await requirePaidSeat(session);
+  const { AUTOMATION_CATALOG, planAllowsAutomation } = await import("@/modules/automations/catalog");
+  const item = AUTOMATION_CATALOG.find((row) => row.key === key);
+  if (!item) throw new Error("Unknown automation.");
+  if (!planAllowsAutomation(entitlements.planKey, item.key)) {
+    throw new Error(`This automation is included on ${item.minPlan === "GROWTH" ? "Business" : "Pro"}.`);
+  }
+  const workspace = await getWorkspace(session);
+  const agent = workspace.agent;
+  if (!agent) throw new Error("Agent not found");
+  await prisma.agentWorkflow.upsert({
+    where: { agentId_key: { agentId: agent.id, key: item.key } },
+    update: { enabled },
+    create: {
+      organizationId: session.organizationId,
+      agentId: agent.id,
+      key: item.key,
+      enabled,
+    },
+  });
+  revalidatePath("/automations");
+}
+
+export async function ensureAgentWorkflows(agentId: string, organizationId: string) {
+  const { AUTOMATION_CATALOG } = await import("@/modules/automations/catalog");
+  await prisma.agentWorkflow.createMany({
+    data: AUTOMATION_CATALOG.map((item) => ({
+      organizationId,
+      agentId,
+      key: item.key,
+      enabled: true,
+    })),
+    skipDuplicates: true,
+  });
 }

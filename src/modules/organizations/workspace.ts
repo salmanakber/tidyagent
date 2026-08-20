@@ -29,6 +29,7 @@ export async function getWorkspace(session: AppSession) {
           capabilities: true,
           rules: true,
           toolPermissions: true,
+          workflows: true,
         },
         orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
       },

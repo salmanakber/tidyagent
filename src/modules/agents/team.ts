@@ -1,4 +1,5 @@
 import type { AgentSpecialty, KnowledgeContentType, PlanKey } from "@prisma/client";
+import { PLAN_ENTITLEMENTS } from "@/modules/billing/entitlements";
 
 export const WIDGET_TEMPLATES = [
   {
@@ -68,9 +69,7 @@ export const SPECIALTIES: {
 ];
 
 export function maxAgentsForPlan(planKey: PlanKey) {
-  if (planKey === "PRO") return 8;
-  if (planKey === "GROWTH") return 4;
-  return 1;
+  return PLAN_ENTITLEMENTS[planKey].maxAgents;
 }
 
 export function classifyVisitorIntent(text: string): AgentSpecialty {

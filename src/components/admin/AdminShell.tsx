@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { logoutPlatformAdmin } from "@/app/actions/admin";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -103,9 +104,12 @@ export function AdminShell({
               <Menu className="h-5 w-5" />
             </button>
             <p className="hidden text-sm text-navy-300 lg:block">All connected Wix sites</p>
-            <form action={logoutPlatformAdmin}>
-              <button className="btn-secondary px-3 py-1.5 text-xs">Sign out</button>
-            </form>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <form action={logoutPlatformAdmin}>
+                <button className="btn-secondary px-3 py-1.5 text-xs">Sign out</button>
+              </form>
+            </div>
           </header>
           <main className="flex-1 px-4 pb-16 pt-6 lg:px-8">{children}</main>
         </div>

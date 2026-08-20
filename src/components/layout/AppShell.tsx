@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { logout } from "@/app/actions/auth";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { cn, initials } from "@/lib/utils";
 
 const NAV = [
@@ -167,9 +168,12 @@ export function AppShell({
             <div className="lg:hidden">
               <Logo compact />
             </div>
-            <form action={logout} className="hidden lg:block">
-              <button className="btn-secondary px-3 py-1.5 text-xs">Sign out</button>
-            </form>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <form action={logout} className="hidden lg:block">
+                <button className="btn-secondary px-3 py-1.5 text-xs">Sign out</button>
+              </form>
+            </div>
           </header>
           <main className="flex-1 px-4 pb-28 pt-6 lg:px-8 lg:pb-10">{children}</main>
         </div>

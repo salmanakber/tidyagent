@@ -88,3 +88,85 @@ body {
     @apply glass hairline rounded-3xl;
   }
 }
+
+html.theme-light {
+  color-scheme: light;
+}
+
+html.theme-light body {
+  background: #f3efe6;
+  color: #122033;
+}
+
+html.theme-light .bg-brand-gradient {
+  background-image:
+    radial-gradient(900px 420px at 8% -10%, rgba(245, 158, 11, 0.16), transparent 52%),
+    linear-gradient(180deg, #f7f3eb 0%, #efe6d6 100%) !important;
+}
+
+html.theme-light .bg-noise {
+  opacity: 0.35;
+}
+
+html.theme-light .glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 246, 0.9));
+  border-color: rgba(18, 32, 51, 0.08);
+}
+
+html.theme-light .text-white {
+  color: #122033 !important;
+}
+
+html.theme-light .text-navy-100,
+html.theme-light .text-navy-200,
+html.theme-light .text-navy-300,
+html.theme-light .text-navy-400 {
+  color: #5c6d88 !important;
+}
+
+html.theme-light .text-amber-200,
+html.theme-light .text-amber-300 {
+  color: #b45309 !important;
+}
+
+html.theme-light .border-white\/5,
+html.theme-light .border-white\/10 {
+  border-color: rgba(18, 32, 51, 0.08) !important;
+}
+
+html.theme-light .bg-white\/5,
+html.theme-light .hover\:bg-white\/5:hover,
+html.theme-light .hover\:bg-white\/10:hover {
+  background-color: rgba(18, 32, 51, 0.05) !important;
+}
+
+html.theme-light .bg-navy-950\/40,
+html.theme-light .bg-navy-950\/60 {
+  background-color: rgba(18, 32, 51, 0.05) !important;
+}
+
+html.theme-light .bg-navy-950\/70,
+html.theme-light .bg-navy-950\/90 {
+  background-color: rgba(247, 243, 235, 0.88) !important;
+}
+
+html.theme-light .bg-navy-900 {
+  background-color: #fffdf8 !important;
+}
+
+html.theme-light .field {
+  background: #fff;
+  color: #122033;
+  border-color: rgba(18, 32, 51, 0.12);
+}
+
+html.theme-light .btn-secondary {
+  color: #122033;
+  border-color: rgba(18, 32, 51, 0.12);
+  background: #fff;
+}
+
+html.theme-light header,
+html.theme-light .sticky {
+  color: #122033;
+}

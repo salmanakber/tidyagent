@@ -11,6 +11,8 @@ export type Entitlements = {
   voiceEnabled: boolean;
   advancedToolsEnabled: boolean;
   automationEnabled: boolean;
+  maxAgents: number;
+  allTemplates: boolean;
   isFree: boolean;
   isPaidSeat: boolean;
   isUsable: boolean;
@@ -33,6 +35,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
     voiceEnabled: false,
     advancedToolsEnabled: false,
     automationEnabled: false,
+    maxAgents: 1,
+    allTemplates: false,
   },
   STARTER: {
     conversationLimit: 1000,
@@ -40,6 +44,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
     voiceEnabled: false,
     advancedToolsEnabled: false,
     automationEnabled: true,
+    maxAgents: 1,
+    allTemplates: false,
   },
   GROWTH: {
     conversationLimit: 5000,
@@ -47,6 +53,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
     voiceEnabled: false,
     advancedToolsEnabled: true,
     automationEnabled: true,
+    maxAgents: 4,
+    allTemplates: true,
   },
   PRO: {
     conversationLimit: 25000,
@@ -54,6 +62,8 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Omit<Entitlements, "planKey" | "
     voiceEnabled: true,
     advancedToolsEnabled: true,
     automationEnabled: true,
+    maxAgents: 8,
+    allTemplates: true,
   },
 };
 

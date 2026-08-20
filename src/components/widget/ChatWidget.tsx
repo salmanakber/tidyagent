@@ -92,14 +92,18 @@ export function ChatWidget({
         handoff?: { from: Person; to: Person };
       };
       if (data.conversationId) setConversationId(data.conversationId);
-      if (data.handoff?.to) {
-        setLines((current) => [...current, { kind: "xfer", from: data.handoff!.from, to: data.handoff!.to }]);
+      const next = data.agent || agent;
+      const switched = Boolean(data.handoff?.to) || (next.name && next.name !== agent.name);
+      if (switched && (data.handoff?.to || next.name)) {
+        const from = data.handoff?.from || agent;
+        const to = data.handoff?.to || next;
+        setLines((current) => [...current, { kind: "xfer", from, to }]);
         await new Promise((resolve) => window.setTimeout(resolve, 2200));
-        setAgent(data.handoff.to);
+        setAgent(to);
         setLines((current) => [
           ...current.filter((item) => item.kind !== "xfer"),
-          { kind: "joined", person: data.handoff!.to },
-          { kind: "msg", role: "agent", text: data.text || "I’m here to help.", at: data.createdAt || new Date().toISOString(), agent: data.handoff!.to },
+          { kind: "joined", person: to },
+          { kind: "msg", role: "agent", text: data.text || "I’m here to help.", at: data.createdAt || new Date().toISOString(), agent: to },
         ]);
       } else {
         if (data.agent?.name) setAgent(data.agent);
@@ -255,11 +259,14 @@ export function ChatWidget({
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className={cn("relative flex items-center overflow-hidden rounded-full text-white shadow-lg", template === "MINIMAL" ? "h-12 gap-2 bg-slate-950 pr-4" : "h-16 w-16")}
-          style={template === "MINIMAL" ? undefined : bubbleStyle}
+          className={cn(
+            "relative flex items-center overflow-hidden rounded-full text-white shadow-lg",
+            template === "MINIMAL" ? "h-12 gap-2 bg-slate-950 pr-4" : avatarUrl ? "h-16 w-16 bg-transparent p-0" : "h-16 w-16",
+          )}
+          style={template === "MINIMAL" || avatarUrl ? undefined : bubbleStyle}
           aria-label="Open chat"
         >
-          <span className={cn("overflow-hidden rounded-full", template === "MINIMAL" ? "ml-1 h-9 w-9" : "h-16 w-16")}>
+          <span className={cn("overflow-hidden rounded-full", template === "MINIMAL" ? "ml-1 h-9 w-9" : "h-full w-full")}>
             {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-sm">{initials(name)}</span>}
           </span>
           {template === "MINIMAL" ? <span className="text-sm font-semibold">Chat</span> : null}
@@ -271,7 +278,7 @@ export function ChatWidget({
 
 function Face({ name, url, small }: { name: string; url?: string | null; small?: boolean }) {
   const size = small ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
-  if (url) return <img src={url} alt="" className={cn(size, "rounded-full object-cover")} />;
+  if (url) return <img src={url} alt="" className={cn(size, "rounded-full object-cover bg-transparent")} />;
   return <span className={cn(size, "flex items-center justify-center rounded-full bg-black/20 font-semibold")}>{initials(name)}</span>;
 }
 

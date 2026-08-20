@@ -31,6 +31,8 @@ export function PlatformSettingsForm({
     cloudinaryApiKey: boolean;
     cloudinaryApiSecret: boolean;
     adminPassword: boolean;
+    googleTts: boolean;
+    awsPolly: boolean;
   };
   googleClientId: string;
   cloudinaryCloudName: string;
@@ -208,6 +210,44 @@ export function PlatformSettingsForm({
             API secret {configured.cloudinaryApiSecret ? <span className="text-emerald-300">(saved)</span> : null}
             <input className="field mt-2" name="cloudinary_api_secret" type="password" autoComplete="off" />
           </label>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">Spoken voice (Pro)</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          Google Cloud Text-to-Speech is used first. Amazon Polly is the fallback if Google is missing or fails.
+          Leave a field blank to keep the current value.
+        </p>
+        <div className="mt-5 grid gap-4">
+          <label className="text-sm text-navy-300">
+            Google TTS API key {configured.googleTts ? <span className="text-emerald-300">(saved)</span> : null}
+            <input className="field mt-2" name="google_tts_api_key" type="password" placeholder="AIza…" autoComplete="off" />
+          </label>
+          <label className="text-sm text-navy-300">
+            Google voice name
+            <input className="field mt-2" name="google_tts_voice" placeholder="en-US-Neural2-F" />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm text-navy-300">
+              AWS access key {configured.awsPolly ? <span className="text-emerald-300">(saved)</span> : null}
+              <input className="field mt-2" name="aws_access_key_id" type="password" autoComplete="off" />
+            </label>
+            <label className="text-sm text-navy-300">
+              AWS secret key
+              <input className="field mt-2" name="aws_secret_access_key" type="password" autoComplete="off" />
+            </label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm text-navy-300">
+              AWS region
+              <input className="field mt-2" name="aws_region" placeholder="us-east-1" />
+            </label>
+            <label className="text-sm text-navy-300">
+              Polly voice
+              <input className="field mt-2" name="polly_voice" placeholder="Joanna" />
+            </label>
+          </div>
         </div>
       </div>
 

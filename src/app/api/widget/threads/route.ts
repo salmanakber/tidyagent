@@ -56,12 +56,20 @@ export async function GET(request: Request) {
       {
         conversationId: conversation.id,
         agent: conversation.agent ? personPayload(conversation.agent) : null,
-        messages: conversation.messages.map((row) => ({
-          role: row.role === "CUSTOMER" ? "visitor" : "agent",
-          text: row.content,
-          createdAt: row.createdAt.toISOString(),
-          agentName: asMeta(row.metadata).agentName,
-        })),
+        messages: conversation.messages.map((row) => {
+          const meta = asMeta(row.metadata);
+          return {
+            role: row.role === "CUSTOMER" ? "visitor" : "agent",
+            text: row.content,
+            createdAt: row.createdAt.toISOString(),
+            kind: meta.kind,
+            agentName: meta.agentName,
+            agentRole: meta.agentRole,
+            avatarUrl: meta.avatarUrl,
+            from: meta.from,
+            to: meta.to,
+          };
+        }),
       },
       { headers: corsHeaders() },
     );
@@ -109,10 +117,31 @@ export async function GET(request: Request) {
   );
 }
 
-function asMeta(value: unknown): { agentName?: string } {
+function asMeta(value: unknown): {
+  agentName?: string;
+  agentRole?: string;
+  avatarUrl?: string;
+  kind?: string;
+  from?: { id?: string; name?: string; role?: string; avatarUrl?: string | null };
+  to?: { id?: string; name?: string; role?: string; avatarUrl?: string | null };
+} {
   if (!value || typeof value !== "object") return {};
-  const row = value as { agentName?: string };
-  return { agentName: typeof row.agentName === "string" ? row.agentName : undefined };
+  const row = value as {
+    agentName?: string;
+    agentRole?: string;
+    avatarUrl?: string;
+    kind?: string;
+    from?: { id?: string; name?: string; role?: string; avatarUrl?: string | null };
+    to?: { id?: string; name?: string; role?: string; avatarUrl?: string | null };
+  };
+  return {
+    agentName: typeof row.agentName === "string" ? row.agentName : undefined,
+    agentRole: typeof row.agentRole === "string" ? row.agentRole : undefined,
+    avatarUrl: typeof row.avatarUrl === "string" ? row.avatarUrl : undefined,
+    kind: typeof row.kind === "string" ? row.kind : undefined,
+    from: row.from,
+    to: row.to,
+  };
 }
 
 function titleFrom(text?: string) {

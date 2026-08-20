@@ -56,6 +56,7 @@ export async function GET(request: Request) {
       status: live ? agent.status : "LOCKED",
       template: agent.widgetTemplate || "CLASSIC",
       voiceEnabled: Boolean(live && entitlements.voiceEnabled && agent.voiceEnabled),
+      id: agent.id,
     },
     { headers: { ...corsHeaders(), "Cache-Control": "no-store" } },
   );

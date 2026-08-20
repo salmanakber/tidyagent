@@ -28,9 +28,12 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional().default(""),
   CLOUDINARY_API_SECRET: z.string().optional().default(""),
   REDIS_URL: z.string().optional().default(""),
-  PIPER_URL: z.string().optional().default("http://127.0.0.1:5510"),
-  PIPER_VOICE: z.string().optional().default("en_US-lessac-medium"),
-  PIPER_DATA_DIR: z.string().optional().default(""),
+  GOOGLE_TTS_API_KEY: z.string().optional().default(""),
+  GOOGLE_TTS_VOICE: z.string().optional().default("en-US-Neural2-F"),
+  AWS_ACCESS_KEY_ID: z.string().optional().default(""),
+  AWS_SECRET_ACCESS_KEY: z.string().optional().default(""),
+  AWS_REGION: z.string().optional().default("us-east-1"),
+  POLLY_VOICE: z.string().optional().default("Joanna"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

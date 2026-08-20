@@ -12,7 +12,7 @@ export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
   const config = await getAIRuntimeConfig();
   const cloudinary = await getCloudinaryConfig();
-  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet] = await Promise.all([
+  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet, googleTtsSet, awsKeySet, awsSecretSet] = await Promise.all([
     settingExists("gemini_api_key"),
     settingExists("groq_api_key"),
     settingExists("openai_api_key"),
@@ -21,6 +21,9 @@ export async function getPlatformSettingsView() {
     settingExists("cloudinary_cloud_name"),
     settingExists("cloudinary_api_key"),
     settingExists("cloudinary_api_secret"),
+    settingExists("google_tts_api_key"),
+    settingExists("aws_access_key_id"),
+    settingExists("aws_secret_access_key"),
   ]);
   const env = getEnv();
   const googleClientId = await getSetting("google_client_id");
@@ -47,6 +50,8 @@ export async function getPlatformSettingsView() {
       cloudinaryApiKey: cloudKeySet || Boolean(cloudinary.apiKey),
       cloudinaryApiSecret: cloudSecretSet || Boolean(cloudinary.apiSecret),
       adminPassword: passwordSet,
+      googleTts: googleTtsSet || Boolean(env.GOOGLE_TTS_API_KEY),
+      awsPolly: (awsKeySet && awsSecretSet) || Boolean(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY),
     },
     googleClientId,
     cloudinaryCloudName,
@@ -117,6 +122,18 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     await setSetting("plan_price_pro", String(formData.get("plan_price_pro") ?? "").trim());
     await setSetting("plan_price_currency", String(formData.get("plan_price_currency") ?? "USD").trim() || "USD");
     await setSetting("plan_trial_days", String(formData.get("plan_trial_days") ?? "7").trim() || "7");
+    const googleTts = String(formData.get("google_tts_api_key") ?? "").trim();
+    const googleTtsVoice = String(formData.get("google_tts_voice") ?? "").trim();
+    const awsKey = String(formData.get("aws_access_key_id") ?? "").trim();
+    const awsSecret = String(formData.get("aws_secret_access_key") ?? "").trim();
+    const awsRegion = String(formData.get("aws_region") ?? "").trim();
+    const pollyVoice = String(formData.get("polly_voice") ?? "").trim();
+    if (googleTts) await setSetting("google_tts_api_key", googleTts);
+    if (googleTtsVoice) await setSetting("google_tts_voice", googleTtsVoice);
+    if (awsKey) await setSetting("aws_access_key_id", awsKey);
+    if (awsSecret) await setSetting("aws_secret_access_key", awsSecret);
+    if (awsRegion) await setSetting("aws_region", awsRegion);
+    if (pollyVoice) await setSetting("polly_voice", pollyVoice);
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/access");

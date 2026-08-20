@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { synthesizePiper } from "@/modules/voice/piper";
+import { getSession } from "@/lib/security/session";
+import { resolveWidgetAgent } from "@/modules/widget/resolve";
+import { entitlementsForOrganization } from "@/modules/billing/service";
+import { synthesizeSpeech } from "@/modules/voice/tts";
 
 function corsHeaders() {
   return {
@@ -11,30 +14,53 @@ function corsHeaders() {
   };
 }
 
+const bodySchema = z.object({
+  text: z.string().min(1).max(800),
+  token: z.string().max(2000).optional().nullable(),
+  instanceId: z.string().max(200).optional().nullable(),
+  site: z.string().max(200).optional().nullable(),
+  preview: z.boolean().optional(),
+});
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
 export async function POST(request: Request) {
-  let text = "";
+  let parsed: z.infer<typeof bodySchema>;
   try {
-    const body = z.object({ text: z.string().min(1).max(800) }).parse(await request.json());
-    text = body.text;
+    parsed = bodySchema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid text" }, { status: 400, headers: corsHeaders() });
   }
 
-  const wav = await synthesizePiper(text);
-  if (!wav) {
-    return NextResponse.json({ error: "Piper TTS is not running" }, { status: 503, headers: corsHeaders() });
+  const session = parsed.preview ? await getSession() : null;
+  const agent = await resolveWidgetAgent(
+    session
+      ? { organizationId: session.organizationId, siteId: session.siteId }
+      : { token: parsed.token, instanceId: parsed.instanceId, site: parsed.site },
+  );
+  if (!agent) {
+    return NextResponse.json({ error: "Widget not found" }, { status: 404, headers: corsHeaders() });
   }
 
-  return new NextResponse(new Uint8Array(wav), {
+  const entitlements = await entitlementsForOrganization(agent.organizationId);
+  if (!entitlements.voiceEnabled || !agent.voiceEnabled) {
+    return NextResponse.json({ error: "Voice is included on Pro." }, { status: 403, headers: corsHeaders() });
+  }
+
+  const spoken = await synthesizeSpeech(parsed.text);
+  if (!spoken) {
+    return NextResponse.json({ error: "Voice is unavailable right now" }, { status: 503, headers: corsHeaders() });
+  }
+
+  return new NextResponse(new Uint8Array(spoken.bytes), {
     status: 200,
     headers: {
       ...corsHeaders(),
-      "Content-Type": "audio/wav",
-      "Content-Length": String(wav.length),
+      "Content-Type": spoken.contentType,
+      "Content-Length": String(spoken.bytes.length),
+      "X-Tidyagent-Tts": spoken.provider,
     },
   });
 }

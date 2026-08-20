@@ -5,6 +5,8 @@ import { retrieveKnowledgeChunks } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
 import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team";
+import { isWorkflowOn, type AutomationKey } from "@/modules/automations/catalog";
+import { PLAN_RANK } from "@/modules/billing/entitlements";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
 
 const OPENER =
@@ -47,13 +49,31 @@ export async function replyToVisitor(input: {
     where: { organizationId: input.agent.organizationId, siteId: input.agent.siteId },
     orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
   });
+  const primary = team.find((row) => row.isPrimary) ?? team[0] ?? null;
+  const workflows = primary
+    ? await prisma.agentWorkflow.findMany({
+        where: { agentId: primary.id, organizationId: input.agent.organizationId },
+      })
+    : [];
+  const on = (key: AutomationKey) => {
+    if (key === "specialist_routing" || key === "lead_capture" || key === "after_hours" || key === "shopping") {
+      if (PLAN_RANK[entitlements.planKey] < PLAN_RANK.GROWTH) return false;
+    }
+    if (key === "shopping" && !entitlements.advancedToolsEnabled) return false;
+    return isWorkflowOn(workflows, key, true);
+  };
+
   const current =
     team.find((row) => row.id === conversation.agentId) ??
     team.find((row) => row.isPrimary) ??
     input.agent;
-  const intent = isCasualOpener(message) ? "GENERAL" : classifyVisitorIntent(message);
-  const routed = pickAgentForIntent(team, intent) ?? current;
-  const handedOff = routed.id !== current.id && !isCasualOpener(message);
+  const greetingTurn = isCasualOpener(message) && on("greeting");
+  const intent = greetingTurn ? "GENERAL" : classifyVisitorIntent(message);
+  let routed = current;
+  if (on("specialist_routing") && !greetingTurn && !(intent === "ECOMMERCE" && !on("shopping"))) {
+    routed = pickAgentForIntent(team, intent) ?? current;
+  }
+  const handedOff = routed.id !== current.id && !greetingTurn;
 
   if (handedOff) {
     await prisma.conversation.update({
@@ -71,19 +91,61 @@ export async function replyToVisitor(input: {
     },
   });
 
+  if (on("lead_capture")) {
+    await captureLeadEmail({
+      organizationId: input.agent.organizationId,
+      siteId: input.agent.siteId,
+      conversationId: conversation.id,
+      message,
+    });
+  }
+
+  if (handedOff) {
+    await prisma.message.create({
+      data: {
+        organizationId: input.agent.organizationId,
+        conversationId: conversation.id,
+        role: "AGENT",
+        content: `${routed.name} joined`,
+        metadata: {
+          kind: "handoff",
+          agentId: routed.id,
+          agentName: routed.name,
+          from: {
+            id: current.id,
+            name: current.name,
+            role: current.role,
+            specialty: current.specialty,
+            avatarUrl: current.widgetAvatarUrl,
+          },
+          to: {
+            id: routed.id,
+            name: routed.name,
+            role: routed.role,
+            specialty: routed.specialty,
+            avatarUrl: routed.widgetAvatarUrl,
+          },
+        },
+      },
+    });
+  }
+
   const profile = await prisma.businessProfile.findUnique({
     where: { organizationId: input.agent.organizationId },
   });
   const businessName = profile?.name || input.agent.site.displayName || "our team";
   const scope = scanScopeForPlan(entitlements.planKey);
-  const evidence = isCasualOpener(message)
+  const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
+    on("shopping") ? true : item !== "PRODUCT",
+  );
+  const evidence = greetingTurn
     ? []
     : await gatherEvidence({
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
         question: message,
-        includeStores: scope.includeStores,
-        contentTypes: routed.knowledgeScopes as KnowledgeContentType[],
+        includeStores: scope.includeStores && on("shopping"),
+        contentTypes: assignedScopes,
       });
 
   const history = await prisma.message.findMany({
@@ -92,7 +154,10 @@ export async function replyToVisitor(input: {
     take: 12,
   });
 
-  const text = await generateReply({
+  const hour = new Date().getUTCHours();
+  const afterHours = on("after_hours") && (hour >= 20 || hour < 8);
+
+  let text = await generateReply({
     agentName: routed.name,
     role: routed.role,
     personality: routed.personality,
@@ -101,11 +166,21 @@ export async function replyToVisitor(input: {
     summary: profile?.summary || "",
     industry: profile?.industry || "",
     question: message,
-    greeting: isCasualOpener(message),
+    greeting: greetingTurn,
     evidence,
-    history: history.map((row) => ({ role: row.role, content: row.content })),
+    history: history
+      .filter((row) => {
+        const meta = row.metadata as { kind?: string } | null;
+        return meta?.kind !== "handoff";
+      })
+      .map((row) => ({ role: row.role, content: row.content })),
     handoffFrom: handedOff ? current.name : null,
+    offerHuman: on("human_handoff"),
+    afterHours,
   });
+  if (on("follow_up") && !greetingTurn && !/[?？]/.test(text)) {
+    text = `${text.replace(/\s+$/, "")} Anything else I can help with?`;
+  }
 
   await prisma.message.create({
     data: {
@@ -119,6 +194,7 @@ export async function replyToVisitor(input: {
         agentName: routed.name,
         agentRole: routed.role,
         specialty: routed.specialty,
+        avatarUrl: routed.widgetAvatarUrl,
         handoff: handedOff,
       },
     },
@@ -281,15 +357,23 @@ async function generateReply(input: {
   evidence: { content: string; title: string | null; sourceUrl: string | null }[];
   history: { role: string; content: string }[];
   handoffFrom: string | null;
+  offerHuman: boolean;
+  afterHours: boolean;
 }) {
   const intro = input.handoffFrom
     ? `The visitor was just transferred to you from ${input.handoffFrom}. Do not mention the transfer, introductions, or that you were connected. Answer the question immediately as ${input.agentName}.`
     : "";
+  const hoursNote = input.afterHours
+    ? "It is outside typical business hours. You may briefly say the team is away, then still answer from evidence."
+    : "";
+  const handoffLine = input.offerHuman
+    ? "If the question needs facts you do not have, say so plainly and offer a human handoff."
+    : "If the question needs facts you do not have, say so plainly. Do not offer a human transfer.";
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help you today?`
     : input.evidence.length
       ? answerFromEvidence(input.question, input.evidence)
-      : `I don’t have that on file for ${input.businessName} yet. I can connect you with the team to confirm.`;
+      : `I don’t have that on file for ${input.businessName} yet.${input.offerHuman ? " I can connect you with the team to confirm." : ""}`;
 
   try {
     const ai = await getAIProvider();
@@ -308,8 +392,9 @@ Specialty: ${input.specialty}. Stay inside that specialty and the evidence. If t
 You are a real customer-service employee for this Wix business, not a generic chatbot.
 Never invent prices, policies, hours, or products. Use only the business profile and evidence.
 ${intro}
+${hoursNote}
 If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
-If the question needs facts you do not have, say so plainly and offer a human handoff.`,
+${handoffLine}`,
       prompt: `Business: ${input.businessName}
 Industry: ${input.industry || "unknown"}
 Profile: ${input.summary || "none"}
@@ -336,4 +421,36 @@ function answerFromEvidence(question: string, evidence: { content: string; title
   const hay = `${evidence[0]?.title ?? ""} ${evidence[0]?.content ?? ""}`.replace(/\s+/g, " ").trim();
   if (!hay) return "I can look that up with the team if you’d like.";
   return hay.slice(0, 420);
+}
+
+async function captureLeadEmail(input: {
+  organizationId: string;
+  siteId: string;
+  conversationId: string;
+  message: string;
+}) {
+  const match = input.message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (!match) return;
+  const email = match[0].toLowerCase();
+  const existing = await prisma.customer.findFirst({
+    where: { organizationId: input.organizationId, email },
+  });
+  if (existing) {
+    await prisma.conversation.update({
+      where: { id: input.conversationId },
+      data: { customerId: existing.id },
+    });
+    return;
+  }
+  const customer = await prisma.customer.create({
+    data: {
+      organizationId: input.organizationId,
+      siteId: input.siteId,
+      email,
+    },
+  });
+  await prisma.conversation.update({
+    where: { id: input.conversationId },
+    data: { customerId: customer.id },
+  });
 }

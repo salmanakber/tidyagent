@@ -1,19 +1,29 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/security/session";
+import { getWorkspace } from "@/modules/organizations/workspace";
+import { entitlementsForOrganization } from "@/modules/billing/service";
+import { ensureAgentWorkflows } from "@/app/actions/workspace";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AutomationsBoard } from "@/components/automations/AutomationsBoard";
 
-export default function AutomationsPage() {
+export default async function AutomationsPage() {
+  const session = await getSession();
+  if (!session) redirect("/");
+  const workspace = await getWorkspace(session);
+  if (!workspace.agent) redirect("/onboarding");
+  const entitlements = await entitlementsForOrganization(session.organizationId);
+  await ensureAgentWorkflows(workspace.agent.id, session.organizationId);
+  const refreshed = await getWorkspace(session);
+  const rows = refreshed.agent?.workflows ?? [];
+
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Later phase"
+        eyebrow="Playbooks"
         title="Automations"
-        description="After the text agent is stable, automations reuse the same knowledge, tools, and business rules. Nothing to configure as a flowchart today."
+        description="Turn on the behaviors this AI employee should follow. Starter covers greeting and handoff. Business adds specialists, leads, and store help. Voice stays on Pro."
       />
-      <div className="panel p-8">
-        <p className="text-sm leading-7 text-navy-200">
-          Coming after human handoff and ecommerce tools are proven. Owners will approve meaningful changes — the AI will
-          never silently rewrite policies.
-        </p>
-      </div>
+      <AutomationsBoard planKey={entitlements.planKey} rows={rows} />
     </div>
   );
 }

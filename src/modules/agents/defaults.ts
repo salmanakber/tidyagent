@@ -59,11 +59,13 @@ export async function seedDefaultAgent(input: {
       },
       workflows: {
         create: [
-          { organizationId: input.organizationId, key: "support", enabled: true },
-          { organizationId: input.organizationId, key: "sales", enabled: true },
+          { organizationId: input.organizationId, key: "greeting", enabled: true },
+          { organizationId: input.organizationId, key: "human_handoff", enabled: true },
+          { organizationId: input.organizationId, key: "follow_up", enabled: true },
+          { organizationId: input.organizationId, key: "specialist_routing", enabled: true },
+          { organizationId: input.organizationId, key: "lead_capture", enabled: true },
           { organizationId: input.organizationId, key: "shopping", enabled: Boolean(input.storesEnabled) },
-          { organizationId: input.organizationId, key: "complaints", enabled: true },
-          { organizationId: input.organizationId, key: "handoff", enabled: true },
+          { organizationId: input.organizationId, key: "after_hours", enabled: true },
         ],
       },
     },

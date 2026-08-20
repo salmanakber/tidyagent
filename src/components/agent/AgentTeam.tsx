@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createSpecialistAgent, deleteAgent } from "@/app/actions/workspace";
-import { maxAgentsForPlan, SPECIALTIES, WIDGET_TEMPLATES } from "@/modules/agents/team";
+import { createSpecialistAgent, deleteAgent, updateAgent } from "@/app/actions/workspace";
+import { maxAgentsForPlan, SPECIALTIES } from "@/modules/agents/team";
+import { AvatarPicker } from "@/components/agent/AvatarPicker";
 import type { AgentSpecialty, KnowledgeContentType, PlanKey } from "@prisma/client";
 
 export function AgentTeam({
@@ -20,6 +21,7 @@ export function AgentTeam({
     specialty: AgentSpecialty;
     knowledgeScopes: string[];
     status: string;
+    widgetAvatarUrl?: string | null;
   }[];
   planKey: PlanKey;
   hasStores: boolean;
@@ -46,9 +48,9 @@ export function AgentTeam({
     return (
       <div className="panel p-6">
         <h3 className="font-display text-lg text-white">Team of agents</h3>
-        <p className="mt-2 text-sm text-navy-300">
+      <p className="mt-2 text-sm text-navy-300">
           Business and Pro can add specialists (store, support, bookings) and assign each one only the data they should see.
-          Starter keeps a single general agent.
+          Set a photo for every agent so visitors see who they are talking to. Starter keeps a single general agent.
         </p>
       </div>
     );
@@ -58,20 +60,28 @@ export function AgentTeam({
     <div className="panel p-6">
       <h3 className="font-display text-lg text-white">Team of agents</h3>
       <p className="mt-2 text-sm text-navy-300">
-        The general agent greets visitors. Specialists only see the data you assign. This plan allows {limit} agents (
-        {agents.length} in use).
+        The general agent greets visitors. Specialists only see the data you assign. Click a photo to set it for that agent.
+        This plan allows {limit} agents ({agents.length} in use).
       </p>
       <ul className="mt-4 space-y-2">
         {agents.map((agent) => (
           <li key={agent.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-navy-950/40 px-4 py-3">
-            <div>
-              <p className="text-sm text-white">
-                {agent.name}
-                {agent.isPrimary ? <span className="ml-2 text-xs text-amber-300">general</span> : null}
-              </p>
-              <p className="text-xs text-navy-400">
-                {agent.role} · {agent.specialty.toLowerCase()} · {agent.knowledgeScopes.join(", ") || "no data assigned"}
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <AvatarPicker
+                compact
+                name={agent.name}
+                url={agent.widgetAvatarUrl}
+                onChange={(url) => startTransition(() => updateAgent({ agentId: agent.id, widgetAvatarUrl: url ?? "" }))}
+              />
+              <div>
+                <p className="text-sm text-white">
+                  {agent.name}
+                  {agent.isPrimary ? <span className="ml-2 text-xs text-amber-300">general</span> : null}
+                </p>
+                <p className="text-xs text-navy-400">
+                  {agent.role} · {agent.specialty.toLowerCase()} · {agent.knowledgeScopes.join(", ") || "no data assigned"}
+                </p>
+              </div>
             </div>
             {!agent.isPrimary ? (
               <button

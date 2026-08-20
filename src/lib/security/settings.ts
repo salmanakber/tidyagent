@@ -12,6 +12,9 @@ const SECRET_KEYS = new Set([
   "google_client_secret",
   "cloudinary_api_key",
   "cloudinary_api_secret",
+  "google_tts_api_key",
+  "aws_access_key_id",
+  "aws_secret_access_key",
 ]);
 
 function keyMaterial() {
