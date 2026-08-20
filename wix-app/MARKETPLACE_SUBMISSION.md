@@ -244,6 +244,7 @@ Work through this on a **premium test site**, Chrome + Safari, desktop and phone
 - [ ] Closing and reopening **Manage Apps → tidyAgent** stays signed in for that `instanceId`  
 - [ ] Second Wix site is a **separate** workspace (do not reuse the first site’s data)  
 - [ ] After paid plan / trial, onboarding scan runs and widget appears on the **published** site  
+- [ ] Finish onboarding on a **production** install so Wix receives `APP_SETUP_FINISHED` (clears the “Add BI events” recommendation)  
 - [ ] Widget uses **owner** colors, not tidyAgent amber, on the live site  
 - [ ] Each plan’s Wix checkout matches names/prices in the listing  
 - [ ] Cancel at period end keeps access until the period ends  

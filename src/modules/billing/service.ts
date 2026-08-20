@@ -13,6 +13,7 @@ import {
 import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "@/modules/billing/entitlements";
 import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
+import { reportAppUpgraded } from "@/modules/wix/bi-events";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -184,6 +185,14 @@ async function upsertSubscriptionFromWix(input: {
   } else {
     await prisma.subscription.create({
       data: { organizationId: site.organizationId, ...data },
+    });
+  }
+
+  if (input.kind === "purchased" || input.kind === "changed") {
+    reportAppUpgraded(input.instanceId, {
+      vendorProductId: derived.vendorProductId,
+      cycle: derived.billingCycle,
+      reason: input.kind === "purchased" ? "purchase" : "upgrade",
     });
   }
 

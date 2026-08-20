@@ -8,6 +8,7 @@ import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team";
 import { isWorkflowOn, type AutomationKey, automationAllowedForEntitlements } from "@/modules/automations/catalog";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
+import { reportPrimaryAction } from "@/modules/wix/bi-events";
 
 const OPENER =
   /^(hi+|hii+|hello|hey|hey there|hi there|good morning|good afternoon|good evening|howdy|yo|sup|what'?s up|how are you)\s*[!.?]*$/i;
@@ -44,7 +45,10 @@ export async function replyToVisitor(input: {
     };
   }
 
-  const conversation = await getOrCreateConversation(input);
+  const { conversation, created } = await getOrCreateConversation(input);
+  if (created && !input.preview) {
+    reportPrimaryAction(input.agent.site.wixInstanceId);
+  }
   const team = await prisma.agent.findMany({
     where: { organizationId: input.agent.organizationId, siteId: input.agent.siteId },
     orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
@@ -268,9 +272,9 @@ async function getOrCreateConversation(input: {
         siteId: input.agent.siteId,
       },
     });
-    if (existing) return existing;
+    if (existing) return { conversation: existing, created: false };
   }
-  return prisma.conversation.create({
+  const conversation = await prisma.conversation.create({
     data: {
       organizationId: input.agent.organizationId,
       siteId: input.agent.siteId,
@@ -279,6 +283,7 @@ async function getOrCreateConversation(input: {
       metadata: { source: input.preview ? "preview" : "live" },
     },
   });
+  return { conversation, created: true };
 }
 
 async function gatherEvidence(input: {

@@ -5,6 +5,7 @@ import { fetchWixAppInstance } from "@/services/wix/client";
 import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { prisma } from "@/lib/prisma";
 import { entitlementsForOrganization } from "@/modules/billing/service";
+import { reportDashboardLoaded } from "@/modules/wix/bi-events";
 
 export async function completeWixLogin(instance: string): Promise<{
   session: AppSession;
@@ -30,12 +31,14 @@ export async function completeWixLogin(instance: string): Promise<{
     where: { id: session.organizationId },
   });
   const entitlements = await entitlementsForOrganization(session.organizationId);
+  const setupComplete = organization.onboardingStatus === "PUBLISHED";
+  reportDashboardLoaded(session.wixInstanceId, setupComplete);
 
   return {
     session,
     destination: !entitlements.isPaidSeat
       ? "/billing"
-      : organization.onboardingStatus === "PUBLISHED"
+      : setupComplete
         ? "/dashboard"
         : "/onboarding",
   };

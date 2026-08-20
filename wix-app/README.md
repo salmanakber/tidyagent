@@ -33,6 +33,19 @@ If the iframe is blank: publish a new app version, then on the test site open **
 - Paid Plan Changed
 - Paid Plan Auto Renewal Cancelled
 
+## BI events (App Market recommendation)
+
+Wix tracks setup and usage through [Send BI Event](https://dev.wix.com/docs/rest/app-management/bi-event/send-bi-event.md). tidyAgent sends these automatically after you deploy this code — there is nothing to toggle in the Wix dashboard.
+
+| Event | When |
+| --- | --- |
+| `APP_DASHBOARD_LOADED` | Owner opens tidyAgent from the site dashboard (`/wix/open`) |
+| `APP_SETUP_FINISHED` + `APP_FINISHED_CONFIGURATION` | Onboarding is published (widget live) |
+| `APP_UPGRADED` | Paid Plan Purchased or Paid Plan Changed webhook |
+| `PRIMARY_ACTION_PERFORMED` | A visitor starts a live chat |
+
+Do **not** send `CHARGE` / `FUNDS_RETURNED` — Wix checkout already owns billing. After deploy, complete onboarding once on a test site so Wix can record `APP_SETUP_FINISHED` and drop the “Add BI events” recommendation.
+
 ## Customer-site widget (required)
 
 Wix will not inject the chat bubble unless the app has an **Embedded Script** extension.

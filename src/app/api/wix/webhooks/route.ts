@@ -19,7 +19,12 @@ export async function POST(request: Request) {
     envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
   } catch (error) {
     const message = error instanceof Error ? error.message : "verify failed";
-    console.error("[wix-webhook] verify failed:", message);
+    const key = env.WIX_APP_PUBLIC_KEY;
+    console.error("[wix-webhook] verify failed:", message, {
+      hasPublicKey: Boolean(key),
+      keyChars: key.length,
+      bodyLooksJwt: raw.includes(".") && !raw.trim().startsWith("{"),
+    });
     return NextResponse.json({ ok: false, error: "verify_failed" }, { status: 401, headers: corsHeaders() });
   }
 

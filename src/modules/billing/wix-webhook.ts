@@ -2,11 +2,15 @@ import { jwtVerify, importSPKI } from "jose";
 import type { WixWebhookEnvelope } from "@/modules/billing/service";
 
 export function normalizePublicKey(value: string) {
-  let pem = value.trim().replace(/\r/g, "").replace(/^["']|["']$/g, "");
+  let pem = value.trim().replace(/\r/g, "").replace(/^["']+|["']+$/g, "");
   pem = pem.replace(/\\n/g, "\n");
-  if (pem.includes("BEGIN PUBLIC KEY")) return pem;
-  const body = pem.replace(/\s+/g, "\n").trim();
-  return `-----BEGIN PUBLIC KEY-----\n${body}\n-----END PUBLIC KEY-----`;
+  const body = pem
+    .replace(/-----BEGIN (?:RSA )?PUBLIC KEY-----/g, "")
+    .replace(/-----END (?:RSA )?PUBLIC KEY-----/g, "")
+    .replace(/\s+/g, "");
+  if (!body) throw new Error("WIX_APP_PUBLIC_KEY is empty");
+  const wrapped = body.match(/.{1,64}/g)?.join("\n") ?? body;
+  return `-----BEGIN PUBLIC KEY-----\n${wrapped}\n-----END PUBLIC KEY-----`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

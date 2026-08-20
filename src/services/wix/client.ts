@@ -1,5 +1,5 @@
 import { createClient, AppStrategy } from "@wix/sdk";
-import { appInstances, embeddedScripts, billing } from "@wix/app-management";
+import { appInstances, biEvents, embeddedScripts, billing } from "@wix/app-management";
 import { products, collections as storeCatalogs } from "@wix/stores";
 import { collections as cmsCollections, items as cmsItems } from "@wix/data";
 import { siteProperties } from "@wix/business-tools";
@@ -20,6 +20,7 @@ export function createWixAppClient(instanceId: string) {
     }),
     modules: {
       appInstances,
+      biEvents,
       embeddedScripts,
       billing,
       products,

@@ -228,6 +228,8 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
     });
     const { embedSiteWidget } = await import("@/modules/wix/embed");
     await embedSiteWidget(session.wixInstanceId, false);
+    const { reportSetupFinished } = await import("@/modules/wix/bi-events");
+    await reportSetupFinished(session.wixInstanceId);
   }
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");
