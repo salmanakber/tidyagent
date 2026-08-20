@@ -52,7 +52,8 @@
               <p class="nm">${escapeHtml(startName)}</p>
               <p class="st"><span class="dot"></span> <span class="st-label">Online</span></p>
             </div>
-            ${voiceOffered ? `<button type="button" class="icon-btn voice-tog on" aria-pressed="true" title="Voice">${iconWave()}</button>` : ""}
+            ${voiceOffered ? `<button type="button" class="icon-btn voice-tog on" aria-pressed="true" title="Voice replies on">${iconWave()}</button>
+            <button type="button" class="icon-btn voice-stop" hidden title="Stop listening">${iconStop()}</button>` : ""}
             <button type="button" class="icon-btn x" aria-label="Close chat">${iconClose()}</button>
           </div>
           <div class="inbox" hidden>
@@ -98,6 +99,7 @@
     const composer = shadow.querySelector(".composer");
     const box = shadow.querySelector(".box");
     const voiceTog = shadow.querySelector(".voice-tog");
+    const voiceStop = shadow.querySelector(".voice-stop");
     const micBtn = shadow.querySelector(".mic");
     const nameEl = shadow.querySelector(".nm");
     const statusEl = shadow.querySelector(".st-label");
@@ -110,6 +112,9 @@
     let voiceOn = voiceOffered;
     let listening = false;
     let recognition = null;
+    let speakGen = 0;
+    let currentAudio = null;
+    let ttsAbort = null;
     let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials, voiceId };
     let conversationId = readStore("conv") || "";
     let visitorId = readStore("vid");
@@ -127,6 +132,7 @@
     close.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      stopSpeech();
       setOpen(false);
     });
     shadow.querySelector(".teaser-x").addEventListener("click", (event) => {
@@ -157,8 +163,15 @@
         voiceOn = !voiceOn;
         voiceTog.classList.toggle("on", voiceOn);
         voiceTog.setAttribute("aria-pressed", String(voiceOn));
-        if (!voiceOn) stopListen();
+        voiceTog.title = voiceOn ? "Voice replies on" : "Voice replies off";
+        if (!voiceOn) {
+          stopSpeech();
+          stopListen();
+        }
       });
+    }
+    if (voiceStop) {
+      voiceStop.addEventListener("click", () => stopSpeech());
     }
     if (micBtn) micBtn.addEventListener("click", () => (listening ? stopListen() : startListen()));
 
@@ -216,6 +229,7 @@
         }
         window.setTimeout(() => box.focus(), 60);
       } else {
+        stopSpeech();
         stopListen();
         inbox.setAttribute("hidden", "");
       }
@@ -261,6 +275,7 @@
       const text = String(raw || "").trim();
       if (!text || box.disabled) return;
       box.value = "";
+      stopSpeech();
       playSendTick();
       addMsg("visitor", text);
       box.disabled = true;
@@ -421,6 +436,7 @@
       conversationId = "";
       writeStore("conv", "");
       inbox.setAttribute("hidden", "");
+      stopSpeech();
       setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant", voiceId });
       seedGreeting();
     }
@@ -469,8 +485,43 @@
       micBtn?.classList.remove("live");
     }
 
+    function setSpeaking(on) {
+      if (!voiceStop) return;
+      if (on) voiceStop.removeAttribute("hidden");
+      else voiceStop.setAttribute("hidden", "");
+    }
+
+    function stopSpeech() {
+      speakGen += 1;
+      setSpeaking(false);
+      try {
+        ttsAbort?.abort();
+      } catch {
+        /* ignore */
+      }
+      ttsAbort = null;
+      if (currentAudio) {
+        try {
+          currentAudio.pause();
+          currentAudio.src = "";
+        } catch {
+          /* ignore */
+        }
+        currentAudio = null;
+      }
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {
+        /* ignore */
+      }
+    }
+
     async function speak(text) {
       if (!voiceOn || !text) return;
+      stopSpeech();
+      const gen = speakGen;
+      const controller = new AbortController();
+      ttsAbort = controller;
       try {
         const response = await fetch(`${origin}/api/widget/tts`, {
           method: "POST",
@@ -482,20 +533,39 @@
             site,
             voiceId: currentAgent.voiceId || voiceId,
           }),
+          signal: controller.signal,
         });
+        if (gen !== speakGen) return;
         if (!response.ok) throw new Error("tts");
         const blob = await response.blob();
+        if (gen !== speakGen) return;
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+        currentAudio = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (currentAudio === audio) currentAudio = null;
+          if (gen === speakGen) setSpeaking(false);
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          if (currentAudio === audio) currentAudio = null;
+          if (gen === speakGen) setSpeaking(false);
+        };
+        setSpeaking(true);
         await audio.play();
-        audio.onended = () => URL.revokeObjectURL(url);
-      } catch {
+      } catch (error) {
+        if (gen !== speakGen || error?.name === "AbortError") return;
         try {
           const utter = new SpeechSynthesisUtterance(String(text).slice(0, 600));
+          utter.onend = () => {
+            if (gen === speakGen) setSpeaking(false);
+          };
           window.speechSynthesis.cancel();
+          setSpeaking(true);
           window.speechSynthesis.speak(utter);
         } catch {
-          /* ignore */
+          setSpeaking(false);
         }
       }
     }
@@ -655,6 +725,9 @@
   function iconWave() {
     return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="9" width="2.4" height="6" rx="1"/><rect x="8.5" y="6" width="2.4" height="12" rx="1"/><rect x="13" y="8" width="2.4" height="8" rx="1"/><rect x="17.5" y="5" width="2.4" height="14" rx="1"/></svg>`;
   }
+  function iconStop() {
+    return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+  }
 
   function widgetCss(color, left, template) {
     const noir = template === "MINIMAL";
@@ -721,6 +794,7 @@
       .icon-btn { border:0; background:rgba(255,255,255,.1); color:#fff; width:36px; height:36px; border-radius:12px; display:grid; place-items:center; cursor:pointer; }
       .icon-btn svg { width:16px; height:16px; }
       .icon-btn.on { background:#fff; color:${color}; }
+      .icon-btn.voice-stop { background:#fff; color:#b42318; }
       .thread { flex:1; overflow-y:auto; padding:16px 14px 18px; background:${threadBg}; display:flex; flex-direction:column; gap:12px; -webkit-overflow-scrolling:touch; }
       .row { display:flex; gap:8px; max-width:92%; align-items:flex-end; animation: ta-msg 280ms ease both; }
       .row.visitor { margin-left:auto; flex-direction:row-reverse; }

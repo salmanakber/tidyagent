@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AudioLines, History, Mic, Send, X } from "lucide-react";
+import { AudioLines, History, Mic, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 
 export type WidgetProps = {
@@ -41,9 +41,13 @@ export function ChatWidget({
   const [typed, setTyped] = useState("");
   const [teaserOn, setTeaserOn] = useState(template !== "MINIMAL");
   const [voiceOn, setVoiceOn] = useState(voiceEnabled);
+  const [speaking, setSpeaking] = useState(false);
   const [agent, setAgent] = useState<Person>({ name, avatarUrl, role: "Online", voiceId });
   const [inboxOpen, setInboxOpen] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speakGenRef = useRef(0);
+  const ttsAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
 
   const bubbleStyle = useMemo(() => ({ backgroundColor: primaryColor }), [primaryColor]);
@@ -73,22 +77,54 @@ export function ChatWidget({
     if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
   }
 
+  function stopSpeech() {
+    speakGenRef.current += 1;
+    setSpeaking(false);
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.src = "";
+      audioRef.current = null;
+    }
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function speak(text: string, nextVoice?: string | null) {
     if (!voiceEnabled || !voiceOn || !text) return;
+    stopSpeech();
+    const gen = speakGenRef.current;
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
     try {
       const response = await fetch("/api/widget/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text.slice(0, 600), preview: true, voiceId: nextVoice || voiceId }),
+        signal: controller.signal,
       });
+      if (gen !== speakGenRef.current) return;
       if (!response.ok) return;
       const blob = await response.blob();
+      if (gen !== speakGenRef.current) return;
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (audioRef.current === audio) audioRef.current = null;
+        if (gen === speakGenRef.current) setSpeaking(false);
+      };
+      setSpeaking(true);
       await audio.play();
-      audio.onended = () => URL.revokeObjectURL(url);
     } catch {
-      /* ignore */
+      if (gen !== speakGenRef.current) return;
+      setSpeaking(false);
     }
   }
 
@@ -96,6 +132,7 @@ export function ChatWidget({
     if (!text || thinking) return;
     setInput("");
     unlock();
+    stopSpeech();
     setLines((current) => [...current, { kind: "msg", role: "customer", text, at: new Date().toISOString() }]);
     setThinking(true);
     try {
@@ -177,11 +214,36 @@ export function ChatWidget({
                 <p className="text-[11px] opacity-80">{agent.role || "Online"}</p>
               </div>
               {voiceEnabled ? (
-                <button type="button" onClick={() => setVoiceOn((value) => !value)} className={cn("rounded-xl p-2", voiceOn ? "bg-white text-slate-900" : "bg-white/10")}>
-                  <AudioLines className="h-4 w-4" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoiceOn((value) => {
+                        const next = !value;
+                        if (!next) stopSpeech();
+                        return next;
+                      });
+                    }}
+                    className={cn("rounded-xl p-2", voiceOn ? "bg-white text-slate-900" : "bg-white/10")}
+                    aria-label={voiceOn ? "Voice replies on" : "Voice replies off"}
+                    title={voiceOn ? "Voice replies on" : "Voice replies off"}
+                  >
+                    <AudioLines className="h-4 w-4" />
+                  </button>
+                  {speaking ? (
+                    <button
+                      type="button"
+                      onClick={stopSpeech}
+                      className="rounded-xl bg-white p-2 text-rose-600"
+                      aria-label="Stop listening"
+                      title="Stop listening"
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </button>
+                  ) : null}
+                </>
               ) : null}
-              <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2" aria-label="Close">
+              <button type="button" onClick={() => { stopSpeech(); setOpen(false); }} className="rounded-xl p-2" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
