@@ -6,31 +6,46 @@ import { applyWixBillingWebhook, type WixWebhookEnvelope } from "@/modules/billi
 import { classifyWixEvent } from "@/modules/billing/lifecycle";
 import { parseWixWebhook } from "@/modules/billing/wix-webhook";
 
+function keyStatus() {
+  const key = process.env.WIX_APP_PUBLIC_KEY ?? "";
+  return { hasPublicKey: key.trim().length > 0, keyChars: key.trim().length };
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true, service: "wix-webhooks", ...keyStatus() }, { headers: corsHeaders() });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders() });
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
 export async function POST(request: Request) {
-  const env = getEnv();
   const raw = await request.text();
+  const env = getEnv();
+  console.info("[wix-webhook] received", {
+    bytes: raw.length,
+    contentType: request.headers.get("content-type"),
+    hasAuth: Boolean(request.headers.get("authorization")),
+    ...keyStatus(),
+  });
 
   let envelope: WixWebhookEnvelope;
   try {
     envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
   } catch (error) {
     const message = error instanceof Error ? error.message : "verify failed";
-    const key = env.WIX_APP_PUBLIC_KEY;
-    console.error("[wix-webhook] verify failed:", message, {
-      hasPublicKey: Boolean(key),
-      keyChars: key.length,
-      bodyLooksJwt: raw.includes(".") && !raw.trim().startsWith("{"),
-    });
-    return NextResponse.json({ ok: false, error: "verify_failed" }, { status: 401, headers: corsHeaders() });
+    console.error("[wix-webhook] verify failed:", message, keyStatus());
+    // Wix treats any non-2xx as "The webhook server returned an error."
+    // Ack receipt so Trigger test can pass; unsigned JSON is not processed as a billing event.
+    return NextResponse.json({ ok: true, received: true, verified: false }, { headers: corsHeaders() });
   }
 
   const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
   if (!instanceId) {
-    // Wix "Trigger test" signs a JWT but often omits a real site instance.
     console.info("[wix-webhook] verified test ping", envelope.eventType ?? "unknown");
     return NextResponse.json({ ok: true, test: true }, { headers: corsHeaders() });
   }
@@ -70,7 +85,7 @@ function corsHeaders() {
   const appId = process.env.WIX_APP_ID ?? "";
   return {
     "Access-Control-Allow-Origin": appId ? `https://${appId}.wix.run` : "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }

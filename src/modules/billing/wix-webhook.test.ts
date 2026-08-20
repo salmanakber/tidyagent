@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exportSPKI, generateKeyPair, SignJWT } from "jose";
-import { normalizePublicKey, parseWixWebhook, unwrapWixWebhookPayload } from "@/modules/billing/wix-webhook";
+import { normalizePublicKey, parseWixWebhook, unwrapWixWebhookPayload, extractWixJwt } from "@/modules/billing/wix-webhook";
 
 describe("Wix webhook unwrap", () => {
   it("reads instanceId from the nested JWT data string", () => {
@@ -48,5 +48,13 @@ describe("Wix webhook unwrap", () => {
     const envelope = await parseWixWebhook(jwt, spki.replace(/\n/g, " "), null);
     expect(envelope.eventType).toBe("AppInstanceInstalled");
     expect(envelope.instanceId).toBeUndefined();
+  });
+
+  it("finds a JWT in the raw body or Authorization header", () => {
+    const jwt = `${"a".repeat(20)}.${"b".repeat(20)}.${"c".repeat(20)}`;
+    expect(extractWixJwt(jwt, null)).toBe(jwt);
+    expect(extractWixJwt("{}", `Bearer ${jwt}`)).toBe(jwt);
+    expect(extractWixJwt(JSON.stringify({ data: jwt }), null)).toBe(jwt);
+    expect(extractWixJwt("{}", null)).toBe("");
   });
 });

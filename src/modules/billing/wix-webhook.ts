@@ -66,11 +66,15 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export async function parseWixWebhook(
-  raw: string,
-  publicKey: string,
-  authorization: string | null,
-): Promise<WixWebhookEnvelope> {
+function looksLikeJwt(value: string) {
+  const trimmed = value.trim();
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(trimmed)) return false;
+  const parts = trimmed.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 8);
+}
+
+export function extractWixJwt(raw: string, authorization: string | null) {
+  const bearer = authorization?.replace(/^Bearer\s+/i, "").trim() ?? "";
   let body = raw.trim();
   if (body.startsWith('"') && body.endsWith('"')) {
     try {
@@ -79,11 +83,30 @@ export async function parseWixWebhook(
       /* keep */
     }
   }
+  if (looksLikeJwt(body)) return body;
+  if (looksLikeJwt(bearer)) return bearer;
+  if (body.startsWith("{")) {
+    try {
+      const json = JSON.parse(body) as Record<string, unknown>;
+      for (const value of [json.data, json.jwt, json.token, json.payload]) {
+        if (typeof value === "string" && looksLikeJwt(value)) return value;
+      }
+    } catch {
+      /* keep */
+    }
+  }
+  return "";
+}
 
-  const jwtCandidate =
-    body.includes(".") && !body.startsWith("{") ? body : authorization?.replace(/^Bearer\s+/i, "") ?? "";
+export async function parseWixWebhook(
+  raw: string,
+  publicKey: string,
+  authorization: string | null,
+): Promise<WixWebhookEnvelope> {
+  const jwtCandidate = extractWixJwt(raw, authorization);
 
-  if (publicKey && jwtCandidate && jwtCandidate.split(".").length === 3) {
+  if (jwtCandidate) {
+    if (!publicKey.trim()) throw new Error("WIX_APP_PUBLIC_KEY is empty on this server");
     const key = await importSPKI(normalizePublicKey(publicKey), "RS256");
     const { payload } = await jwtVerify(jwtCandidate, key, {
       algorithms: ["RS256"],
@@ -92,6 +115,7 @@ export async function parseWixWebhook(
     return unwrapWixWebhookPayload(payload as unknown as Record<string, unknown>);
   }
 
+  const body = raw.trim();
   if (body.startsWith("{")) {
     return unwrapWixWebhookPayload(JSON.parse(body) as Record<string, unknown>);
   }
