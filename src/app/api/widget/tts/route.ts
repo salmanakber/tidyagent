@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/security/session";
 import { resolveWidgetAgent } from "@/modules/widget/resolve";
 import { entitlementsForOrganization } from "@/modules/billing/service";
-import { synthesizeSpeech } from "@/modules/voice/tts";
+import { synthesizeSpeechDetailed } from "@/modules/voice/tts";
 
 function corsHeaders() {
   return {
@@ -20,6 +20,7 @@ const bodySchema = z.object({
   instanceId: z.string().max(200).optional().nullable(),
   site: z.string().max(200).optional().nullable(),
   preview: z.boolean().optional(),
+  voiceId: z.string().max(80).optional().nullable(),
 });
 
 export async function OPTIONS() {
@@ -49,9 +50,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Voice is included on Pro." }, { status: 403, headers: corsHeaders() });
   }
 
-  const spoken = await synthesizeSpeech(parsed.text);
-  if (!spoken) {
-    return NextResponse.json({ error: "Voice is unavailable right now" }, { status: 503, headers: corsHeaders() });
+  const spoken = await synthesizeSpeechDetailed(parsed.text, parsed.voiceId || agent.voiceId);
+  if (!spoken.ok) {
+    return NextResponse.json({ error: spoken.error }, { status: 503, headers: corsHeaders() });
   }
 
   return new NextResponse(new Uint8Array(spoken.bytes), {
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       "Content-Type": spoken.contentType,
       "Content-Length": String(spoken.bytes.length),
       "X-Tidyagent-Tts": spoken.provider,
+      "X-Tidyagent-Voice": spoken.voice,
     },
   });
 }

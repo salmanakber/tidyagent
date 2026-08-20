@@ -29,6 +29,7 @@ export async function seedDefaultAgent(input: {
       knowledgeScopes: ["PAGE", "FAQ", "POLICY", "CUSTOM"],
       widgetTemplate: "CLASSIC",
       voiceEnabled: true,
+      voiceId: "en-US-Neural2-F",
       focus: ["customer_support", "sales"],
       widgetPrimaryColor: "#1F3A5F",
       widgetGreeting: "Hi! How can I help you today?",

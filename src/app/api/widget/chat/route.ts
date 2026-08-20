@@ -70,11 +70,21 @@ export async function POST(request: Request) {
         conversationId: result.conversationId,
         text: result.text,
         createdAt: result.createdAt,
-        agent: result.agent ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl }) : undefined,
+        agent: result.agent
+          ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl, voiceId: result.agent.voiceId })
+          : undefined,
         handoff: result.handoff
           ? {
-              from: personPayload({ ...result.handoff.from, widgetAvatarUrl: result.handoff.from.avatarUrl }),
-              to: personPayload({ ...result.handoff.to, widgetAvatarUrl: result.handoff.to.avatarUrl }),
+              from: personPayload({
+                ...result.handoff.from,
+                widgetAvatarUrl: result.handoff.from.avatarUrl,
+                voiceId: result.handoff.from.voiceId,
+              }),
+              to: personPayload({
+                ...result.handoff.to,
+                widgetAvatarUrl: result.handoff.to.avatarUrl,
+                voiceId: result.handoff.to.voiceId,
+              }),
             }
           : null,
       },

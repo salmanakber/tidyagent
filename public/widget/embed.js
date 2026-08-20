@@ -28,6 +28,7 @@
     const startName = String(config.name || "Assistant");
     const template = String(config.template || "CLASSIC").toUpperCase();
     const voiceOffered = Boolean(config.voiceEnabled);
+    const voiceId = String(config.voiceId || "en-US-Neural2-F");
     const startAvatar = absoluteUrl(config.avatarUrl, origin);
     const startInitials = initialsOf(startName);
     const host = document.documentElement || document.body;
@@ -109,7 +110,7 @@
     let voiceOn = voiceOffered;
     let listening = false;
     let recognition = null;
-    let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials };
+    let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials, voiceId };
     let conversationId = readStore("conv") || "";
     let visitorId = readStore("vid");
     if (!visitorId) {
@@ -227,6 +228,7 @@
         avatarUrl: absoluteUrl(person.avatarUrl, origin) || startAvatar,
         role: person.role || person.specialty || "Assistant",
         initials: initialsOf(person.name || startName),
+        voiceId: person.voiceId || currentAgent.voiceId || voiceId,
       };
       nameEl.textContent = currentAgent.name;
       statusEl.textContent = currentAgent.role;
@@ -419,7 +421,7 @@
       conversationId = "";
       writeStore("conv", "");
       inbox.setAttribute("hidden", "");
-      setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant" });
+      setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant", voiceId });
       seedGreeting();
     }
 
@@ -478,6 +480,7 @@
             token,
             instanceId: instance,
             site,
+            voiceId: currentAgent.voiceId || voiceId,
           }),
         });
         if (!response.ok) throw new Error("tts");
@@ -511,6 +514,7 @@
         avatarUrl: absoluteUrl(row?.avatarUrl, origin),
         role: row?.role || row?.specialty || "Assistant",
         initials: initialsOf(row?.name || startName),
+        voiceId: row?.voiceId || voiceId,
       };
     }
 

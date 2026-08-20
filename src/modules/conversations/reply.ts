@@ -91,13 +91,16 @@ export async function replyToVisitor(input: {
     },
   });
 
+  let leadCreated = false;
   if (on("lead_capture")) {
-    await captureLeadEmail({
-      organizationId: input.agent.organizationId,
-      siteId: input.agent.siteId,
-      conversationId: conversation.id,
-      message,
-    });
+    leadCreated = Boolean(
+      await captureLeadEmail({
+        organizationId: input.agent.organizationId,
+        siteId: input.agent.siteId,
+        conversationId: conversation.id,
+        message,
+      }),
+    );
   }
 
   if (handedOff) {
@@ -195,13 +198,27 @@ export async function replyToVisitor(input: {
         agentRole: routed.role,
         specialty: routed.specialty,
         avatarUrl: routed.widgetAvatarUrl,
+        voiceId: routed.voiceId,
         handoff: handedOff,
       },
     },
   });
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: { lastMessageAt: new Date() },
+
+  const unanswered = !greetingTurn && evidence.length === 0;
+  const { recordConversationTurn } = await import("@/modules/analytics/record");
+  await recordConversationTurn({
+    organizationId: input.agent.organizationId,
+    siteId: input.agent.siteId,
+    conversationId: conversation.id,
+    agentId: routed.id,
+    agentName: routed.name,
+    intent,
+    greeting: greetingTurn,
+    handedOff,
+    unanswered,
+    leadCreated,
+    offerHuman: on("human_handoff") && unanswered,
+    question: message,
   });
 
   return {
@@ -214,11 +231,26 @@ export async function replyToVisitor(input: {
       role: routed.role,
       specialty: routed.specialty,
       avatarUrl: routed.widgetAvatarUrl,
+      voiceId: routed.voiceId,
     },
     handoff: handedOff
       ? {
-          from: { id: current.id, name: current.name, role: current.role, specialty: current.specialty, avatarUrl: current.widgetAvatarUrl },
-          to: { id: routed.id, name: routed.name, role: routed.role, specialty: routed.specialty, avatarUrl: routed.widgetAvatarUrl },
+          from: {
+            id: current.id,
+            name: current.name,
+            role: current.role,
+            specialty: current.specialty,
+            avatarUrl: current.widgetAvatarUrl,
+            voiceId: current.voiceId,
+          },
+          to: {
+            id: routed.id,
+            name: routed.name,
+            role: routed.role,
+            specialty: routed.specialty,
+            avatarUrl: routed.widgetAvatarUrl,
+            voiceId: routed.voiceId,
+          },
         }
       : null,
   };
@@ -430,7 +462,7 @@ async function captureLeadEmail(input: {
   message: string;
 }) {
   const match = input.message.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  if (!match) return;
+  if (!match) return false;
   const email = match[0].toLowerCase();
   const existing = await prisma.customer.findFirst({
     where: { organizationId: input.organizationId, email },
@@ -440,7 +472,7 @@ async function captureLeadEmail(input: {
       where: { id: input.conversationId },
       data: { customerId: existing.id },
     });
-    return;
+    return false;
   }
   const customer = await prisma.customer.create({
     data: {
@@ -453,4 +485,5 @@ async function captureLeadEmail(input: {
     where: { id: input.conversationId },
     data: { customerId: customer.id },
   });
+  return true;
 }

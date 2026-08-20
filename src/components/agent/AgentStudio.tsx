@@ -7,6 +7,8 @@ import { AvatarPicker } from "@/components/agent/AvatarPicker";
 import { AgentTeam } from "@/components/agent/AgentTeam";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { WIDGET_TEMPLATES } from "@/modules/agents/team";
+import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
+import { DEFAULT_VOICE_ID } from "@/modules/voice/voices";
 import type { AgentSpecialty, KnowledgeContentType, PlanKey, WidgetTemplate } from "@prisma/client";
 
 type AgentView = {
@@ -22,6 +24,7 @@ type AgentView = {
   widgetAvatarUrl?: string | null;
   widgetTemplate?: WidgetTemplate;
   voiceEnabled?: boolean;
+  voiceId?: string | null;
   isPrimary?: boolean;
   specialty?: AgentSpecialty;
   knowledgeScopes?: string[];
@@ -58,6 +61,7 @@ export function AgentStudio({
   const [avatarUrl, setAvatarUrl] = useState(agent.widgetAvatarUrl ?? null);
   const [template, setTemplate] = useState<WidgetTemplate>(agent.widgetTemplate ?? "CLASSIC");
   const [voiceOn, setVoiceOn] = useState(Boolean(agent.voiceEnabled));
+  const [voiceId, setVoiceId] = useState(agent.voiceId || DEFAULT_VOICE_ID);
   const [pending, startTransition] = useTransition();
 
   function save() {
@@ -73,6 +77,7 @@ export function AgentStudio({
         widgetAvatarUrl: avatarUrl ?? "",
         widgetTemplate: template,
         voiceEnabled: voiceOn,
+        voiceId,
       });
     });
   }
@@ -156,15 +161,28 @@ export function AgentStudio({
             </div>
           </div>
           {voiceOnPlan ? (
-            <label className="mt-5 flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
-              <span>
-                <span className="block text-white">Spoken replies</span>
-                <span className="text-xs text-navy-400">
-                  Google Cloud TTS first, Amazon Polly if Google is down. Mic uses the visitor’s browser.
+            <div className="mt-5 space-y-3 rounded-2xl bg-navy-950/40 px-4 py-3">
+              <label className="flex items-center justify-between text-sm">
+                <span>
+                  <span className="block text-white">Spoken replies</span>
+                  <span className="text-xs text-navy-400">Visitors hear this voice. Mic still uses their browser.</span>
                 </span>
-              </span>
-              <input type="checkbox" checked={voiceOn} onChange={(event) => setVoiceOn(event.target.checked)} />
-            </label>
+                <input type="checkbox" checked={voiceOn} onChange={(event) => setVoiceOn(event.target.checked)} />
+              </label>
+              {voiceOn ? (
+                <div>
+                  <p className="text-sm text-navy-300">Voice for {name}</p>
+                  <VoiceSelect value={voiceId} onChange={setVoiceId} />
+                  <div className="mt-3">
+                    <VoiceTestButton
+                      preview
+                      voiceId={voiceId}
+                      sample={`Hi, I’m ${name}. If you can hear this, this is the voice visitors will get.`}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : (
             <p className="mt-5 text-xs text-navy-400">Spoken voice is included on Pro.</p>
           )}
@@ -222,8 +240,10 @@ export function AgentStudio({
             knowledgeScopes: row.knowledgeScopes ?? [],
             status: row.status,
             widgetAvatarUrl: row.widgetAvatarUrl,
+            voiceId: row.voiceId,
           }))}
           planKey={planKey}
+          voiceOnPlan={voiceOnPlan}
           hasStores={hasStores}
           hasBookings={hasBookings}
           contentTypes={contentTypes}
@@ -241,6 +261,7 @@ export function AgentStudio({
             preview
             template={template}
             voiceEnabled={voiceOnPlan && voiceOn}
+            voiceId={voiceId}
           />
         </div>
       </div>

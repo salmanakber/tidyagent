@@ -14,6 +14,7 @@ export function personPayload(agent: {
   role?: string | null;
   specialty?: string | null;
   widgetAvatarUrl?: string | null;
+  voiceId?: string | null;
 }) {
   return {
     id: agent.id,
@@ -21,5 +22,6 @@ export function personPayload(agent: {
     role: agent.role || "Assistant",
     specialty: agent.specialty || "GENERAL",
     avatarUrl: absoluteAvatar(agent.widgetAvatarUrl),
+    voiceId: agent.voiceId || null,
   };
 }

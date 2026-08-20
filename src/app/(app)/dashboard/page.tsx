@@ -32,7 +32,7 @@ export default async function DashboardPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Conversations" value={formatNumber(data.metrics.conversations)} hint="Today’s workspace total" />
+        <MetricCard label="Conversations" value={formatNumber(data.metrics.conversations)} hint="All conversations" />
         <MetricCard label="Resolved by AI" value={formatNumber(data.metrics.resolvedByAi)} />
         <MetricCard label="Human escalations" value={formatNumber(data.metrics.humanEscalations)} />
         <MetricCard label="Leads" value={formatNumber(data.metrics.leads)} hint={`${formatNumber(data.metrics.salesAssisted)} sales assisted`} />

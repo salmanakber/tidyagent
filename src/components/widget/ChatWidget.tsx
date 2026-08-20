@@ -13,9 +13,10 @@ export type WidgetProps = {
   preview?: boolean;
   template?: "CLASSIC" | "SOFT" | "BAR" | "MINIMAL";
   voiceEnabled?: boolean;
+  voiceId?: string | null;
 };
 
-type Person = { name: string; avatarUrl?: string | null; role?: string };
+type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null };
 type Line =
   | { kind: "msg"; role: "agent" | "customer"; text: string; at: string; agent?: Person }
   | { kind: "xfer"; from: Person; to: Person; done?: boolean }
@@ -30,6 +31,7 @@ export function ChatWidget({
   preview = false,
   template = "CLASSIC",
   voiceEnabled = false,
+  voiceId,
 }: WidgetProps) {
   const left = position === "BOTTOM_LEFT";
   const [open, setOpen] = useState(false);
@@ -39,7 +41,7 @@ export function ChatWidget({
   const [typed, setTyped] = useState("");
   const [teaserOn, setTeaserOn] = useState(template !== "MINIMAL");
   const [voiceOn, setVoiceOn] = useState(voiceEnabled);
-  const [agent, setAgent] = useState<Person>({ name, avatarUrl, role: "Online" });
+  const [agent, setAgent] = useState<Person>({ name, avatarUrl, role: "Online", voiceId });
   const [inboxOpen, setInboxOpen] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
@@ -47,7 +49,7 @@ export function ChatWidget({
   const bubbleStyle = useMemo(() => ({ backgroundColor: primaryColor }), [primaryColor]);
 
   useEffect(() => {
-    setAgent({ name, avatarUrl, role: "Online" });
+    setAgent({ name, avatarUrl, role: "Online", voiceId });
     setLines([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
     setTyped("");
     setTeaserOn(template !== "MINIMAL");
@@ -62,13 +64,32 @@ export function ChatWidget({
       if (i >= max) window.clearInterval(id);
     }, 22);
     return () => window.clearInterval(id);
-  }, [greeting, name, template, voiceEnabled, avatarUrl]);
+  }, [greeting, name, template, voiceEnabled, avatarUrl, voiceId]);
 
   function unlock() {
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     if (!ctxRef.current) ctxRef.current = new Ctx();
     if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
+  }
+
+  async function speak(text: string, nextVoice?: string | null) {
+    if (!voiceEnabled || !voiceOn || !text) return;
+    try {
+      const response = await fetch("/api/widget/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 600), preview: true, voiceId: nextVoice || voiceId }),
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play();
+      audio.onended = () => URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
   }
 
   async function send(text = input.trim()) {
@@ -105,12 +126,15 @@ export function ChatWidget({
           { kind: "joined", person: to },
           { kind: "msg", role: "agent", text: data.text || "I’m here to help.", at: data.createdAt || new Date().toISOString(), agent: to },
         ]);
+        void speak(data.text || "I’m here to help.", to.voiceId);
       } else {
         if (data.agent?.name) setAgent(data.agent);
+        const reply = data.text || data.error || "I couldn’t reply just then.";
         setLines((current) => [
           ...current,
-          { kind: "msg", role: "agent", text: data.text || data.error || "I couldn’t reply just then.", at: data.createdAt || new Date().toISOString(), agent: data.agent || agent },
+          { kind: "msg", role: "agent", text: reply, at: data.createdAt || new Date().toISOString(), agent: data.agent || agent },
         ]);
+        void speak(reply, data.agent?.voiceId);
       }
     } catch {
       setLines((current) => [...current, { kind: "msg", role: "agent", text: "I couldn’t reach the team just then.", at: new Date().toISOString() }]);

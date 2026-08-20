@@ -27,6 +27,7 @@ export default async function AgentPage() {
     widgetAvatarUrl: agent.widgetAvatarUrl,
     widgetTemplate: agent.widgetTemplate,
     voiceEnabled: agent.voiceEnabled,
+    voiceId: agent.voiceId,
     isPrimary: agent.isPrimary,
     specialty: agent.specialty,
     knowledgeScopes: agent.knowledgeScopes,

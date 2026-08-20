@@ -27,6 +27,7 @@ export default async function AdminSettingsPage() {
         planPricePro={settings.planPricePro}
         planPriceCurrency={settings.planPriceCurrency}
         planTrialDays={settings.planTrialDays}
+        googleTtsVoice={settings.googleTtsVoice}
       />
     </div>
   );

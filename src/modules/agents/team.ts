@@ -72,6 +72,14 @@ export function maxAgentsForPlan(planKey: PlanKey) {
   return PLAN_ENTITLEMENTS[planKey].maxAgents;
 }
 
+export const INTENT_LABELS: Record<AgentSpecialty, string> = {
+  GENERAL: "General",
+  ECOMMERCE: "Products & orders",
+  SUPPORT: "Support",
+  BOOKINGS: "Bookings",
+  CONTENT: "Pages & content",
+};
+
 export function classifyVisitorIntent(text: string): AgentSpecialty {
   const value = text.toLowerCase();
   if (

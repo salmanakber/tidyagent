@@ -379,6 +379,7 @@ model Agent {
   widgetEmbedMode     WidgetEmbedMode @default(AUTO)
   widgetTemplate      WidgetTemplate @default(CLASSIC)
   voiceEnabled        Boolean        @default(true)
+  voiceId             String         @default("en-US-Neural2-F")
   isPrimary           Boolean        @default(false)
   specialty           AgentSpecialty @default(GENERAL)
   knowledgeScopes     String[]       @default(["PAGE", "FAQ", "POLICY", "CUSTOM"])

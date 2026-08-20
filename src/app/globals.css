@@ -94,23 +94,30 @@ html.theme-light {
 }
 
 html.theme-light body {
-  background: #f3efe6;
+  background: #f4f1ea;
   color: #122033;
 }
 
 html.theme-light .bg-brand-gradient {
-  background-image:
-    radial-gradient(900px 420px at 8% -10%, rgba(245, 158, 11, 0.16), transparent 52%),
-    linear-gradient(180deg, #f7f3eb 0%, #efe6d6 100%) !important;
+  background: #f4f1ea !important;
+  background-image: none !important;
 }
 
 html.theme-light .bg-noise {
-  opacity: 0.35;
+  background-image: none !important;
 }
 
-html.theme-light .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 246, 0.9));
-  border-color: rgba(18, 32, 51, 0.08);
+html.theme-light .glass,
+html.theme-light .panel {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(18, 32, 51, 0.08);
+  box-shadow: 0 1px 2px rgba(18, 32, 51, 0.04);
+}
+
+html.theme-light .hairline {
+  box-shadow: none;
 }
 
 html.theme-light .text-white {
@@ -137,25 +144,29 @@ html.theme-light .border-white\/10 {
 html.theme-light .bg-white\/5,
 html.theme-light .hover\:bg-white\/5:hover,
 html.theme-light .hover\:bg-white\/10:hover {
-  background-color: rgba(18, 32, 51, 0.05) !important;
+  background-color: #f3efe6 !important;
 }
 
 html.theme-light .bg-navy-950\/40,
 html.theme-light .bg-navy-950\/60 {
-  background-color: rgba(18, 32, 51, 0.05) !important;
+  background-color: #f3efe6 !important;
 }
 
 html.theme-light .bg-navy-950\/70,
-html.theme-light .bg-navy-950\/90 {
-  background-color: rgba(247, 243, 235, 0.88) !important;
+html.theme-light .bg-navy-950\/90,
+html.theme-light header.sticky,
+html.theme-light .sticky {
+  background-color: #f4f1ea !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 html.theme-light .bg-navy-900 {
-  background-color: #fffdf8 !important;
+  background-color: #ffffff !important;
 }
 
 html.theme-light .field {
-  background: #fff;
+  background: #ffffff;
   color: #122033;
   border-color: rgba(18, 32, 51, 0.12);
 }
@@ -163,10 +174,9 @@ html.theme-light .field {
 html.theme-light .btn-secondary {
   color: #122033;
   border-color: rgba(18, 32, 51, 0.12);
-  background: #fff;
+  background: #ffffff;
 }
 
-html.theme-light header,
-html.theme-light .sticky {
+html.theme-light header {
   color: #122033;
 }

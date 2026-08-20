@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { savePlatformSettings, testAIProviders } from "@/app/actions/settings";
+import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
 
 export function PlatformSettingsForm({
   failoverEnabled,
@@ -18,6 +19,7 @@ export function PlatformSettingsForm({
   planPricePro,
   planPriceCurrency,
   planTrialDays,
+  googleTtsVoice,
 }: {
   failoverEnabled: boolean;
   order: string;
@@ -49,10 +51,12 @@ export function PlatformSettingsForm({
   planPricePro: string;
   planPriceCurrency: string;
   planTrialDays: string;
+  googleTtsVoice: string;
 }) {
   const [state, formAction, saving] = useActionState(savePlatformSettings, null);
   const [pending, startTransition] = useTransition();
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [voiceId, setVoiceId] = useState(googleTtsVoice || "en-US-Neural2-F");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -216,8 +220,9 @@ export function PlatformSettingsForm({
       <div className="panel p-6">
         <h2 className="font-display text-xl text-white">Spoken voice (Pro)</h2>
         <p className="mt-2 text-sm text-navy-300">
-          Google Cloud Text-to-Speech is used first. Amazon Polly is the fallback if Google is missing or fails.
-          Leave a field blank to keep the current value.
+          Save the Google API key first, then press Play test voice. You should hear a sample. If Google is not enabled
+          or the key is restricted, the error message appears here instead of failing silently. Amazon Polly is only used
+          if Google fails.
         </p>
         <div className="mt-5 grid gap-4">
           <label className="text-sm text-navy-300">
@@ -225,9 +230,11 @@ export function PlatformSettingsForm({
             <input className="field mt-2" name="google_tts_api_key" type="password" placeholder="AIza…" autoComplete="off" />
           </label>
           <label className="text-sm text-navy-300">
-            Google voice name
-            <input className="field mt-2" name="google_tts_voice" placeholder="en-US-Neural2-F" />
+            Default voice
+            <input type="hidden" name="google_tts_voice" value={voiceId} />
+            <VoiceSelect value={voiceId} onChange={setVoiceId} />
           </label>
+          <VoiceTestButton voiceId={voiceId} />
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-navy-300">
               AWS access key {configured.awsPolly ? <span className="text-emerald-300">(saved)</span> : null}

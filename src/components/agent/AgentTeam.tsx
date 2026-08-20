@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { createSpecialistAgent, deleteAgent, updateAgent } from "@/app/actions/workspace";
 import { maxAgentsForPlan, SPECIALTIES } from "@/modules/agents/team";
 import { AvatarPicker } from "@/components/agent/AvatarPicker";
+import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
+import { DEFAULT_VOICE_ID } from "@/modules/voice/voices";
 import type { AgentSpecialty, KnowledgeContentType, PlanKey } from "@prisma/client";
 
 export function AgentTeam({
@@ -12,6 +14,7 @@ export function AgentTeam({
   hasStores,
   hasBookings,
   contentTypes,
+  voiceOnPlan = false,
 }: {
   agents: {
     id: string;
@@ -22,11 +25,13 @@ export function AgentTeam({
     knowledgeScopes: string[];
     status: string;
     widgetAvatarUrl?: string | null;
+    voiceId?: string | null;
   }[];
   planKey: PlanKey;
   hasStores: boolean;
   hasBookings: boolean;
   contentTypes: KnowledgeContentType[];
+  voiceOnPlan?: boolean;
 }) {
   const limit = maxAgentsForPlan(planKey);
   const [pending, startTransition] = useTransition();
@@ -60,12 +65,13 @@ export function AgentTeam({
     <div className="panel p-6">
       <h3 className="font-display text-lg text-white">Team of agents</h3>
       <p className="mt-2 text-sm text-navy-300">
-        The general agent greets visitors. Specialists only see the data you assign. Click a photo to set it for that agent.
-        This plan allows {limit} agents ({agents.length} in use).
+        The general agent greets visitors. Specialists only see the data you assign. Click a photo to set it, and pick a
+        different spoken voice for each person. This plan allows {limit} agents ({agents.length} in use).
       </p>
-      <ul className="mt-4 space-y-2">
+      <ul className="mt-4 space-y-3">
         {agents.map((agent) => (
-          <li key={agent.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-navy-950/40 px-4 py-3">
+          <li key={agent.id} className="space-y-3 rounded-2xl bg-navy-950/40 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <AvatarPicker
                 compact
@@ -91,6 +97,22 @@ export function AgentTeam({
               >
                 Remove
               </button>
+            ) : null}
+            </div>
+            {voiceOnPlan ? (
+              <div className="flex items-center gap-2">
+                <VoiceSelect
+                  compact
+                  value={agent.voiceId || DEFAULT_VOICE_ID}
+                  onChange={(id) => startTransition(() => updateAgent({ agentId: agent.id, voiceId: id }))}
+                />
+                <VoiceTestButton
+                  compact
+                  preview
+                  voiceId={agent.voiceId || DEFAULT_VOICE_ID}
+                  sample={`Hi, I’m ${agent.name}. This is how I sound.`}
+                />
+              </div>
             ) : null}
           </li>
         ))}

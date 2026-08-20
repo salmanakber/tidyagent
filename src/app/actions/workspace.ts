@@ -20,6 +20,7 @@ const agentUpdateSchema = z.object({
   widgetTemplate: z.enum(["CLASSIC", "SOFT", "BAR", "MINIMAL"]).optional(),
   widgetAvatarUrl: z.union([z.string().url(), z.literal("")]).optional(),
   voiceEnabled: z.boolean().optional(),
+  voiceId: z.string().min(3).max(80).optional(),
   specialty: z.enum(["GENERAL", "ECOMMERCE", "SUPPORT", "BOOKINGS", "CONTENT"]).optional(),
   knowledgeScopes: z.array(z.enum(["PAGE", "PRODUCT", "FAQ", "POLICY", "CUSTOM", "SERVICE"])).optional(),
   focus: z.array(z.string()).optional(),
@@ -36,6 +37,9 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
     throw new Error("Agent not found");
   }
   if (data.voiceEnabled && !entitlements.voiceEnabled) {
+    throw new Error("Voice is included on Pro.");
+  }
+  if (data.voiceId && !entitlements.voiceEnabled) {
     throw new Error("Voice is included on Pro.");
   }
   if (data.widgetTemplate && data.widgetTemplate !== "CLASSIC" && !entitlements.allTemplates) {
@@ -90,6 +94,11 @@ export async function createSpecialistAgent(input: {
   const scopes = input.knowledgeScopes?.length
     ? input.knowledgeScopes.filter((scope) => facts.contentTypes.includes(scope))
     : scopesForSpecialty(input.specialty, facts.contentTypes);
+  const { pickVoiceForAgent } = await import("@/modules/voice/voices");
+  const voiceId = pickVoiceForAgent(
+    input.specialty,
+    workspace.agents.map((agent) => agent.voiceId),
+  );
 
   await prisma.agent.create({
     data: {
@@ -114,6 +123,7 @@ export async function createSpecialistAgent(input: {
       widgetPosition: workspace.agent?.widgetPosition ?? "BOTTOM_RIGHT",
       widgetTemplate: workspace.agent?.widgetTemplate ?? "CLASSIC",
       voiceEnabled: workspace.agent?.voiceEnabled ?? true,
+      voiceId,
     },
   });
   revalidatePath("/agent");

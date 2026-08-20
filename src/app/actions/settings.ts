@@ -36,6 +36,7 @@ export async function getPlatformSettingsView() {
   const planPricePro = await getSetting("plan_price_pro");
   const planPriceCurrency = await getSetting("plan_price_currency", "USD");
   const planTrialDays = await getSetting("plan_trial_days", "7");
+  const googleTtsVoice = await getSetting("google_tts_voice", env.GOOGLE_TTS_VOICE);
 
   return {
     failoverEnabled: config.failoverEnabled,
@@ -68,6 +69,7 @@ export async function getPlatformSettingsView() {
     planPricePro,
     planPriceCurrency,
     planTrialDays,
+    googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
   };
 }
 
@@ -158,4 +160,21 @@ export async function testAIProviders() {
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "Test failed" };
   }
+}
+
+export async function testPlatformTts(voiceId?: string, text?: string) {
+  await requireAdminSession("SUPER");
+  const { synthesizeSpeechDetailed } = await import("@/modules/voice/tts");
+  const sample = (text || "Hi, I’m your tidyAgent voice. If you can hear this, Google Text-to-Speech is working.").slice(0, 400);
+  const result = await synthesizeSpeechDetailed(sample, voiceId);
+  if (!result.ok) {
+    return { ok: false as const, error: result.error };
+  }
+  return {
+    ok: true as const,
+    provider: result.provider,
+    voice: result.voice,
+    contentType: result.contentType,
+    audio: result.bytes.toString("base64"),
+  };
 }
