@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/env";
 import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { fetchWixAppInstance } from "@/services/wix/client";
@@ -6,9 +6,28 @@ import { applyWixBillingWebhook, type WixWebhookEnvelope } from "@/modules/billi
 import { classifyWixEvent } from "@/modules/billing/lifecycle";
 import { parseWixWebhook, extractWixJwt, peekWixJwtHeader } from "@/modules/billing/wix-webhook";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function keyStatus() {
   const key = process.env.WIX_APP_PUBLIC_KEY ?? "";
   return { hasPublicKey: key.trim().length > 0, keyChars: key.trim().length };
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+  };
+}
+
+/** Wix Trigger test only checks that POST returns 200 within 1250ms. */
+function received() {
+  return new NextResponse("ok", {
+    status: 200,
+    headers: { ...corsHeaders(), "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
 
 export async function GET() {
@@ -20,73 +39,64 @@ export async function HEAD() {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+  return new NextResponse(null, { status: 200, headers: corsHeaders() });
 }
 
 export async function POST(request: Request) {
-  try {
-    const raw = await request.text();
-    const env = getEnv();
-    console.info("[wix-webhook] received", {
-      bytes: raw.length,
-      contentType: request.headers.get("content-type"),
-      hasAuth: Boolean(request.headers.get("authorization")),
-      ...keyStatus(),
+  const raw = await request.text();
+  const authorization = request.headers.get("authorization");
+  const contentType = request.headers.get("content-type");
+
+  // Ack first. Wix fails the Trigger test if we wait on verify / Wix APIs / DB.
+  setImmediate(() => {
+    void handleIncoming(raw, authorization, contentType).catch((error) => {
+      const message = error instanceof Error ? error.message : "handler failed";
+      console.error("[wix-webhook] background failed:", message);
     });
+  });
 
-    let envelope: WixWebhookEnvelope;
-    try {
-      envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, request.headers.get("authorization"));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "verify failed";
-      const jwt = extractWixJwt(raw, request.headers.get("authorization"));
-      console.error("[wix-webhook] ack unverified:", message, {
-        ...keyStatus(),
-        jwtParts: jwt ? jwt.split(".").length : 0,
-        ...peekWixJwtHeader(jwt),
-      });
-      return ack({ received: true, verified: false });
-    }
-
-    const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
-    if (instanceId) {
-      // Wix Trigger test times out after 1250ms. Ack first, then process.
-      after(() =>
-        handleVerifiedWebhook(envelope).catch((error) => {
-          const message = error instanceof Error ? error.message : "handler failed";
-          console.error("[wix-webhook] handler failed:", message);
-        }),
-      );
-    } else {
-      console.info("[wix-webhook] verified test ping", envelope.eventType ?? "unknown");
-    }
-
-    return ack({ test: !instanceId, verified: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "crash";
-    console.error("[wix-webhook] crash:", message);
-    return ack({ received: true });
-  }
+  return received();
 }
 
-async function handleVerifiedWebhook(envelope: WixWebhookEnvelope) {
+async function handleIncoming(raw: string, authorization: string | null, contentType: string | null) {
+  console.info("[wix-webhook] received", {
+    bytes: raw.length,
+    contentType,
+    hasAuth: Boolean(authorization),
+    ...keyStatus(),
+  });
+
+  const env = getEnv();
+  let envelope: WixWebhookEnvelope;
+  try {
+    envelope = await parseWixWebhook(raw, env.WIX_APP_PUBLIC_KEY, authorization);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "verify failed";
+    const jwt = extractWixJwt(raw, authorization);
+    console.error("[wix-webhook] unverified (acked 200):", message, {
+      ...keyStatus(),
+      jwtParts: jwt ? jwt.split(".").length : 0,
+      ...peekWixJwtHeader(jwt),
+    });
+    return;
+  }
+
+  const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
+  if (!instanceId) {
+    console.info("[wix-webhook] test ping", envelope.eventType ?? "unknown");
+    return;
+  }
+
   const kind = classifyWixEvent(envelope.eventType ?? envelope.metadata?.eventType);
   if (kind === "installed") {
-    const instanceId = envelope.instanceId ?? envelope.metadata?.instanceId;
-    if (instanceId) {
-      const snapshot = await fetchWixAppInstance(instanceId).catch(() => null);
-      await provisionTenantFromWix({
-        instance: { instanceId, uid: envelope.uid, vendorProductId: asVendor(envelope) },
-        snapshot,
-      });
-    }
+    const snapshot = await fetchWixAppInstance(instanceId).catch(() => null);
+    await provisionTenantFromWix({
+      instance: { instanceId, uid: envelope.uid, vendorProductId: asVendor(envelope) },
+      snapshot,
+    });
   }
   await applyWixBillingWebhook(envelope);
   console.info("[wix-webhook] processed", kind);
-}
-
-function ack(body: Record<string, unknown>) {
-  return NextResponse.json({ ok: true, ...body }, { status: 200, headers: corsHeaders() });
 }
 
 function asVendor(envelope: WixWebhookEnvelope) {
@@ -98,12 +108,4 @@ function asVendor(envelope: WixWebhookEnvelope) {
       : data;
   const value = merged.vendorProductId ?? merged.packageName ?? merged.productId;
   return typeof value === "string" ? value : null;
-}
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
 }
