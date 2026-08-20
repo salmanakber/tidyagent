@@ -70,6 +70,15 @@ describe("Wix webhook unwrap", () => {
     expect(extractWixJwt(jwt, null)).toBe(jwt);
     expect(extractWixJwt("{}", `Bearer ${jwt}`)).toBe(jwt);
     expect(extractWixJwt(JSON.stringify({ data: jwt }), null)).toBe(jwt);
+    expect(extractWixJwt(`garbage eyJ${"h".repeat(20)}.${"p".repeat(20)}.${"s".repeat(20)}`, null)).toBe(
+      `eyJ${"h".repeat(20)}.${"p".repeat(20)}.${"s".repeat(20)}`,
+    );
     expect(extractWixJwt("{}", null)).toBe("");
+  });
+
+  it("treats an empty Trigger test POST as a ping, not an error", async () => {
+    const envelope = await parseWixWebhook("", "", null);
+    expect(envelope.eventType).toBe("wix.test");
+    expect(envelope.instanceId).toBeUndefined();
   });
 });

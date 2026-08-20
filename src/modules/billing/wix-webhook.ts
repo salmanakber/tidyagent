@@ -1,4 +1,5 @@
-import { createPublicKey, createVerify } from "node:crypto";
+import { createPublicKey } from "node:crypto";
+import jwt from "jsonwebtoken";
 import type { WixWebhookEnvelope } from "@/modules/billing/service";
 
 export function normalizePublicKey(value: string) {
@@ -46,64 +47,70 @@ function looksLikeJwt(value: string) {
 }
 
 export function extractWixJwt(raw: string, authorization: string | null) {
-  const bearer = authorization?.replace(/^Bearer\s+/i, "").trim() ?? "";
-  let body = raw.replace(/^\uFEFF/, "").trim();
-  if (body.startsWith('"') && body.endsWith('"')) {
-    try {
-      body = JSON.parse(body) as string;
-    } catch {
-      /* keep */
-    }
-  }
-  if (looksLikeJwt(body)) return compactJwt(body);
-  if (looksLikeJwt(bearer)) return compactJwt(bearer);
-  if (body.startsWith("{")) {
-    try {
-      const json = JSON.parse(body) as Record<string, unknown>;
-      for (const value of [json.jwt, json.token, json.data, json.payload]) {
-        if (typeof value === "string" && looksLikeJwt(value)) return compactJwt(value);
+  const blobs = [
+    raw,
+    authorization?.replace(/^Bearer\s+/i, "").replace(/^JWT\s+/i, "") ?? "",
+  ];
+
+  for (const blob of blobs) {
+    let text = blob.replace(/^\uFEFF/, "").trim();
+    if (text.startsWith('"') && text.endsWith('"')) {
+      try {
+        text = JSON.parse(text) as string;
+      } catch {
+        /* keep */
       }
-    } catch {
-      /* keep */
+    }
+    const found = firstJwtIn(text);
+    if (found) return found;
+    if (text.startsWith("{")) {
+      try {
+        const json = JSON.parse(text) as Record<string, unknown>;
+        for (const value of [json.jwt, json.token, json.data, json.payload, json.body]) {
+          if (typeof value === "string") {
+            const nested = firstJwtIn(value);
+            if (nested) return nested;
+          }
+        }
+      } catch {
+        /* keep */
+      }
     }
   }
   return "";
 }
 
-let cachedKey: ReturnType<typeof createPublicKey> | null = null;
-let cachedPem = "";
-
-function nodePublicKey(publicKey: string) {
-  const pem = normalizePublicKey(publicKey);
-  if (cachedKey && cachedPem === pem) return cachedKey;
-  cachedKey = createPublicKey(pem);
-  cachedPem = pem;
-  return cachedKey;
+function firstJwtIn(value: string) {
+  const compact = compactJwt(value);
+  if (looksLikeJwt(compact) && (compact.startsWith("eyJ") || !compact.includes("eyJ"))) {
+    return compact;
+  }
+  const start = compact.indexOf("eyJ");
+  if (start < 0) return looksLikeJwt(compact) ? compact : "";
+  const token = compact.slice(start).split(".").slice(0, 3).join(".");
+  return looksLikeJwt(token) ? token : "";
 }
 
-/** Wix sample uses jsonwebtoken + PEM. Node crypto is the same algorithm, more tolerant of base64 padding. */
+export function decodeWixJwtUnsafe(token: string) {
+  try {
+    const payload = jwt.decode(compactJwt(token));
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Wix dashboard sample: jwt.verify(request.body, PUBLIC_KEY). */
 export function verifyWixJwt(token: string, publicKey: string) {
   const compact = compactJwt(token);
-  const parts = compact.split(".");
-  if (parts.length !== 3) throw new Error("JWT does not have 3 parts");
-  const [headerPart, payloadPart, signaturePart] = parts;
-
-  let header: { alg?: string };
-  try {
-    header = JSON.parse(b64ToBuf(headerPart).toString("utf8")) as { alg?: string };
-  } catch {
-    throw new Error("JWS Protected Header is invalid");
-  }
-  if (header.alg && header.alg !== "RS256") {
-    throw new Error(`Unexpected JWT alg ${header.alg}`);
-  }
-
-  const verifier = createVerify("RSA-SHA256");
-  verifier.update(`${headerPart}.${payloadPart}`);
-  const ok = verifier.verify(nodePublicKey(publicKey), b64ToBuf(signaturePart));
-  if (!ok) throw new Error("signature verification failed");
-
-  const payload = JSON.parse(b64ToBuf(payloadPart).toString("utf8")) as unknown;
+  const pem = normalizePublicKey(publicKey);
+  createPublicKey(pem);
+  const payload = jwt.verify(compact, pem, {
+    algorithms: ["RS256"],
+    clockTolerance: 300,
+  });
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("JWT payload is not an object");
   }
@@ -168,6 +175,11 @@ export async function parseWixWebhook(
   publicKey: string,
   authorization: string | null,
 ): Promise<WixWebhookEnvelope> {
+  const trimmed = raw.trim();
+  if (!trimmed && !authorization) {
+    return { eventType: "wix.test" };
+  }
+
   const jwtCandidate = extractWixJwt(raw, authorization);
 
   if (jwtCandidate) {
@@ -175,9 +187,8 @@ export async function parseWixWebhook(
     return unwrapWixWebhookPayload(verifyWixJwt(jwtCandidate, publicKey));
   }
 
-  const body = raw.trim();
-  if (body.startsWith("{")) {
-    return unwrapWixWebhookPayload(JSON.parse(body) as Record<string, unknown>);
+  if (trimmed.startsWith("{")) {
+    return unwrapWixWebhookPayload(JSON.parse(trimmed) as Record<string, unknown>);
   }
 
   throw new Error("Unverifiable webhook: body is not a JWT and public key verify failed");

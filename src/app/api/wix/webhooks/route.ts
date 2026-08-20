@@ -4,7 +4,7 @@ import { provisionTenantFromWix } from "@/modules/organizations/provision";
 import { fetchWixAppInstance } from "@/services/wix/client";
 import { applyWixBillingWebhook, type WixWebhookEnvelope } from "@/modules/billing/service";
 import { classifyWixEvent } from "@/modules/billing/lifecycle";
-import { parseWixWebhook, extractWixJwt, peekWixJwtHeader } from "@/modules/billing/wix-webhook";
+import { parseWixWebhook, extractWixJwt, peekWixJwtHeader, decodeWixJwtUnsafe } from "@/modules/billing/wix-webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,10 +73,14 @@ async function handleIncoming(raw: string, authorization: string | null, content
   } catch (error) {
     const message = error instanceof Error ? error.message : "verify failed";
     const jwt = extractWixJwt(raw, authorization);
+    const decoded = jwt ? decodeWixJwtUnsafe(jwt) : null;
     console.error("[wix-webhook] unverified (acked 200):", message, {
       ...keyStatus(),
+      bytes: raw.length,
+      bodyStart: raw.trim().slice(0, 48).replace(/[^\x20-\x7e]/g, "."),
       jwtParts: jwt ? jwt.split(".").length : 0,
       ...peekWixJwtHeader(jwt),
+      eventType: typeof decoded?.data === "string" ? decoded.data.slice(0, 80) : decoded?.eventType,
     });
     return;
   }
