@@ -11,6 +11,7 @@ import {
   Menu,
   Settings,
   Shield,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/sites", label: "Websites", icon: Globe },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
+  { href: "/admin/plans", label: "Plans", icon: SlidersHorizontal },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/access", label: "Access", icon: Shield },

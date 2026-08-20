@@ -13,6 +13,15 @@ export type Entitlements = {
   automationEnabled: boolean;
   maxAgents: number;
   allTemplates: boolean;
+  automations?: {
+    greeting: boolean;
+    human_handoff: boolean;
+    follow_up: boolean;
+    specialist_routing: boolean;
+    lead_capture: boolean;
+    shopping: boolean;
+    after_hours: boolean;
+  };
   isFree: boolean;
   isPaidSeat: boolean;
   isUsable: boolean;

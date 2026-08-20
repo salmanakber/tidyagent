@@ -6,7 +6,8 @@ import { AddKnowledgeForm } from "@/components/knowledge/AddKnowledgeForm";
 import { SiteScanPanel } from "@/components/knowledge/SiteScanPanel";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
-import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
+import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import { knowledgeCardsForSite, siteFactsFromApps } from "@/modules/knowledge/site-facts";
 
 export const maxDuration = 120;
@@ -16,7 +17,8 @@ export default async function KnowledgePage() {
   if (!session) redirect("/");
   const data = await getDashboardOverview(session);
   const entitlements = await entitlementsForOrganization(session.organizationId);
-  const scope = scanScopeForPlan(entitlements.planKey);
+  const planScope = await getPlanScope(entitlements.planKey);
+  const scope = scanScopeFromConfig(entitlements.planKey, planScope);
 
   const facts = siteFactsFromApps(data.site.installedWixApps);
   const cards = knowledgeCardsForSite({

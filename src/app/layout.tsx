@@ -16,6 +16,11 @@ export const metadata: Metadata = {
   title: "tidyAgent — AI employee for Wix",
   description:
     "Connect your Wix website. Answer a few simple questions. Your AI employee understands your business and starts helping customers 24/7.",
+  icons: {
+    icon: [{ url: "/images/logo-icon.png", type: "image/png" }],
+    shortcut: "/images/logo-icon.png",
+    apple: "/images/logo-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

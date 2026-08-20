@@ -5,7 +5,8 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { detectWixCapabilities } from "@/modules/wix/capabilities";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
-import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
+import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import type { SiteUnderstanding } from "@/modules/knowledge/types";
 
 export const maxDuration = 120;
@@ -15,7 +16,8 @@ export default async function OnboardingPage() {
   if (!session) redirect("/");
   const workspace = await getWorkspace(session);
   const entitlements = await entitlementsForOrganization(session.organizationId);
-  const scope = scanScopeForPlan(entitlements.planKey);
+  const planScope = await getPlanScope(entitlements.planKey);
+  const scope = scanScopeFromConfig(entitlements.planKey, planScope);
   const apps = Array.isArray(workspace.site.installedWixApps)
     ? (workspace.site.installedWixApps as string[])
     : [];

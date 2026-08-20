@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createSpecialistAgent, deleteAgent, updateAgent } from "@/app/actions/workspace";
-import { maxAgentsForPlan, SPECIALTIES } from "@/modules/agents/team";
+import { SPECIALTIES } from "@/modules/agents/team";
 import { AvatarPicker } from "@/components/agent/AvatarPicker";
 import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
 import { DEFAULT_VOICE_ID } from "@/modules/voice/voices";
@@ -10,7 +10,7 @@ import type { AgentSpecialty, KnowledgeContentType, PlanKey } from "@prisma/clie
 
 export function AgentTeam({
   agents,
-  planKey,
+  maxAgents = 1,
   hasStores,
   hasBookings,
   contentTypes,
@@ -27,13 +27,14 @@ export function AgentTeam({
     widgetAvatarUrl?: string | null;
     voiceId?: string | null;
   }[];
-  planKey: PlanKey;
+  planKey?: PlanKey;
+  maxAgents?: number;
   hasStores: boolean;
   hasBookings: boolean;
   contentTypes: KnowledgeContentType[];
   voiceOnPlan?: boolean;
 }) {
-  const limit = maxAgentsForPlan(planKey);
+  const limit = maxAgents;
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("John");
   const allowedSpecialties = SPECIALTIES.filter((item) => {
@@ -54,8 +55,7 @@ export function AgentTeam({
       <div className="panel p-6">
         <h3 className="font-display text-lg text-white">Team of agents</h3>
       <p className="mt-2 text-sm text-navy-300">
-          Business and Pro can add specialists (store, support, bookings) and assign each one only the data they should see.
-          Set a photo for every agent so visitors see who they are talking to. Starter keeps a single general agent.
+          This plan includes one general agent. Specialists unlock when the plan’s agent limit is raised.
         </p>
       </div>
     );

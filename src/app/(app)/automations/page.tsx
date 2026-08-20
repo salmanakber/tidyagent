@@ -21,9 +21,13 @@ export default async function AutomationsPage() {
       <PageHeader
         eyebrow="Playbooks"
         title="Automations"
-        description="Turn on the behaviors this AI employee should follow. Starter covers greeting and handoff. Business adds specialists, leads, and store help. Voice stays on Pro."
+        description="Turn on the behaviors this AI employee should follow. What is available depends on the current plan’s scopes."
       />
-      <AutomationsBoard planKey={entitlements.planKey} rows={rows} />
+      <AutomationsBoard
+        planKey={entitlements.planKey}
+        allowed={entitlements.automations ?? {}}
+        rows={rows}
+      />
     </div>
   );
 }

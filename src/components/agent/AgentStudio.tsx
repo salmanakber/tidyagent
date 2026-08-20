@@ -37,6 +37,7 @@ export function AgentStudio({
   planKey = "STARTER",
   voiceOnPlan = false,
   allTemplates = false,
+  maxAgents = 1,
   hasStores = false,
   hasBookings = false,
   contentTypes = ["PAGE", "FAQ", "POLICY", "CUSTOM"],
@@ -47,6 +48,7 @@ export function AgentStudio({
   planKey?: PlanKey;
   voiceOnPlan?: boolean;
   allTemplates?: boolean;
+  maxAgents?: number;
   hasStores?: boolean;
   hasBookings?: boolean;
   contentTypes?: KnowledgeContentType[];
@@ -243,6 +245,7 @@ export function AgentStudio({
             voiceId: row.voiceId,
           }))}
           planKey={planKey}
+          maxAgents={maxAgents}
           voiceOnPlan={voiceOnPlan}
           hasStores={hasStores}
           hasBookings={hasBookings}

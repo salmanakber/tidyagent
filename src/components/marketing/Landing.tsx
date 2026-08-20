@@ -245,12 +245,15 @@ export function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
           <Logo compact href="/" />
           <div className="flex items-center gap-6 text-[12px] text-navy-400">
+            <Link href="/terms" className="transition hover:text-white">
+              Terms
+            </Link>
+            <Link href="/privacy" className="transition hover:text-white">
+              Privacy
+            </Link>
             <Link href="/login" className="transition hover:text-white">
               Sign in
             </Link>
-            <a href="/admin/login" className="transition hover:text-amber-300">
-              Platform admin
-            </a>
           </div>
           <p className="text-[12px] text-navy-500">© {new Date().getFullYear()} tidyAgent</p>
         </div>

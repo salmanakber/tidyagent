@@ -1,5 +1,7 @@
 # Wix CLI app (companion)
 
+For **App Market listing copy, legal URLs, and the submit checklist**, use [MARKETPLACE_SUBMISSION.md](./MARKETPLACE_SUBMISSION.md).
+
 tidyAgent’s intelligence lives in the Next.js app at the repo root. The Wix CLI app is the install surface: dashboard entry, webhooks, and the site widget.
 
 Do **not** use Wix Blocks/Velo as the primary backend. This product is an externally hosted Next.js + Postgres service.

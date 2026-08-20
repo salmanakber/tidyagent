@@ -2,7 +2,8 @@ import type { KnowledgeContentType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { fetchWixAppInstance } from "@/services/wix/client";
-import { scanScopeForPlan, pathPriority, type ScanScope } from "@/modules/knowledge/scan-scope";
+import { pathPriority, scanScopeFromConfig, type ScanScope } from "@/modules/knowledge/scan-scope";
+import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import {
   chunkText,
   extractPage,
@@ -33,7 +34,8 @@ export async function scanOrganizationSite(input: {
   if (!entitlements.isPaidSeat) {
     throw new Error("A purchased plan is required before the site can be read.");
   }
-  const scope = scanScopeForPlan(entitlements.planKey);
+  const planScope = await getPlanScope(entitlements.planKey);
+  const scope = scanScopeFromConfig(entitlements.planKey, planScope);
   const site = await prisma.wixSite.findFirst({
     where: { id: input.siteId, organizationId: input.organizationId },
   });

@@ -7,6 +7,9 @@ import { getAIProvider } from "@/modules/ai/factory";
 import { hashPassword } from "@/lib/security/passwords";
 import { getEnv } from "@/lib/env";
 import { GEMINI_MODELS, GROQ_MODELS, OPENAI_MODELS } from "@/modules/ai/models";
+import type { PlanKey } from "@prisma/client";
+import { saveAllPlanScopes } from "@/modules/billing/plan-scope-store";
+import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 
 export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
@@ -177,4 +180,23 @@ export async function testPlatformTts(voiceId?: string, text?: string) {
     contentType: result.contentType,
     audio: result.bytes.toString("base64"),
   };
+}
+
+export async function savePlanScopesAction(input: Record<PlanKey, PlanScopeConfig>) {
+  try {
+    await requireAdminSession("SUPER");
+    await saveAllPlanScopes(input);
+    revalidatePath("/admin/plans");
+    revalidatePath("/admin/settings");
+    revalidatePath("/pricing");
+    revalidatePath("/billing");
+    revalidatePath("/agent");
+    revalidatePath("/automations");
+    revalidatePath("/knowledge");
+    revalidatePath("/onboarding");
+    return { ok: true as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save plan scopes.";
+    return { ok: false as const, error: message };
+  }
 }

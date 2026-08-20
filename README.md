@@ -69,6 +69,8 @@ WIX_VENDOR_PRODUCT_PRO=
 Webhooks: `POST /api/wix/webhooks`
 Upgrade CTA: `https://www.wix.com/apps/upgrade/{APP_ID}?appInstanceId={instanceId}`
 
+App Market listing text, Terms/Privacy URLs, and the submit checklist: [wix-app/MARKETPLACE_SUBMISSION.md](wix-app/MARKETPLACE_SUBMISSION.md)
+
 
 Dev mode (`TIDYAGENT_DEV_MODE=true`) signs a session for the seeded Atelier Noir tenant. It does **not** skip tenant checks.
 

@@ -42,6 +42,7 @@ export default async function SettingsPage() {
             <Row label="Plan" value={planLabel(data.entitlements.planKey)} />
             <Row label="Conversations" value={String(data.entitlements.conversationLimit)} />
             <Row label="Knowledge" value={String(data.entitlements.knowledgeLimit)} />
+            <Row label="Agents" value={String(data.entitlements.maxAgents)} />
             <Row label="Voice" value={data.entitlements.voiceEnabled ? "On" : "Off"} />
           </dl>
         </div>
@@ -52,7 +53,7 @@ export default async function SettingsPage() {
           <a href="/agent" className="text-amber-300">
             AI Agent
           </a>
-          . Voice is {data.entitlements.voiceEnabled ? "included on this plan" : "a Pro feature"}.
+          . Voice is {data.entitlements.voiceEnabled ? "included on this plan" : "not included on this plan"}.
         </p>
       ) : null}
     </div>

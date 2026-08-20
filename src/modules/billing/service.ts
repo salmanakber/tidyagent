@@ -11,6 +11,8 @@ import {
   type DerivedSubscription,
 } from "@/modules/billing/lifecycle";
 import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "@/modules/billing/entitlements";
+import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes";
+import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -197,43 +199,44 @@ async function upsertSubscriptionFromWix(input: {
 }
 
 export async function entitlementsForOrganization(organizationId: string): Promise<Entitlements> {
-  const [subscription, organization] = await Promise.all([
+  const [subscription, organization, scopes] = await Promise.all([
     prisma.subscription.findFirst({
       where: { organizationId },
       orderBy: { createdAt: "desc" },
     }),
     prisma.organization.findUnique({ where: { id: organizationId } }),
+    getAllPlanScopes(),
   ]);
 
   const suspended = organization?.accessStatus === "suspended";
   const grant = organization?.compPlanKey ?? null;
 
-  if (!subscription) {
-    return withComplimentaryGrant(
-      resolveEntitlements({
-        planKey: "FREE",
-        status: "NONE",
-        isFree: true,
+  const base = !subscription
+    ? withComplimentaryGrant(
+        resolveEntitlements({
+          planKey: "FREE",
+          status: "NONE",
+          isFree: true,
+          suspended,
+        }),
+        grant,
         suspended,
-      }),
-      grant,
-      suspended,
-    );
-  }
+      )
+    : withComplimentaryGrant(
+        resolveEntitlements({
+          planKey: subscription.planKey,
+          status: subscription.status,
+          isFree: subscription.isFree,
+          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+          billingIssue: subscription.billingIssue,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          suspended,
+        }),
+        grant,
+        suspended,
+      );
 
-  return withComplimentaryGrant(
-    resolveEntitlements({
-      planKey: subscription.planKey,
-      status: subscription.status,
-      isFree: subscription.isFree,
-      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-      billingIssue: subscription.billingIssue,
-      currentPeriodEnd: subscription.currentPeriodEnd,
-      suspended,
-    }),
-    grant,
-    suspended,
-  );
+  return applyPlanScope(base, scopes[base.planKey] ?? defaultPlanScope(base.planKey));
 }
 
 function asString(value: unknown): string | null {

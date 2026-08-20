@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getAIProvider } from "@/modules/ai/factory";
 import { retrieveKnowledgeChunks } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
-import { scanScopeForPlan } from "@/modules/knowledge/scan-scope";
+import { getPlanScope } from "@/modules/billing/plan-scope-store";
+import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team";
-import { isWorkflowOn, type AutomationKey } from "@/modules/automations/catalog";
-import { PLAN_RANK } from "@/modules/billing/entitlements";
+import { isWorkflowOn, type AutomationKey, automationAllowedForEntitlements } from "@/modules/automations/catalog";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
 
 const OPENER =
@@ -56,10 +56,7 @@ export async function replyToVisitor(input: {
       })
     : [];
   const on = (key: AutomationKey) => {
-    if (key === "specialist_routing" || key === "lead_capture" || key === "after_hours" || key === "shopping") {
-      if (PLAN_RANK[entitlements.planKey] < PLAN_RANK.GROWTH) return false;
-    }
-    if (key === "shopping" && !entitlements.advancedToolsEnabled) return false;
+    if (!automationAllowedForEntitlements(entitlements, key)) return false;
     return isWorkflowOn(workflows, key, true);
   };
 
@@ -137,7 +134,8 @@ export async function replyToVisitor(input: {
     where: { organizationId: input.agent.organizationId },
   });
   const businessName = profile?.name || input.agent.site.displayName || "our team";
-  const scope = scanScopeForPlan(entitlements.planKey);
+  const planScope = await getPlanScope(entitlements.planKey);
+  const scope = scanScopeFromConfig(entitlements.planKey, planScope);
   const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
     on("shopping") ? true : item !== "PRODUCT",
   );

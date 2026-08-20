@@ -37,13 +37,13 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
     throw new Error("Agent not found");
   }
   if (data.voiceEnabled && !entitlements.voiceEnabled) {
-    throw new Error("Voice is included on Pro.");
+    throw new Error("Voice is not included on this plan.");
   }
   if (data.voiceId && !entitlements.voiceEnabled) {
-    throw new Error("Voice is included on Pro.");
+    throw new Error("Voice is not included on this plan.");
   }
   if (data.widgetTemplate && data.widgetTemplate !== "CLASSIC" && !entitlements.allTemplates) {
-    throw new Error("Extra widget looks are included on Business and Pro.");
+    throw new Error("Extra widget looks are not included on this plan.");
   }
 
   const { widgetAvatarUrl, widgetEmbedMode, agentId: _id, ...rest } = data;
@@ -76,10 +76,10 @@ export async function createSpecialistAgent(input: {
 }) {
   const session = await requireSession();
   const entitlements = await requirePaidSeat(session);
-  const { maxAgentsForPlan, scopesForSpecialty } = await import("@/modules/agents/team");
+  const { scopesForSpecialty } = await import("@/modules/agents/team");
   const { siteFactsFromApps } = await import("@/modules/knowledge/site-facts");
   const workspace = await getWorkspace(session);
-  const limit = maxAgentsForPlan(entitlements.planKey);
+  const limit = entitlements.maxAgents;
   if (workspace.agents.length >= limit) {
     throw new Error(`This plan allows ${limit} agent${limit === 1 ? "" : "s"}.`);
   }
@@ -236,11 +236,11 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
 export async function toggleWorkflow(key: string, enabled: boolean) {
   const session = await requireSession();
   const entitlements = await requirePaidSeat(session);
-  const { AUTOMATION_CATALOG, planAllowsAutomation } = await import("@/modules/automations/catalog");
+  const { AUTOMATION_CATALOG, automationAllowedForEntitlements } = await import("@/modules/automations/catalog");
   const item = AUTOMATION_CATALOG.find((row) => row.key === key);
   if (!item) throw new Error("Unknown automation.");
-  if (!planAllowsAutomation(entitlements.planKey, item.key)) {
-    throw new Error(`This automation is included on ${item.minPlan === "GROWTH" ? "Business" : "Pro"}.`);
+  if (!automationAllowedForEntitlements(entitlements, item.key)) {
+    throw new Error("This automation is not included on the current plan.");
   }
   const workspace = await getWorkspace(session);
   const agent = workspace.agent;

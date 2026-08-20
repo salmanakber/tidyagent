@@ -1,5 +1,7 @@
 import type { PlanKey } from "@prisma/client";
-import { PLAN_SCOPES, planLabel } from "@/modules/billing/catalog";
+import { planLabel } from "@/modules/billing/catalog";
+import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
+import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { getDisplayPricing } from "@/modules/billing/display-prices";
 import { getEnv } from "@/lib/env";
 import { parseWixInstance } from "@/lib/security/instance";
@@ -19,13 +21,14 @@ export default async function PricingPage({
   const instanceId = parsed?.instanceId ?? params.appInstanceId ?? null;
   const installUrl = env.WIX_APP_ID ? `https://www.wix.com/app-market/add-app/${env.WIX_APP_ID}` : null;
   const pricing = await getDisplayPricing();
+  const scopes = await getAllPlanScopes();
 
   const plans = PAID_PLANS.map((key) => {
     const price = pricing.plans[key];
     return {
       key,
       name: price.name || planLabel(key),
-      features: PLAN_SCOPES[key].filter((item) => !/7-day/i.test(item)),
+      features: bulletsForPlanScope(key, scopes[key]).filter((item) => !/7-day/i.test(item)),
       href: checkoutHref(key, instanceToken, instanceId) ?? installUrl,
       featured: key === "GROWTH",
       monthly: price.monthly,

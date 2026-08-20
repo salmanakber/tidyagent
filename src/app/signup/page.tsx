@@ -32,6 +32,17 @@ export default async function SignupPage({
             <Link href="/login" className="text-amber-300">
               Sign in
             </Link>
+            <p className="mt-3 text-xs leading-5 text-navy-400">
+              By creating an account you agree to the{" "}
+              <Link href="/terms" className="text-amber-300">
+                Terms of Use
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-amber-300">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </>
         }
       />

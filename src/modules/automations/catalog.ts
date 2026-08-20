@@ -1,5 +1,5 @@
 import type { PlanKey } from "@prisma/client";
-import { PLAN_RANK } from "@/modules/billing/entitlements";
+import { PLAN_RANK, type Entitlements } from "@/modules/billing/entitlements";
 import { planLabel } from "@/modules/billing/catalog";
 
 export type AutomationKey =
@@ -73,6 +73,15 @@ export function planAllowsAutomation(planKey: PlanKey, key: AutomationKey) {
   const item = AUTOMATION_CATALOG.find((row) => row.key === key);
   if (!item) return false;
   return PLAN_RANK[planKey] >= PLAN_RANK[item.minPlan];
+}
+
+export function automationAllowedForEntitlements(
+  entitlements: Pick<Entitlements, "planKey" | "automationEnabled" | "automations">,
+  key: AutomationKey,
+) {
+  if (!entitlements.automationEnabled) return false;
+  if (entitlements.automations) return Boolean(entitlements.automations[key]);
+  return planAllowsAutomation(entitlements.planKey, key);
 }
 
 export function automationLockedHint(key: AutomationKey) {

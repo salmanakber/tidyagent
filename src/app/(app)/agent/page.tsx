@@ -47,6 +47,7 @@ export default async function AgentPage() {
         planKey={entitlements.planKey}
         voiceOnPlan={entitlements.voiceEnabled}
         allTemplates={entitlements.allTemplates}
+        maxAgents={entitlements.maxAgents}
         hasStores={facts.hasStores}
         hasBookings={facts.hasBookings}
         contentTypes={facts.contentTypes}

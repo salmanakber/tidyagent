@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import type { PlanKey } from "@prisma/client";
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
-import { wixUpgradeUrl, planLabel, PLAN_SCOPES } from "@/modules/billing/catalog";
+import { wixUpgradeUrl, planLabel } from "@/modules/billing/catalog";
+import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
+import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { refreshWixBilling } from "@/app/actions/billing";
 
@@ -14,6 +16,7 @@ export default async function BillingPage() {
   const data = await getDashboardOverview(session);
   const e = data.entitlements;
   const upgradeUrl = wixUpgradeUrl(session.wixInstanceId);
+  const scopes = await getAllPlanScopes();
 
   return (
     <div className="space-y-8">
@@ -74,7 +77,7 @@ export default async function BillingPage() {
               </p>
               <p className="mt-3 font-display text-3xl text-white">{planLabel(key)}</p>
               <ul className="mt-4 space-y-2 text-sm text-navy-200">
-                {PLAN_SCOPES[key].map((item) => (
+                {bulletsForPlanScope(key, scopes[key]).map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
