@@ -3,6 +3,7 @@ import { createWixAppClient } from "@/services/wix/client";
 import { cmsCollectionAllowed, type ScanScope } from "@/modules/knowledge/scan-scope";
 import { classifyPage, type ExtractedPage } from "@/modules/knowledge/extract";
 import type { ScanStage } from "@/modules/knowledge/types";
+import { productImageFromRecord } from "@/modules/knowledge/media";
 
 export type WixApiHarvest = {
   pages: ExtractedPage[];
@@ -12,6 +13,7 @@ export type WixApiHarvest = {
     price?: string;
     id?: string;
     url?: string;
+    imageUrl?: string;
     data?: Prisma.InputJsonValue;
   }[];
   stages: ScanStage[];
@@ -304,6 +306,7 @@ async function readStores(client: ReturnType<typeof createWixAppClient>, siteUrl
       description: product.description ? stripTags(String(product.description)).slice(0, 1500) : undefined,
       price: formatted,
       url,
+      imageUrl: productImageFromRecord(product) || undefined,
       data: product as Prisma.InputJsonValue,
     };
   });

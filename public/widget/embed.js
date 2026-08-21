@@ -263,9 +263,10 @@
       row.className = `row ${role}`;
       const time = extra.time ? new Date(extra.time) : new Date();
       const person = extra.agent || currentAgent;
+      const cards = Array.isArray(extra.products) ? extra.products : [];
       if (role === "agent") {
         row.innerHTML = `<div class="ava sm${person.avatarUrl ? " has-photo" : ""}">${avatarMarkup(person.avatarUrl, person.initials || initialsOf(person.name))}</div>
-          <div class="stack"><div class="who">${escapeHtml(person.name || "")}</div><div class="msg">${formatAgentHtml(text)}</div><time>${formatTime(time)}</time></div>`;
+          <div class="stack"><div class="who">${escapeHtml(person.name || "")}${person.human ? " · team" : ""}</div><div class="msg">${formatAgentHtml(text)}</div>${productCardsHtml(cards)}<time>${formatTime(time)}</time></div>`;
       } else {
         row.innerHTML = `<div class="stack"><div class="msg">${escapeHtml(text)}</div><time>${formatTime(time)}</time></div>`;
       }
@@ -317,7 +318,11 @@
           setHeader(data.agent);
         }
         const reply = data.text || data.error || "I couldn’t reply just then. Please try again.";
-        addMsg("agent", reply, { time: data.createdAt, agent: data.agent ? personFrom(data.agent) : currentAgent });
+        addMsg("agent", reply, {
+          time: data.createdAt,
+          agent: data.agent ? personFrom(data.agent) : currentAgent,
+          products: data.products,
+        });
         playReceiveTick();
         if (voiceOn) void speak(reply);
         saveInboxMeta(text);
@@ -342,7 +347,7 @@
           <div class="ava pulse${to.avatarUrl ? " has-photo" : ""}">${avatarMarkup(to.avatarUrl, to.initials)}</div>
         </div>
         <p class="xfer-title">Connecting you with <strong>${escapeHtml(to.name)}</strong></p>
-        <p class="xfer-sub">${escapeHtml(to.role || "Specialist")} · <span class="xfer-sec">1s</span></p>
+        <p class="xfer-sub">${escapeHtml(to.human ? "Real team member" : to.role || "Specialist")} · <span class="xfer-sec">1s</span></p>
         <div class="xfer-bar"><span></span></div>`;
       thread.appendChild(card);
       thread.scrollTop = thread.scrollHeight;
@@ -588,7 +593,22 @@
         role: row?.role || row?.specialty || "Assistant",
         initials: initialsOf(row?.name || startName),
         voiceId: row?.voiceId || voiceId,
+        human: Boolean(row?.human),
       };
+    }
+
+    function productCardsHtml(cards) {
+      if (!Array.isArray(cards) || !cards.length) return "";
+      return `<div class="cards">${cards
+        .slice(0, 4)
+        .map((card) => {
+          const body = `<div class="card-photo">${card.imageUrl ? `<img src="${escapeAttr(card.imageUrl)}" alt="">` : ""}</div>
+            <div class="card-copy"><p class="card-name">${escapeHtml(card.name || "")}</p>${card.price ? `<p class="card-price">${escapeHtml(card.price)}</p>` : ""}</div>`;
+          return card.url
+            ? `<a class="card" href="${escapeAttr(card.url)}" target="_blank" rel="noreferrer">${body}</a>`
+            : `<div class="card">${body}</div>`;
+        })
+        .join("")}</div>`;
     }
 
     function readStore(suffix) {
@@ -852,6 +872,13 @@
       .xfer-sub { margin:0; font:500 11px/1.3 ui-sans-serif,system-ui; color:#64748b; }
       .xfer-bar { margin-top:12px; height:3px; background:rgba(100,116,139,.2); border-radius:99px; overflow:hidden; }
       .xfer-bar span { display:block; height:100%; width:0; background:${fill}; animation: ta-bar 2.4s linear forwards; }
+      .cards { display:grid; gap:8px; width:min(100%,220px); }
+      .card { display:block; overflow:hidden; border-radius:16px; background:${noir ? "#151c2b" : "#fff"}; text-decoration:none; color:inherit; box-shadow:0 8px 24px rgba(16,24,40,.08); }
+      .card-photo { height:112px; background:${noir ? "#1a2436" : "#eef2f7"}; }
+      .card-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+      .card-copy { padding:10px 12px 12px; }
+      .card-name { margin:0; font:650 13px/1.35 ui-sans-serif,system-ui; }
+      .card-price { margin:4px 0 0; font:600 13px/1.3 ui-sans-serif,system-ui; opacity:.8; }
       .joined { display:flex; align-items:center; gap:8px; color:#64748b; font:650 11px/1 ui-sans-serif,system-ui; letter-spacing:.04em; text-transform:uppercase; margin:4px 0 2px; }
       .joined .line { flex:1; height:1px; background:currentColor; opacity:.25; }
       .composer { display:flex; gap:8px; padding:8px 8px 10px; border-top:1px solid ${noir ? "rgba(255,255,255,.06)" : "#e8eef5"}; background:${paper}; align-items:center; flex:none; }

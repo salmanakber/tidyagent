@@ -53,6 +53,7 @@ export function AppShell({
   suspended,
   suspendedReason,
   locked,
+  setupIncomplete,
 }: {
   children: React.ReactNode;
   orgName: string;
@@ -63,11 +64,20 @@ export function AppShell({
   suspended?: boolean;
   suspendedReason?: string | null;
   locked?: boolean;
+  setupIncomplete?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const nav = locked ? NAV.filter((item) => item.href === "/billing") : NAV;
-  const mobile = locked ? [{ href: "/billing", label: "Plan", icon: CreditCard }] : MOBILE_PRIMARY;
+  const nav = locked
+    ? NAV.filter((item) => item.href === "/billing")
+    : setupIncomplete
+      ? []
+      : NAV;
+  const mobile = locked
+    ? [{ href: "/billing", label: "Plan", icon: CreditCard }]
+    : setupIncomplete
+      ? []
+      : MOBILE_PRIMARY;
 
   return (
     <div className="min-h-dvh bg-brand-gradient bg-noise">
@@ -104,7 +114,9 @@ export function AppShell({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">{userName || orgName}</p>
-                <p className="truncate text-xs text-navy-300">{agentStatus === "ACTIVE" ? "AI employee live" : "Setup in progress"}</p>
+                <p className="truncate text-xs text-navy-300">
+                  {setupIncomplete ? "Finish setup to open the dashboard" : agentStatus === "ACTIVE" ? "AI employee live" : "Setup in progress"}
+                </p>
               </div>
             </div>
           </div>
@@ -151,6 +163,11 @@ export function AppShell({
               Choose a plan to unlock the dashboard and the live chat bubble.
             </div>
           ) : null}
+          {setupIncomplete && !locked ? (
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
+              Finish the setup wizard to open the dashboard, inbox, and live widget.
+            </div>
+          ) : null}
           {suspended ? (
             <div className="bg-rose-600 px-4 py-2 text-center text-sm text-white">
               This website’s AI employee is suspended
@@ -158,9 +175,11 @@ export function AppShell({
             </div>
           ) : null}
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/5 bg-navy-950/70 px-4 py-3 backdrop-blur-xl lg:px-8">
+            {setupIncomplete || locked ? <span className="w-9 lg:hidden" /> : (
             <button className="rounded-full p-2 hover:bg-white/5 lg:hidden" onClick={() => setOpen(true)}>
               <Menu className="h-5 w-5" />
             </button>
+            )}
             <div className="hidden items-center gap-2 text-sm text-navy-300 lg:flex">
               <Sparkles className="h-4 w-4 text-amber-400" />
               Wix-connected workspace
@@ -175,10 +194,11 @@ export function AppShell({
               </form>
             </div>
           </header>
-          <main className="flex-1 px-4 pb-28 pt-6 lg:px-8 lg:pb-10">{children}</main>
+          <main className={cn("flex-1 px-4 pt-6 lg:px-8 lg:pb-10", setupIncomplete || locked ? "pb-10" : "pb-28")}>{children}</main>
         </div>
       </div>
 
+      {setupIncomplete || locked ? null : (
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-navy-950/90 px-2 py-2 backdrop-blur-xl lg:hidden">
         <div className={cn("grid", locked ? "grid-cols-1" : "grid-cols-5")}>
           {mobile.map((item) => {
@@ -205,6 +225,7 @@ export function AppShell({
           )}
         </div>
       </nav>
+      )}
     </div>
   );
 }

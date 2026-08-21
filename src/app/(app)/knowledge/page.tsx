@@ -25,7 +25,7 @@ export default async function KnowledgePage() {
   const scope = scanScopeFromConfig(entitlements.planKey, planScope);
 
   const facts = siteFactsFromApps(data.site.installedWixApps);
-  const [storedFacts, conflicts, documents, scanSource] = await Promise.all([
+  const [storedFacts, conflicts, documents, scanSource, customNotes] = await Promise.all([
     prisma.knowledgeFact.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId },
       orderBy: [{ kind: "asc" }, { entity: "asc" }],
@@ -44,6 +44,12 @@ export default async function KnowledgePage() {
     prisma.knowledgeSource.findFirst({
       where: { organizationId: session.organizationId, siteId: session.siteId, type: "site-scan" },
       select: { metadata: true, pagesDiscovered: true, pagesCrawled: true },
+    }),
+    prisma.knowledgeDocument.findMany({
+      where: { organizationId: session.organizationId, siteId: session.siteId, contentType: "CUSTOM" },
+      select: { id: true, title: true, cleanedContent: true, metadata: true },
+      orderBy: { createdAt: "desc" },
+      take: 40,
     }),
   ]);
   const indexedPages = mergeCrawlIndex(documents, scanSource?.metadata);
@@ -92,7 +98,21 @@ export default async function KnowledgePage() {
           />
         </div>
       </div>
-      <AddKnowledgeForm lastSynced={data.knowledge.lastSyncedAt?.toISOString() ?? null} />
+      <AddKnowledgeForm
+        lastSynced={data.knowledge.lastSyncedAt?.toISOString() ?? null}
+        notes={customNotes.map((row) => {
+          const meta = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+            ? (row.metadata as Record<string, unknown>)
+            : {};
+          return {
+            id: row.id,
+            title: row.title,
+            content: row.cleanedContent || "",
+            priority: Boolean(meta.priority),
+            sensitive: Boolean(meta.sensitive),
+          };
+        })}
+      />
       <KnowledgeIntelligence
         facts={storedFacts.map((row) => ({
           id: row.id,

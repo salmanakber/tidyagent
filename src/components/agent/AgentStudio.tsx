@@ -83,28 +83,33 @@ export function AgentStudio({
   const [template, setTemplate] = useState<WidgetTemplate>(agent.widgetTemplate ?? "CLASSIC");
   const [voiceOn, setVoiceOn] = useState(Boolean(agent.voiceEnabled));
   const [voiceId, setVoiceId] = useState(agent.voiceId || DEFAULT_VOICE_ID);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function save() {
     startTransition(async () => {
-      await updateAgent({
-        agentId: agent.id,
-        name,
-        role,
-        personality: personality as "friendly" | "professional" | "casual" | "custom",
-        widgetPrimaryColor: color,
-        widgetUseGradient: useGradient,
-        widgetGradientTo: gradientTo,
-        widgetGradientAngle: gradientAngle,
-        widgetTextColor: textColor,
-        widgetMessageColor: messageColor,
-        widgetGreeting: greeting,
-        widgetPosition: position,
-        widgetAvatarUrl: avatarUrl ?? "",
-        widgetTemplate: template,
-        voiceEnabled: voiceOn,
-        voiceId,
-      });
+      setError(null);
+      try {
+        await updateAgent({
+          agentId: agent.id,
+          name,
+          role,
+          personality: personality as "friendly" | "professional" | "casual" | "custom",
+          widgetPrimaryColor: color,
+          widgetUseGradient: useGradient,
+          widgetGradientTo: gradientTo,
+          widgetGradientAngle: gradientAngle,
+          widgetTextColor: textColor,
+          widgetMessageColor: messageColor,
+          widgetGreeting: greeting,
+          widgetPosition: position,
+          widgetAvatarUrl: avatarUrl ?? "",
+          widgetTemplate: template,
+          ...(voiceOnPlan ? { voiceEnabled: voiceOn, voiceId } : { voiceEnabled: false }),
+        });
+      } catch (caught) {
+        setError(caught instanceof Error ? "Could not save. Please try again." : "Could not save.");
+      }
     });
   }
 
@@ -237,6 +242,7 @@ export function AgentStudio({
           ) : (
             <p className="mt-5 text-xs text-navy-400">Spoken voice is included on Pro.</p>
           )}
+          {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <button className="btn-primary" onClick={save} disabled={pending}>
               {pending ? "Saving…" : "Save agent"}

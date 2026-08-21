@@ -16,9 +16,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const suspended = workspace.organization.accessStatus === "suspended";
   const paid = entitlements.isPaidSeat || Boolean(impersonating);
   const path = (await headers()).get("x-tidyagent-path") || "";
+  const setupComplete = workspace.organization.onboardingStatus === "PUBLISHED";
 
   if (!paid && !path.startsWith("/billing")) {
     redirect("/billing");
+  }
+  if (paid && !setupComplete && !path.startsWith("/onboarding") && !path.startsWith("/billing")) {
+    redirect("/onboarding");
   }
 
   return (
@@ -31,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       suspended={suspended}
       suspendedReason={workspace.organization.suspendedReason}
       locked={!paid}
+      setupIncomplete={paid && !setupComplete}
     >
       {children}
     </AppShell>

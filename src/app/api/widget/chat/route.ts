@@ -81,6 +81,7 @@ export async function POST(request: Request) {
         conversationId: result.conversationId,
         text: result.text,
         createdAt: result.createdAt,
+        products: result.products ?? [],
         agent: result.agent
           ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl, voiceId: result.agent.voiceId })
           : undefined,
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
                 ...result.handoff.to,
                 widgetAvatarUrl: result.handoff.to.avatarUrl,
                 voiceId: result.handoff.to.voiceId,
+                human: Boolean((result.handoff.to as { human?: boolean }).human),
               }),
             }
           : null,

@@ -15,13 +15,15 @@ export function personPayload(agent: {
   specialty?: string | null;
   widgetAvatarUrl?: string | null;
   voiceId?: string | null;
+  human?: boolean;
 }) {
   return {
     id: agent.id,
     name: agent.name,
-    role: agent.role || "Assistant",
+    role: agent.role || (agent.human ? "Team" : "Assistant"),
     specialty: agent.specialty || "GENERAL",
     avatarUrl: absoluteAvatar(agent.widgetAvatarUrl),
     voiceId: agent.voiceId || null,
+    human: Boolean(agent.human),
   };
 }

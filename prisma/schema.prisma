@@ -153,6 +153,11 @@ model Organization {
   compGrantedAt     DateTime?
   compGrantedBy     String?
   compNote          String?
+  /// Real person visitors are connected to on human handoff (not an AI specialist).
+  humanAgentName      String?
+  humanAgentRole      String?  @default("Team")
+  humanAgentAvatarUrl String?
+  humanAgentEmail     String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   deletedAt         DateTime?

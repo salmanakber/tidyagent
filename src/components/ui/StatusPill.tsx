@@ -7,6 +7,9 @@ export function StatusPill({
 }) {
   const map: Record<string, string> = {
     ACTIVE: "bg-emerald-400/15 text-emerald-300",
+    ESCALATED: "bg-amber-400/15 text-amber-200",
+    OPEN: "bg-sky-400/15 text-sky-200",
+    RESOLVED: "bg-emerald-400/15 text-emerald-300",
     connected: "bg-emerald-400/15 text-emerald-300",
     DRAFT: "bg-amber-400/15 text-amber-200",
     PAUSED: "bg-navy-400/20 text-navy-200",

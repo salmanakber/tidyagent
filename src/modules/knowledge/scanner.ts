@@ -228,7 +228,7 @@ async function persistScan(input: {
   siteId: string;
   understanding: SiteUnderstanding;
   pages: ExtractedPage[];
-  products: { name: string; description?: string; price?: string; id?: string; url?: string; data?: Prisma.InputJsonValue }[];
+  products: { name: string; description?: string; price?: string; id?: string; url?: string; imageUrl?: string; data?: Prisma.InputJsonValue }[];
   knowledgeLimit: number;
   crawl: CrawlItem[];
   pagesDiscovered?: number;
@@ -285,6 +285,11 @@ async function persistScan(input: {
     sourceUrl: page.url,
     cleanedContent: [page.description, page.headings.join("\n"), page.text].filter(Boolean).join("\n\n"),
     extractionMethod: "http",
+    metadata: {
+      origin: "site-scan",
+      imageUrl: page.imageUrl || null,
+      name: page.title,
+    },
   }));
   const productDocs = input.products.map((product) => ({
     title: product.price ? `${product.name} — ${product.price}`.slice(0, 180) : product.name.slice(0, 180),
@@ -294,6 +299,13 @@ async function persistScan(input: {
       .filter(Boolean)
       .join("\n"),
     extractionMethod: "wix-api",
+    metadata: {
+      origin: "wix-store",
+      name: product.name,
+      price: product.price || null,
+      imageUrl: product.imageUrl || null,
+      url: product.url || null,
+    },
   }));
   const docs = [...productDocs, ...pageDocs]
     .filter((doc) => doc.cleanedContent.trim().length > (doc.contentType === "PRODUCT" ? 2 : 24))
@@ -343,7 +355,9 @@ async function persistScan(input: {
         contentType: doc.contentType,
         sourceUrl: doc.sourceUrl,
         cleanedContent: doc.cleanedContent.slice(0, 20000),
-        metadata: { origin: doc.extractionMethod === "wix-api" ? "wix-store" : "site-scan" } as Prisma.InputJsonValue,
+        metadata: ("metadata" in doc && doc.metadata
+          ? doc.metadata
+          : { origin: doc.extractionMethod === "wix-api" ? "wix-store" : "site-scan" }) as Prisma.InputJsonValue,
         contentHash: contentHash(doc.cleanedContent),
         extractionMethod: doc.extractionMethod,
       },

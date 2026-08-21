@@ -1,6 +1,7 @@
 import type { KnowledgeContentType } from "@prisma/client";
 import { pathPriority } from "@/modules/knowledge/scan-scope";
 import { extractJsonLdNodes, pageFactsBlock } from "@/modules/knowledge/facts";
+import { imageFromHtml, imageFromJsonLd } from "@/modules/knowledge/media";
 
 export type ExtractedPage = {
   url: string;
@@ -13,6 +14,7 @@ export type ExtractedPage = {
   links: string[];
   contentType: KnowledgeContentType;
   jsonLd: Record<string, unknown>[];
+  imageUrl?: string | null;
 };
 
 const BLOCKED_HOSTS = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1|\[::1\])/i;
@@ -160,6 +162,7 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
   const combined = [facts, description, headings.join("\n"), text].filter(Boolean).join("\n\n").slice(0, maxChars + 2500);
   const { emails, phones } = extractContacts(`${description}\n${combined}`);
   const links = extractLinks(html, url);
+  const jsonLd = extractJsonLdNodes(html);
   return {
     url,
     title,
@@ -170,7 +173,8 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
     phones,
     links,
     contentType: classifyPage(url, title, `${description} ${combined}`),
-    jsonLd: extractJsonLdNodes(html),
+    jsonLd,
+    imageUrl: imageFromHtml(html) || imageFromJsonLd(jsonLd),
   };
 }
 

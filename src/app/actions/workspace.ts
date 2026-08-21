@@ -41,17 +41,9 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   if (!target) {
     throw new Error("Agent not found");
   }
-  if (data.voiceEnabled && !entitlements.voiceEnabled) {
-    throw new Error("Voice is not included on this plan.");
-  }
-  if (data.voiceId && !entitlements.voiceEnabled) {
-    throw new Error("Voice is not included on this plan.");
-  }
-  if (data.widgetTemplate && data.widgetTemplate !== "CLASSIC" && !entitlements.allTemplates) {
-    throw new Error("Extra widget looks are not included on this plan.");
-  }
-
-  const { widgetAvatarUrl, widgetEmbedMode, agentId: _id, ...rest } = data;
+  const { widgetAvatarUrl, widgetEmbedMode, agentId: _id, voiceEnabled, voiceId, widgetTemplate, ...rest } = data;
+  const voiceAllowed = entitlements.voiceEnabled;
+  const templateAllowed = entitlements.allTemplates || !widgetTemplate || widgetTemplate === "CLASSIC";
   await prisma.agent.update({
     where: {
       id: target.id,
@@ -61,6 +53,9 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
       ...rest,
       ...(widgetEmbedMode !== undefined ? { widgetEmbedMode } : {}),
       ...(widgetAvatarUrl !== undefined ? { widgetAvatarUrl: widgetAvatarUrl || null } : {}),
+      ...(widgetTemplate !== undefined && templateAllowed ? { widgetTemplate } : {}),
+      ...(voiceEnabled !== undefined ? { voiceEnabled: voiceAllowed ? voiceEnabled : false } : {}),
+      ...(voiceId !== undefined && voiceAllowed ? { voiceId } : {}),
     },
   });
 
@@ -132,7 +127,7 @@ export async function createSpecialistAgent(input: {
       widgetGreeting: `Hi, I’m ${name}. I can help with this.`,
       widgetPosition: workspace.agent?.widgetPosition ?? "BOTTOM_RIGHT",
       widgetTemplate: workspace.agent?.widgetTemplate ?? "CLASSIC",
-      voiceEnabled: workspace.agent?.voiceEnabled ?? true,
+      voiceEnabled: workspace.agent?.voiceEnabled ?? false,
       voiceId,
     },
   });
@@ -172,11 +167,17 @@ export async function toggleCapability(capabilityId: string, enabled: boolean) {
   revalidatePath("/agent");
 }
 
-export async function addCustomKnowledge(title: string, content: string) {
+export async function addCustomKnowledge(
+  title: string,
+  content: string,
+  options?: { priority?: boolean; sensitive?: boolean },
+) {
   const session = await requireSession();
   await requireKnowledgeCapacity(session);
   const titleSafe = z.string().min(2).max(120).parse(title);
   const contentSafe = z.string().min(8).max(8000).parse(content);
+  const priority = Boolean(options?.priority);
+  const sensitive = Boolean(options?.sensitive);
 
   const document = await prisma.knowledgeDocument.create({
     data: {
@@ -185,6 +186,7 @@ export async function addCustomKnowledge(title: string, content: string) {
       title: titleSafe,
       contentType: "CUSTOM",
       cleanedContent: contentSafe,
+      metadata: { origin: "owner", priority, sensitive },
     },
   });
 
@@ -196,6 +198,7 @@ export async function addCustomKnowledge(title: string, content: string) {
       title: titleSafe,
       content: contentSafe,
       contentType: "CUSTOM",
+      metadata: { origin: "owner", priority, sensitive },
     },
   });
 
@@ -234,6 +237,85 @@ export async function addCustomKnowledge(title: string, content: string) {
   }
 
   revalidatePath("/knowledge");
+  revalidatePath("/onboarding");
+}
+
+export async function saveHumanHandoff(input: {
+  name: string;
+  role?: string;
+  avatarUrl?: string;
+  email?: string;
+}) {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const name = z.string().min(2).max(60).parse(input.name.trim());
+  const role = z.string().max(80).optional().parse(input.role?.trim() || "Team");
+  const avatarUrl = z.union([z.string().url(), z.literal("")]).optional().parse(input.avatarUrl || "");
+  const rawEmail = (input.email || "").trim();
+  const email = rawEmail && rawEmail.includes("@") && rawEmail.includes(".") ? rawEmail : "";
+  await prisma.organization.update({
+    where: { id: session.organizationId },
+    data: {
+      humanAgentName: name,
+      humanAgentRole: role || "Team",
+      humanAgentAvatarUrl: avatarUrl || null,
+      humanAgentEmail: email || null,
+    },
+  });
+  revalidatePath("/onboarding");
+  revalidatePath("/conversations");
+  revalidatePath("/agent");
+  revalidatePath("/dashboard");
+}
+
+export async function saveSetupPeople(input: {
+  agentName: string;
+  humanName: string;
+  humanRole?: string;
+  humanEmail?: string;
+}) {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const agentName = z.string().min(1).max(60).parse(input.agentName.trim());
+  await prisma.organization.update({
+    where: { id: session.organizationId },
+    data: {
+      humanAgentName: z.string().min(2).max(60).parse(input.humanName.trim()),
+      humanAgentRole: (input.humanRole?.trim() || "Team").slice(0, 80),
+      humanAgentEmail: input.humanEmail?.trim() || null,
+    },
+  });
+  const workspace = await getWorkspace(session);
+  if (workspace.agent) {
+    await prisma.agent.update({
+      where: { id: workspace.agent.id, organizationId: session.organizationId },
+      data: {
+        name: agentName,
+        widgetGreeting: workspace.agent.widgetGreeting.includes(workspace.agent.name)
+          ? workspace.agent.widgetGreeting.replaceAll(workspace.agent.name, agentName)
+          : `Hi! I’m ${agentName}. How can I help you today?`,
+      },
+    });
+  }
+  revalidatePath("/onboarding");
+  revalidatePath("/agent");
+}
+
+export async function resolveConversation(conversationId: string) {
+  const session = await requireSession();
+  await requirePaidSeat(session);
+  const id = z.string().min(8).max(80).parse(conversationId);
+  await prisma.conversation.updateMany({
+    where: { id, organizationId: session.organizationId },
+    data: { status: "RESOLVED", resolvedAt: new Date() },
+  });
+  await prisma.humanEscalation.updateMany({
+    where: { conversationId: id, organizationId: session.organizationId, status: "open" },
+    data: { status: "resolved", resolvedAt: new Date() },
+  });
+  revalidatePath("/conversations");
+  revalidatePath(`/conversations/${id}`);
+  revalidatePath("/dashboard");
 }
 
 export async function resolveKnowledgeConflict(conflictId: string, value: string) {

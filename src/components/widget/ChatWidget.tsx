@@ -24,9 +24,10 @@ export type WidgetProps = {
   voiceId?: string | null;
 };
 
-type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null };
+type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null; human?: boolean };
+type CatalogCard = { name: string; price?: string | null; imageUrl?: string | null; url?: string | null };
 type Line =
-  | { kind: "msg"; role: "agent" | "customer"; text: string; at: string; agent?: Person }
+  | { kind: "msg"; role: "agent" | "customer"; text: string; at: string; agent?: Person; products?: CatalogCard[] }
   | { kind: "xfer"; from: Person; to: Person; done?: boolean }
   | { kind: "joined"; person: Person };
 
@@ -174,6 +175,7 @@ export function ChatWidget({
         error?: string;
         createdAt?: string;
         agent?: Person;
+        products?: CatalogCard[];
         handoff?: { from: Person; to: Person };
       };
       if (data.conversationId) setConversationId(data.conversationId);
@@ -188,7 +190,14 @@ export function ChatWidget({
         setLines((current) => [
           ...current.filter((item) => item.kind !== "xfer"),
           { kind: "joined", person: to },
-          { kind: "msg", role: "agent", text: data.text || "I’m here to help.", at: data.createdAt || new Date().toISOString(), agent: to },
+          {
+            kind: "msg",
+            role: "agent",
+            text: data.text || "I’m here to help.",
+            at: data.createdAt || new Date().toISOString(),
+            agent: to,
+            products: data.products,
+          },
         ]);
         void speak(data.text || "I’m here to help.", to.voiceId);
       } else {
@@ -196,7 +205,14 @@ export function ChatWidget({
         const reply = data.text || data.error || "I couldn’t reply just then.";
         setLines((current) => [
           ...current,
-          { kind: "msg", role: "agent", text: reply, at: data.createdAt || new Date().toISOString(), agent: data.agent || agent },
+          {
+            kind: "msg",
+            role: "agent",
+            text: reply,
+            at: data.createdAt || new Date().toISOString(),
+            agent: data.agent || agent,
+            products: data.products,
+          },
         ]);
         void speak(reply, data.agent?.voiceId);
       }
@@ -315,7 +331,9 @@ export function ChatWidget({
                     <p className="mt-3 text-sm text-slate-800">
                       Connecting you with <span className="font-semibold">{line.to.name}</span>
                     </p>
-                    <p className="mt-1 text-[11px] text-slate-500">{line.to.role || "Specialist"} · 2s</p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {line.to.human ? "Real team member" : line.to.role || "Specialist"} · 2s
+                    </p>
                     <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-slate-200">
                       <div className="h-full w-2/3" style={brandStyle} />
                     </div>
@@ -343,6 +361,7 @@ export function ChatWidget({
                         {line.role === "agent" ? <AgentRichText text={line.text} /> : line.text}
                       </div>
                       <p className="px-1 text-[10px] text-slate-400">{formatTime(line.at)}</p>
+                      {line.role === "agent" && line.products?.length ? <ProductCards cards={line.products} /> : null}
                     </div>
                   </div>
                 ),
@@ -422,6 +441,43 @@ function Face({ name, url, small }: { name: string; url?: string | null; small?:
   const size = small ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
   if (url) return <img src={url} alt="" className={cn(size, "rounded-full object-cover bg-transparent")} />;
   return <span className={cn(size, "flex items-center justify-center rounded-full bg-black/20 font-semibold")}>{initials(name)}</span>;
+}
+
+function ProductCards({ cards }: { cards: CatalogCard[] }) {
+  return (
+    <div className="grid max-w-[min(92%,22rem)] grid-cols-1 gap-2 pt-1">
+      {cards.slice(0, 4).map((card) => {
+        const inner = (
+          <>
+            {card.imageUrl ? (
+              <img src={card.imageUrl} alt="" className="h-28 w-full object-cover" />
+            ) : (
+              <div className="grid h-20 place-items-center bg-slate-100 text-xs text-slate-400">No photo</div>
+            )}
+            <div className="space-y-0.5 p-2.5">
+              <p className="text-[13px] font-semibold leading-5 text-slate-900">{card.name}</p>
+              {card.price ? <p className="text-sm font-medium text-slate-700">{card.price}</p> : null}
+            </div>
+          </>
+        );
+        return card.url ? (
+          <a
+            key={`${card.name}-${card.url}`}
+            href={card.url}
+            target="_blank"
+            rel="noreferrer"
+            className="overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-black/5"
+          >
+            {inner}
+          </a>
+        ) : (
+          <div key={card.name} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+            {inner}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function formatTime(value: string) {

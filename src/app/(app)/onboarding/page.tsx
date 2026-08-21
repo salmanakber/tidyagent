@@ -36,6 +36,9 @@ export default async function OnboardingPage() {
       color={workspace.agent?.widgetPrimaryColor ?? "#1F3A5F"}
       avatarUrl={workspace.agent?.widgetAvatarUrl}
       existingUnderstanding={existingUnderstanding}
+      humanName={workspace.organization.humanAgentName}
+      humanRole={workspace.organization.humanAgentRole}
+      humanEmail={workspace.organization.humanAgentEmail}
     />
   );
 }
