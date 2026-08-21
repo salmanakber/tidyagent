@@ -38,6 +38,8 @@
     const startInitials = initialsOf(startName);
     const host = document.documentElement || document.body;
     const storageKey = `tidyagent:${instance || site || "local"}`;
+    let open = false;
+    let maximized = false;
 
     const root = document.createElement("div");
     root.id = "tidyagent-widget-root";
@@ -113,7 +115,6 @@
     const statusEl = shadow.querySelector(".st-label");
     const headAva = shadow.querySelector(".head-ava");
 
-    let open = false;
     let typed = false;
     let teaserDismissed = false;
     let audioCtx = null;
@@ -126,7 +127,6 @@
     let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials, voiceId };
     let conversationId = "";
     let pausedConv = "";
-    let maximized = false;
     let liveSocket = null;
     let liveClosed = false;
     let visitorId = readStore("vid");
