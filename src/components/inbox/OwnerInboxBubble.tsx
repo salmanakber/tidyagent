@@ -48,6 +48,11 @@ export function OwnerInboxBubble() {
   const [draft, setDraft] = useState("");
   const known = useRef(new Set<string>());
   const primed = useRef(false);
+  const socketRef = useRef<WebSocket | null>(null);
+  const typingTimer = useRef<number>(0);
+  const [peerTyping, setPeerTyping] = useState(false);
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
   const active = useMemo(() => threads.find((row) => row.id === activeId) || null, [threads, activeId]);
   const waiting = threads.filter((row) => row.waiting).length;
 
@@ -79,6 +84,11 @@ export function OwnerInboxBubble() {
     const connect = () => {
       if (closed) return;
       socket = new WebSocket(realtimeSocketUrl({ role: "owner" }));
+      socketRef.current = socket;
+      socket.onopen = () => {
+        const id = activeIdRef.current;
+        if (id) socket?.send(JSON.stringify({ type: "watch", conversationId: id }));
+      };
       socket.onmessage = (event) => {
         let data: { type?: string; conversationId?: string; payload?: Record<string, unknown> } = {};
         try {
@@ -107,6 +117,13 @@ export function OwnerInboxBubble() {
             };
             return [next, ...current.filter((row) => row.id !== id)];
           });
+        }
+        if (data.type === "typing" && data.conversationId) {
+          const typing = Boolean(data.payload?.typing);
+          const who = String(data.payload?.name || "");
+          if (who === "Visitor") {
+            setPeerTyping(data.conversationId === activeIdRef.current ? typing : false);
+          }
         }
         if (data.type === "message" && data.conversationId) {
           const message = data.payload?.message as Thread["messages"][number] | undefined;
@@ -140,9 +157,25 @@ export function OwnerInboxBubble() {
     };
   }, []);
 
+  useEffect(() => {
+    setPeerTyping(false);
+    const socket = socketRef.current;
+    if (activeId && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "watch", conversationId: activeId }));
+    }
+  }, [activeId]);
+
+  function emitTyping(on: boolean) {
+    const socket = socketRef.current;
+    if (!activeId || !socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "typing", conversationId: activeId, typing: on, name: "Team" }));
+  }
+
   async function send() {
     if (!active || !draft.trim()) return;
     const text = draft.trim();
+    emitTyping(false);
+    window.clearTimeout(typingTimer.current);
     setDraft("");
     await fetch("/api/inbox/waiting", {
       method: "POST",
@@ -155,7 +188,7 @@ export function OwnerInboxBubble() {
   return (
     <div className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex flex-col items-end gap-3 lg:bottom-[max(1rem,env(safe-area-inset-bottom))]">
       {open ? (
-        <div className="pointer-events-auto flex h-[min(72dvh,560px)] w-[min(100vw-1.5rem,380px)] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#0f172a] shadow-panel">
+        <div className="inbox-bubble pointer-events-auto flex h-[min(72dvh,560px)] w-[min(100vw-1.5rem,380px)] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#0f172a] shadow-panel">
           <div className="flex items-center justify-between bg-amber-500 px-4 py-3 text-navy-950">
             <div>
               <p className="text-sm font-semibold">{active ? active.customer : "Live inbox"}</p>
@@ -195,13 +228,25 @@ export function OwnerInboxBubble() {
                     <div
                       className={cn(
                         "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
-                        message.role === "CUSTOMER" ? "bg-amber-500 text-navy-950" : "bg-white/10 text-white",
+                        message.role === "CUSTOMER" ? "bg-amber-500 text-navy-950" : "inbox-reply bg-white/10 text-white",
                       )}
                     >
                       {message.text}
                     </div>
                   </div>
                 ))}
+                {peerTyping ? (
+                  <div className="flex justify-end">
+                    <div className="flex items-center gap-2 rounded-2xl bg-amber-500/15 px-3 py-2">
+                      <span className="flex gap-1">
+                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300 [animation-delay:-0.3s]" />
+                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300 [animation-delay:-0.15s]" />
+                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300" />
+                      </span>
+                      <span className="text-[11px] text-amber-200">Visitor is typing</span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <form
                 className="flex gap-2 border-t border-white/10 p-3"
@@ -213,7 +258,12 @@ export function OwnerInboxBubble() {
                 <input
                   className="field flex-1 bg-white/5"
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    emitTyping(true);
+                    window.clearTimeout(typingTimer.current);
+                    typingTimer.current = window.setTimeout(() => emitTyping(false), 1400);
+                  }}
                   placeholder={active.joined ? "Reply as you" : `Hi — this is me. I’ve got your chat now. How can I help?`}
                 />
                 <button type="submit" className="grid h-11 w-11 place-items-center rounded-full bg-amber-500 text-navy-950" disabled={!draft.trim()}>

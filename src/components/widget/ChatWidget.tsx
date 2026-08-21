@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AudioLines, History, Mic, Send, Square, X } from "lucide-react";
+import { AudioLines, History, Maximize2, Mic, Minimize2, Plus, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
 import { widgetGradientCss } from "@/modules/widget/gradient";
@@ -62,6 +62,8 @@ export function ChatWidget({
   const [speaking, setSpeaking] = useState(false);
   const [agent, setAgent] = useState<Person>({ name, avatarUrl, role: "Online", voiceId });
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [large, setLarge] = useState(false);
+  const [humanTyping, setHumanTyping] = useState<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speakGenRef = useRef(0);
@@ -69,6 +71,9 @@ export function ChatWidget({
   const seenLive = useRef(new Set<string>());
   const liveSocket = useRef<WebSocket | null>(null);
   const liveClosed = useRef(false);
+  const agentRef = useRef(agent);
+  agentRef.current = agent;
+  const typingHideRef = useRef<number>(0);
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
 
   const brandStyle = useMemo(
@@ -173,12 +178,27 @@ export function ChatWidget({
     type?: string;
     payload?: {
       human?: Person;
+      typing?: boolean;
+      name?: string;
       message?: { id: string; role: string; text: string; at: string; kind?: string | null };
     };
   }) {
     const human = data.payload?.human;
     const message = data.payload?.message;
+    if (data.type === "typing") {
+      const typing = Boolean((data.payload as { typing?: boolean } | undefined)?.typing);
+      const who = String((data.payload as { name?: string } | undefined)?.name || "");
+      if (who === "Visitor") return;
+      window.clearTimeout(typingHideRef.current);
+      if (typing) {
+        setHumanTyping(agentRef.current.name);
+        typingHideRef.current = window.setTimeout(() => setHumanTyping(null), 4000);
+      } else {
+        setHumanTyping(null);
+      }
+    }
     if (data.type === "joined" && human) {
+      setHumanTyping(null);
       setAgent(human);
       setLines((current) => {
         const withoutWait = current.filter((item) => item.kind !== "wait");
@@ -187,6 +207,7 @@ export function ChatWidget({
       });
     }
     if (data.type === "message" && message && message.role !== "CUSTOMER" && !seenLive.current.has(message.id)) {
+      setHumanTyping(null);
       seenLive.current.add(message.id);
       setLines((current) => [
         ...current.filter((item) => item.kind !== "wait"),
@@ -223,6 +244,17 @@ export function ChatWidget({
       };
     };
     connect();
+  }
+
+  function resetChat() {
+    liveClosed.current = true;
+    liveSocket.current?.close();
+    setConversationId(null);
+    setInboxOpen(false);
+    setHumanTyping(null);
+    setThinking(false);
+    setAgent({ name, avatarUrl, role: "Online", voiceId });
+    setLines([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
   }
 
   async function send(text = input.trim()) {
@@ -311,13 +343,13 @@ export function ChatWidget({
     CLASSIC: "rounded-[22px] bg-white",
     SOFT: "rounded-[28px] bg-[#f7f1e6]",
     BAR: "rounded-t-[20px] rounded-b-none bg-white",
-    MINIMAL: "rounded-[16px] bg-[#101826] text-white",
+    MINIMAL: "rounded-[16px] bg-[#101826] text-[#e8edf5]",
   }[template];
   const head = {
-    CLASSIC: "text-white",
-    SOFT: "bg-[#2c241c] text-white",
-    BAR: "bg-[#075e54] text-white",
-    MINIMAL: "bg-[#101826] text-white",
+    CLASSIC: "",
+    SOFT: "bg-[#2c241c]",
+    BAR: "bg-[#075e54]",
+    MINIMAL: "bg-[#101826]",
   }[template];
   const thread = {
     CLASSIC: "bg-[#f4f7fb]",
@@ -327,29 +359,49 @@ export function ChatWidget({
   }[template];
 
   return (
-    <div className={cn("flex touch-manipulation flex-col", preview ? "relative min-h-[min(72dvh,580px)]" : "pointer-events-none fixed inset-0")}>
+    <div className={cn("widget-isolate flex touch-manipulation flex-col", preview ? "relative min-h-[min(72dvh,580px)]" : "pointer-events-none fixed inset-0")}>
       <div
         className={cn(
-          "pointer-events-auto absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] flex w-[min(100%,400px)] max-w-[calc(100vw-1rem)] flex-col gap-2",
-          left ? "left-[max(0.5rem,env(safe-area-inset-left))] items-start" : "right-[max(0.5rem,env(safe-area-inset-right))] items-end",
+          "pointer-events-auto absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex max-w-[calc(100vw-2.5rem)] flex-col gap-2",
+          large ? "w-[min(100%,520px)]" : "w-[min(100%,372px)]",
+          left ? "left-[max(1.25rem,env(safe-area-inset-left))] items-start" : "right-[max(1.25rem,env(safe-area-inset-right))] items-end",
         )}
       >
         {open ? (
           <div
             className={cn(
-              "relative flex h-[min(72dvh,580px)] max-h-[calc(100dvh-5rem)] w-full min-h-[320px] flex-col overflow-hidden border border-black/10 shadow-panel",
+              "relative flex w-full min-h-[320px] flex-col overflow-hidden border border-black/10 shadow-panel",
+              large ? "h-[min(82dvh,720px)] max-h-[calc(100dvh-6rem)]" : "h-[min(68dvh,520px)] max-h-[calc(100dvh-6rem)]",
               shell,
             )}
           >
-            <div className={cn("flex shrink-0 items-center gap-1.5 px-2 py-2 sm:gap-2 sm:px-3 sm:py-2.5", head)} style={headerStyle}>
-              <button type="button" className="shrink-0 rounded-xl bg-white/10 p-1.5 sm:p-2" onClick={() => setInboxOpen((value) => !value)} aria-label="History">
-                <History className="h-4 w-4" />
+            <div className={cn("flex shrink-0 items-center gap-1 px-2 py-2 sm:gap-1.5 sm:px-3 sm:py-2", head)} style={headerStyle}>
+              <button type="button" className="shrink-0 rounded-xl bg-white/10 p-1.5" onClick={() => setInboxOpen((value) => !value)} aria-label="History">
+                <History className="h-3.5 w-3.5" />
               </button>
               <Face name={agent.name} url={agent.avatarUrl} small />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{agent.name}</p>
-                <p className="text-[11px] opacity-80">{agent.role || "Online"}</p>
+                <p className="truncate text-xs font-semibold">{agent.name}</p>
+                <p className="text-[10px] opacity-80">{humanTyping ? `${humanTyping} is typing` : agent.role || "Online"}</p>
               </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-white/10 p-1.5"
+                onClick={resetChat}
+                aria-label="New chat"
+                title="New chat"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-white/10 p-1.5"
+                onClick={() => setLarge((value) => !value)}
+                aria-label={large ? "Smaller chat" : "Larger chat"}
+                title={large ? "Smaller chat" : "Larger chat"}
+              >
+                {large ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
               {voiceEnabled ? (
                 <>
                   <button
@@ -391,11 +443,7 @@ export function ChatWidget({
                   <button
                     className="rounded-full px-3 py-1 text-xs"
                     style={visitorStyle}
-                    onClick={() => {
-                      setConversationId(null);
-                      setInboxOpen(false);
-                      setLines([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
-                    }}
+                    onClick={resetChat}
                   >
                     New chat
                   </button>
@@ -445,7 +493,7 @@ export function ChatWidget({
                       {line.role === "agent" ? <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">{line.agent?.name || agent.name}</p> : null}
                       <div
                         className={cn(
-                          "break-words rounded-2xl px-3 py-2 text-[13px] leading-5 sm:text-sm sm:leading-6",
+                          "break-words rounded-2xl px-3 py-1.5 text-[12px] leading-5",
                           line.role === "agent" ? "rounded-tl-md bg-white shadow-sm" : "rounded-tr-md",
                           template === "MINIMAL" && line.role === "agent" ? "bg-[#1a2436]" : "",
                         )}
@@ -459,7 +507,8 @@ export function ChatWidget({
                   </div>
                 ),
               )}
-              {thinking ? <p className="text-xs text-slate-400">Checking that for you…</p> : null}
+              {thinking ? <TypingDots label="Checking that for you" /> : null}
+              {humanTyping ? <TypingDots label={`${humanTyping} is typing`} /> : null}
             </div>
             <div className={cn("flex shrink-0 items-center gap-2 border-t p-2.5 sm:p-3", template === "MINIMAL" ? "border-white/10" : "border-slate-100")}>
               {voiceEnabled ? (
@@ -476,7 +525,7 @@ export function ChatWidget({
                 placeholder="Write a message"
                 className={cn(
                   "min-w-0 flex-1 rounded-full px-3 py-2 text-base outline-none sm:px-4 sm:text-sm",
-                  template === "MINIMAL" ? "bg-[#1a2436] text-white" : "bg-slate-100 text-slate-800",
+                  template === "MINIMAL" ? "bg-[#1a2436] text-[#e8edf5]" : "bg-slate-100 text-slate-800",
                 )}
               />
               <button type="button" onClick={() => void send()} className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10" style={visitorStyle}>
@@ -528,6 +577,23 @@ function brandFill(primary: string, useGradient: boolean, gradientTo: string, an
     };
   }
   return { backgroundColor: primary };
+}
+
+function TypingDots({ label }: { label: string }) {
+  return (
+    <div className="flex max-w-[min(92%,18rem)] items-end gap-2">
+      <div className="rounded-2xl rounded-tl-md bg-white px-3 py-2 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+          </span>
+          <span className="text-[11px] font-medium text-slate-500">{label}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function WaitRing({

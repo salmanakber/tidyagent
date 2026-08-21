@@ -47,10 +47,13 @@ function send(socket, payload) {
   }
 }
 
-function publishTo(map, key, payload) {
+function publishTo(map, key, payload, except) {
   const set = map.get(key);
   if (!set) return;
-  for (const socket of set) send(socket, payload);
+  for (const socket of set) {
+    if (except && socket === except) continue;
+    send(socket, payload);
+  }
 }
 
 function scheduleExpiry(conversationId, seconds) {
@@ -178,6 +181,21 @@ function attachSocket(server) {
       if (data?.type === "watch" && data.conversationId && auth.role === "owner") {
         ws.conversationId = data.conversationId;
         addSocket(conversationSockets, data.conversationId, ws);
+      }
+      if (data?.type === "typing") {
+        const conversationId = String(data.conversationId || ws.conversationId || "");
+        if (!conversationId) return;
+        if (auth.role === "owner" && conversationId) addSocket(conversationSockets, conversationId, ws);
+        publishTo(
+          conversationSockets,
+          conversationId,
+          {
+            type: "typing",
+            conversationId,
+            payload: { typing: Boolean(data.typing), name: String(data.name || "") },
+          },
+          ws,
+        );
       }
       if (data?.type === "ping") send(ws, { type: "pong" });
     });

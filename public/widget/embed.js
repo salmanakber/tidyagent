@@ -56,6 +56,8 @@
               <p class="nm">${escapeHtml(startName)}</p>
               <p class="st"><span class="dot"></span> <span class="st-label">Online</span></p>
             </div>
+            <button type="button" class="icon-btn new-head" title="New chat" aria-label="New chat">${iconNew()}</button>
+            <button type="button" class="icon-btn grow" title="Larger chat" aria-label="Larger chat" aria-pressed="false">${iconGrow()}</button>
             ${voiceOffered ? `<button type="button" class="icon-btn voice-tog on" aria-pressed="true" title="Voice replies on">${iconWave()}</button>
             <button type="button" class="icon-btn voice-stop" hidden title="Stop listening">${iconStop()}</button>` : ""}
             <button type="button" class="icon-btn x" aria-label="Close chat">${iconClose()}</button>
@@ -99,6 +101,8 @@
     const inbox = shadow.querySelector(".inbox");
     const inboxList = shadow.querySelector(".inbox-list");
     const newChatBtn = shadow.querySelector(".new-chat");
+    const newHeadBtn = shadow.querySelector(".new-head");
+    const growBtn = shadow.querySelector(".grow");
     const thread = shadow.querySelector(".thread");
     const composer = shadow.querySelector(".composer");
     const box = shadow.querySelector(".box");
@@ -120,11 +124,27 @@
     let currentAudio = null;
     let ttsAbort = null;
     let currentAgent = { id: config.id || "", name: startName, avatarUrl: startAvatar, role: "Assistant", initials: startInitials, voiceId };
-    let conversationId = readStore("conv") || "";
+    let conversationId = "";
+    let pausedConv = "";
+    let maximized = false;
+    let liveSocket = null;
+    let liveClosed = false;
     let visitorId = readStore("vid");
     if (!visitorId) {
       visitorId = `v_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
       writeStore("vid", visitorId);
+    }
+    const STALE_MS = 150000;
+    const savedConv = readStore("conv") || "";
+    const lastAt = Number(readStore("lastAt") || 0);
+    if (savedConv && lastAt && Date.now() - lastAt > STALE_MS) {
+      pausedConv = savedConv;
+      conversationId = "";
+      writeStore("paused", savedConv);
+      writeStore("conv", "");
+    } else {
+      conversationId = savedConv;
+      pausedConv = readStore("paused") || "";
     }
 
     seedGreeting();
@@ -158,6 +178,22 @@
       }
     });
     newChatBtn.addEventListener("click", () => startNewChat());
+    newHeadBtn?.addEventListener("click", () => startNewChat());
+    growBtn?.addEventListener("click", () => {
+      maximized = !maximized;
+      panel.classList.toggle("wide", maximized);
+      growBtn.setAttribute("aria-pressed", String(maximized));
+      growBtn.title = maximized ? "Smaller chat" : "Larger chat";
+      growBtn.setAttribute("aria-label", growBtn.title);
+      growBtn.innerHTML = maximized ? iconShrink() : iconGrow();
+      placeRoot();
+    });
+    let typingTimer = 0;
+    box.addEventListener("input", () => {
+      emitTyping(true);
+      window.clearTimeout(typingTimer);
+      typingTimer = window.setTimeout(() => emitTyping(false), 1400);
+    });
     composer.addEventListener("submit", (event) => {
       event.preventDefault();
       void sendChat(String(box.value || ""));
@@ -199,15 +235,19 @@
     window.addEventListener("resize", placeRoot);
 
     function placeRoot() {
+      const inset = 22;
+      const wide = open && maximized;
       root.style.cssText = [
         "all:initial",
         "display:block",
         "position:fixed",
         "z-index:2147483646",
-        "bottom:max(10px, calc(env(safe-area-inset-bottom, 0px) + 8px))",
-        left ? "left:max(8px, env(safe-area-inset-left, 0px));right:auto" : "right:max(8px, env(safe-area-inset-right, 0px));left:auto",
-        "width:min(400px, calc(100vw - 16px))",
-        "max-width:calc(100vw - 16px)",
+        `bottom:max(${inset}px, calc(env(safe-area-inset-bottom, 0px) + 16px))`,
+        left
+          ? `left:max(${inset}px, env(safe-area-inset-left, 0px));right:auto`
+          : `right:max(${inset}px, env(safe-area-inset-right, 0px));left:auto`,
+        wide ? "width:min(520px, calc(100vw - 44px))" : "width:min(372px, calc(100vw - 44px))",
+        "max-width:calc(100vw - 44px)",
         "pointer-events:none",
       ].join(";");
     }
@@ -225,13 +265,17 @@
       placeRoot();
       if (open) {
         unlockAudio();
-        if (conversationId) void hydrateThread(conversationId);
-        else {
+        if (conversationId) {
+          void hydrateThread(conversationId);
+          watchLive();
+        } else {
           seedGreeting();
+          if (pausedConv) showResumeBanner(pausedConv);
           if (voiceOn) void speak(greeting);
         }
         window.setTimeout(() => box.focus(), 60);
       } else {
+        writeStore("lastAt", String(Date.now()));
         stopSpeech();
         stopListen();
         inbox.setAttribute("hidden", "");
@@ -279,6 +323,7 @@
       const text = String(raw || "").trim();
       if (!text || box.disabled) return;
       box.value = "";
+      emitTyping(false);
       stopSpeech();
       playSendTick();
       addMsg("visitor", text);
@@ -306,6 +351,9 @@
         if (data.conversationId) {
           conversationId = data.conversationId;
           writeStore("conv", conversationId);
+          writeStore("paused", "");
+          writeStore("lastAt", String(Date.now()));
+          watchLive();
         }
         if (data.wait && !data.wait.expired) {
           const to = data.wait.human ? personFrom(data.wait.human) : data.handoff?.to ? personFrom(data.handoff.to) : currentAgent;
@@ -446,19 +494,78 @@
         item.addEventListener("click", () => {
           conversationId = item.getAttribute("data-id");
           writeStore("conv", conversationId);
+          writeStore("paused", "");
+          writeStore("lastAt", String(Date.now()));
+          pausedConv = "";
           inbox.setAttribute("hidden", "");
           void hydrateThread(conversationId);
+          watchLive();
         });
       });
     }
 
     function startNewChat() {
+      liveClosed = true;
+      try {
+        liveSocket?.close();
+      } catch {
+        /* ignore */
+      }
       conversationId = "";
+      pausedConv = "";
       writeStore("conv", "");
+      writeStore("paused", "");
+      writeStore("lastAt", String(Date.now()));
       inbox.setAttribute("hidden", "");
       stopSpeech();
       setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant", voiceId });
       seedGreeting();
+    }
+
+    function showResumeBanner(id) {
+      if (!id || thread.querySelector(".resume")) return;
+      const bar = document.createElement("div");
+      bar.className = "resume";
+      bar.innerHTML = `<p>Welcome back — this is a new chat.</p><button type="button" class="resume-last">Open last chat</button>`;
+      bar.querySelector(".resume-last").addEventListener("click", () => {
+        conversationId = id;
+        pausedConv = "";
+        writeStore("conv", conversationId);
+        writeStore("paused", "");
+        writeStore("lastAt", String(Date.now()));
+        bar.remove();
+        void hydrateThread(conversationId);
+        watchLive();
+      });
+      thread.prepend(bar);
+    }
+
+    function setTyping(on, who) {
+      window.clearTimeout(setTyping.hide);
+      thread.querySelectorAll(".typing-row").forEach((el) => el.remove());
+      if (!on) return;
+      const row = document.createElement("div");
+      row.className = "row agent typing-row";
+      const person = currentAgent;
+      row.innerHTML = `<div class="ava sm${person.avatarUrl ? " has-photo" : ""}">${avatarMarkup(person.avatarUrl, person.initials)}</div>
+        <div class="stack">
+          <div class="typing">
+            <span class="typing-dots"><i></i><i></i><i></i></span>
+            <span class="typing-label">${escapeHtml(who || person.name || "Team")} is typing</span>
+          </div>
+        </div>`;
+      thread.appendChild(row);
+      thread.scrollTop = thread.scrollHeight;
+      setTyping.hide = window.setTimeout(() => setTyping(false), 4000);
+    }
+
+    function emitTyping(on) {
+      if (!liveSocket || liveSocket.readyState !== 1 || !conversationId) return;
+      try {
+        liveSocket.send(JSON.stringify({ type: "typing", conversationId, typing: Boolean(on), name: "Visitor" }));
+      } catch {
+        /* ignore */
+      }
     }
 
     function saveInboxMeta(lastVisitor) {
@@ -625,9 +732,7 @@
         .join("")}</div>`;
     }
 
-    let liveSocket = null;
     const seenLive = new Set();
-    let liveClosed = false;
     function renderWait(person, seconds) {
       thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
       const card = document.createElement("div");
@@ -670,6 +775,12 @@
           } catch {
             return;
           }
+          if (data.type === "typing") {
+            const typing = Boolean(data.payload?.typing);
+            const who = String(data.payload?.name || "");
+            if (who === "Visitor") return;
+            setTyping(typing, currentAgent.name);
+          }
           if (data.type === "joined" && data.payload?.human) {
             thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
             const person = personFrom(data.payload.human);
@@ -686,6 +797,7 @@
             if (seenLive.has(message.id) || message.role === "CUSTOMER") return;
             seenLive.add(message.id);
             thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
+            setTyping(false);
             addMsg("agent", message.text, { time: message.at, agent: data.payload.human ? personFrom(data.payload.human) : currentAgent });
             playReceiveTick();
           }
@@ -942,6 +1054,15 @@
   function iconChats() {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 6h10v8H8l-3 3V6z"/><path d="M9 4h10v10"/></svg>`;
   }
+  function iconNew() {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/><path d="M4 7h8a4 4 0 0 1 4 4v8" opacity=".35"/></svg>`;
+  }
+  function iconGrow() {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M21 15v6h-6"/></svg>`;
+  }
+  function iconShrink() {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9H3V3M15 9h6V3M9 15H3v6M21 15v6h-6"/></svg>`;
+  }
   function iconWave() {
     return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="9" width="2.4" height="6" rx="1"/><rect x="8.5" y="6" width="2.4" height="12" rx="1"/><rect x="13" y="8" width="2.4" height="8" rx="1"/><rect x="17.5" y="5" width="2.4" height="14" rx="1"/></svg>`;
   }
@@ -994,12 +1115,16 @@
       .teaser-text { margin:0; font:500 14px/1.45 ui-sans-serif,system-ui; }
       .panel {
         width: 100%;
-        height: min(580px, calc(100dvh - 24px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)));
-        max-height: calc(100dvh - 20px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+        height: min(520px, calc(100dvh - 56px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)));
+        max-height: calc(100dvh - 48px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
         min-height: 260px;
         display:flex; flex-direction:column; border-radius:${radius}; overflow:hidden; position:relative;
         background:${paper}; color:${ink}; box-shadow: ${noir ? "0 0 0 1px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.45)" : "0 30px 80px rgba(16,24,40,.28)"};
         animation: ta-panel 340ms cubic-bezier(.22,1.15,.36,1);
+      }
+      .panel.wide {
+        height: min(82dvh, 720px);
+        max-height: calc(100dvh - 48px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
       }
       .tpl-bar .panel { align-self: stretch; }
       .head { display:flex; align-items:center; gap:8px; padding:10px; background:${headBg}; color:${textColor}; backdrop-filter: blur(16px); flex:none; }
@@ -1010,11 +1135,11 @@
       .ava.xs { height:18px; width:18px; }
       .ava.pulse { box-shadow:0 0 0 0 rgba(255,255,255,.6); animation: ta-ava 1.2s ease-out infinite; }
       .meta { min-width:0; flex:1; }
-      .nm { margin:0; font:650 13px/1.2 ui-sans-serif,system-ui; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:${textColor}; }
+      .nm { margin:0; font:650 12px/1.2 ui-sans-serif,system-ui; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:${textColor}; }
       .tpl-soft .nm { font-family: Georgia, serif; font-size:15px; }
       .st { margin:3px 0 0; font:500 11px/1 ui-sans-serif,system-ui; opacity:.86; display:flex; align-items:center; gap:6px; color:${textColor}; }
       .dot { height:7px; width:7px; border-radius:999px; background:#86efac; }
-      .icon-btn { border:0; background:rgba(255,255,255,.1); color:${textColor}; width:34px; height:34px; border-radius:12px; display:grid; place-items:center; cursor:pointer; flex:none; }
+      .icon-btn { border:0; background:rgba(255,255,255,.1); color:${textColor}; width:32px; height:32px; border-radius:11px; display:grid; place-items:center; cursor:pointer; flex:none; }
       .icon-btn svg { width:16px; height:16px; }
       .icon-btn.on { background:#fff; color:${color}; }
       .icon-btn.voice-stop { background:#fff; color:#b42318; }
@@ -1023,8 +1148,8 @@
       .row.visitor { margin-left:auto; flex-direction:row-reverse; }
       .stack { display:flex; flex-direction:column; gap:4px; min-width:0; }
       .row.visitor .stack { align-items:flex-end; }
-      .who { font:650 10px/1 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
-      .msg { border-radius:18px; padding:9px 11px; font:500 13px/1.45 ui-sans-serif,system-ui; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow-wrap:anywhere; word-break:break-word; }
+      .who { font:650 9px/1 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
+      .msg { border-radius:16px; padding:8px 10px; font:500 12px/1.45 ui-sans-serif,system-ui; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow-wrap:anywhere; word-break:break-word; }
       .msg p { margin:0; }
       .msg p + ul, .msg p + p { margin-top:8px; }
       .msg ul { margin:6px 0 0; padding-left:1.15rem; }
@@ -1035,7 +1160,16 @@
       .tpl-soft .row.agent .msg { background:#fffaf2; border:1px solid rgba(44,36,28,.06); }
       .msg.dim { color:#64748b; }
       .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-      time { font:500 10px/1 ui-sans-serif,system-ui; color:${noir ? "#8b9bb4" : "#94a3b8"}; padding:0 4px; }
+      .typing { display:flex; align-items:center; gap:8px; background:${noir ? "#1a2436" : "#fff"}; border-radius:6px 16px 16px 16px; padding:8px 10px; box-shadow:0 1px 2px rgba(16,24,40,.05); }
+      .typing-dots { display:flex; align-items:center; gap:4px; height:16px; }
+      .typing-dots i { height:6px; width:6px; border-radius:999px; background:${color}; opacity:.35; animation: ta-dot 1s ease-in-out infinite; }
+      .typing-dots i:nth-child(2) { animation-delay:.15s; }
+      .typing-dots i:nth-child(3) { animation-delay:.3s; }
+      .typing-label { font:600 11px/1.2 ui-sans-serif,system-ui; color:${noir ? "#8b9bb4" : "#64748b"}; }
+      .resume { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 4px; padding:8px 10px; border-radius:12px; background:${noir ? "#151c2b" : "#fff"}; box-shadow:0 6px 16px rgba(16,24,40,.06); }
+      .resume p { margin:0; font:500 11px/1.3 ui-sans-serif,system-ui; color:#64748b; }
+      .resume-last { border:0; background:${fill}; color:${textColor}; border-radius:999px; padding:6px 10px; font:650 10px/1 ui-sans-serif,system-ui; cursor:pointer; white-space:nowrap; }
+      time { font:500 9px/1 ui-sans-serif,system-ui; color:${noir ? "#8b9bb4" : "#94a3b8"}; padding:0 4px; }
       .xfer { margin:8px auto; width:min(260px,100%); text-align:center; background:${noir ? "#151c2b" : "#fff"}; border-radius:20px; padding:16px 14px; box-shadow:0 10px 30px rgba(16,24,40,.08); }
       .xfer-faces { display:flex; align-items:center; justify-content:center; gap:10px; }
       .xfer-dots { display:flex; gap:4px; }
@@ -1088,10 +1222,11 @@
       @media (max-width: 640px) {
         .panel:not([hidden]) {
           width:100%;
-          height: min(70dvh, 560px);
-          max-height: calc(100dvh - 16px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+          height: min(68dvh, 520px);
+          max-height: calc(100dvh - 48px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
           border-radius: 18px;
         }
+        .panel.wide:not([hidden]) { height: min(78dvh, 640px); }
         .launch { height:52px; ${noir ? "" : "width:52px;"} }
         .face { height:${noir ? "30px" : "52px"}; width:${noir ? "30px" : "52px"}; }
         .head { padding: 8px 10px; gap: 6px; }
@@ -1099,11 +1234,11 @@
         .teaser { max-width: min(220px, calc(100vw - 72px)); }
       }
       @media (max-width: 380px) {
-        .panel:not([hidden]) { height: min(64dvh, 480px); border-radius: 16px; }
-        .msg { font-size: 13px; }
+        .panel:not([hidden]) { height: min(62dvh, 460px); border-radius: 16px; }
+        .msg { font-size: 12px; }
       }
       @media (max-height: 560px) {
-        .panel:not([hidden]) { height: min(68dvh, calc(100dvh - 16px)); min-height: 220px; }
+        .panel:not([hidden]) { height: min(66dvh, calc(100dvh - 48px)); min-height: 220px; }
       }
       @keyframes ta-in { to { opacity:1; transform:none; } }
       @keyframes ta-pulse { 0% { transform:scale(.92); opacity:.5; } 100% { transform:scale(1.18); opacity:0; } }

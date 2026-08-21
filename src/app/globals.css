@@ -192,3 +192,31 @@ html.theme-light .btn-secondary {
 html.theme-light header {
   color: #122033;
 }
+
+html.theme-light .inbox-bubble {
+  background: #ffffff !important;
+  border-color: rgba(18, 32, 51, 0.1) !important;
+  color: #122033;
+  box-shadow: 0 18px 50px rgba(18, 32, 51, 0.12);
+}
+
+html.theme-light .inbox-bubble .inbox-reply {
+  background: #eef2f7 !important;
+  color: #122033 !important;
+}
+
+html.theme-light .widget-isolate .text-white {
+  color: #ffffff !important;
+}
+
+html.theme-light .widget-isolate .bg-white\/5,
+html.theme-light .widget-isolate .bg-white\/10,
+html.theme-light .widget-isolate .hover\:bg-white\/5:hover,
+html.theme-light .widget-isolate .hover\:bg-white\/10:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+html.theme-light .widget-isolate .border-white\/5,
+html.theme-light .widget-isolate .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}

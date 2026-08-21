@@ -1,5 +1,5 @@
 export type RealtimeEvent = {
-  type: "handoff" | "message" | "joined" | "expired" | "inbox" | "ready" | "error";
+  type: "handoff" | "message" | "joined" | "expired" | "inbox" | "ready" | "error" | "typing";
   organizationId?: string;
   conversationId?: string;
   payload?: Record<string, unknown>;
