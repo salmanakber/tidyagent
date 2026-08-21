@@ -21,6 +21,7 @@ import {
 import { Logo } from "@/components/brand/Logo";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { OwnerInboxBubble } from "@/components/inbox/OwnerInboxBubble";
 import { cn, initials } from "@/lib/utils";
 
 const NAV = [
@@ -197,6 +198,7 @@ export function AppShell({
           <main className={cn("flex-1 px-4 pt-6 lg:px-8 lg:pb-10", setupIncomplete || locked ? "pb-10" : "pb-28")}>{children}</main>
         </div>
       </div>
+      {locked || setupIncomplete ? null : <OwnerInboxBubble />}
 
       {setupIncomplete || locked ? null : (
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-navy-950/90 px-2 py-2 backdrop-blur-xl lg:hidden">

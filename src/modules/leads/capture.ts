@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { emailHandoffTranscript } from "@/modules/mail/resend";
+import { publishRealtime } from "@/modules/realtime/publish";
 
 const leadSchema = z.object({
   name: z.string().min(2).max(80),
@@ -90,6 +92,20 @@ export async function captureVisitorLead(input: {
       content: `Lead: ${data.name} · ${data.email}${data.phone ? ` · ${data.phone}` : ""}${data.note ? `\n${data.note}` : ""}`,
       metadata: { kind: "lead" },
     },
+  });
+
+  void emailHandoffTranscript({
+    organizationId: input.organizationId,
+    conversationId: conversation.id,
+    reason: "lead",
+    lead: data,
+  }).catch(() => undefined);
+
+  publishRealtime({
+    type: "inbox",
+    organizationId: input.organizationId,
+    conversationId: conversation.id,
+    payload: { lead: true, name: data.name, email: data.email },
   });
 
   return { ok: true as const, customerId: customer.id };

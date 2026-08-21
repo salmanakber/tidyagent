@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { ResolveChatButton } from "@/components/conversations/ResolveChatButton";
+import { HumanReplyBox } from "@/components/conversations/HumanReplyBox";
 import { cn, relativeTime } from "@/lib/utils";
 
 export default async function ConversationDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -85,6 +86,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
             );
           })}
         </ol>
+        <HumanReplyBox conversationId={conversation.id} waiting={conversation.status === "ESCALATED"} />
       </div>
     </div>
   );

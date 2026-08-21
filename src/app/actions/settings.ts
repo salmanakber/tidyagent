@@ -17,7 +17,7 @@ export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
   const config = await getAIRuntimeConfig();
   const cloudinary = await getCloudinaryConfig();
-  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet, googleTtsSet, awsKeySet, awsSecretSet] = await Promise.all([
+  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet, googleTtsSet, awsKeySet, awsSecretSet, resendSet] = await Promise.all([
     settingExists("gemini_api_key"),
     settingExists("groq_api_key"),
     settingExists("openai_api_key"),
@@ -29,6 +29,7 @@ export async function getPlatformSettingsView() {
     settingExists("google_tts_api_key"),
     settingExists("aws_access_key_id"),
     settingExists("aws_secret_access_key"),
+    settingExists("resend_api_key"),
   ]);
   const env = getEnv();
   const googleClientId = await getSetting("google_client_id");
@@ -60,6 +61,7 @@ export async function getPlatformSettingsView() {
       adminPassword: passwordSet,
       googleTts: googleTtsSet || Boolean(env.GOOGLE_TTS_API_KEY),
       awsPolly: (awsKeySet && awsSecretSet) || Boolean(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY),
+      resend: resendSet,
     },
     googleClientId,
     cloudinaryCloudName,
@@ -81,6 +83,7 @@ export async function getPlatformSettingsView() {
     reviewerEmail: reviewer.emails[0] ?? env.WIX_REVIEWER_EMAIL,
     reviewerEmails: reviewer.emails.slice(1).join(", "),
     reviewerPasswordSet: reviewerPasswordSet || Boolean(env.WIX_REVIEWER_PASSWORD),
+    resendFromEmail: await getSetting("resend_from_email"),
   };
 }
 
@@ -147,6 +150,10 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     if (awsSecret) await setSetting("aws_secret_access_key", awsSecret);
     if (awsRegion) await setSetting("aws_region", awsRegion);
     if (pollyVoice) await setSetting("polly_voice", pollyVoice);
+    const resendKey = String(formData.get("resend_api_key") ?? "").trim();
+    const resendFrom = String(formData.get("resend_from_email") ?? "").trim();
+    if (resendKey) await setSetting("resend_api_key", resendKey);
+    if (resendFrom) await setSetting("resend_from_email", resendFrom);
 
     const reviewMode = formData.get("wix_review_mode") === "on" ? "true" : "false";
     const reviewerEmail = String(formData.get("wix_reviewer_email") ?? "").trim().toLowerCase();

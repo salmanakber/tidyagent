@@ -16,6 +16,7 @@ const SECRET_KEYS = new Set([
   "aws_access_key_id",
   "aws_secret_access_key",
   "wix_reviewer_password",
+  "resend_api_key",
 ]);
 
 function keyMaterial() {

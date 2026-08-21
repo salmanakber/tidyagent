@@ -5,6 +5,7 @@ import { AudioLines, History, Mic, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
 import { widgetGradientCss } from "@/modules/widget/gradient";
+import { realtimeSocketUrl } from "@/modules/realtime/publish";
 
 export type WidgetProps = {
   name: string;
@@ -30,6 +31,7 @@ type Line =
   | { kind: "msg"; role: "agent" | "customer"; text: string; at: string; agent?: Person; products?: CatalogCard[] }
   | { kind: "xfer"; from: Person; to: Person; done?: boolean }
   | { kind: "joined"; person: Person }
+  | { kind: "wait"; person: Person; seconds: number }
   | { kind: "lead" };
 
 export function ChatWidget({
@@ -64,6 +66,9 @@ export function ChatWidget({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speakGenRef = useRef(0);
   const ttsAbortRef = useRef<AbortController | null>(null);
+  const seenLive = useRef(new Set<string>());
+  const liveSocket = useRef<WebSocket | null>(null);
+  const liveClosed = useRef(false);
   const [lines, setLines] = useState<Line[]>([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
 
   const brandStyle = useMemo(
@@ -157,6 +162,69 @@ export function ChatWidget({
     }
   }
 
+  useEffect(() => {
+    return () => {
+      liveClosed.current = true;
+      liveSocket.current?.close();
+    };
+  }, []);
+
+  function applyLiveEvent(data: {
+    type?: string;
+    payload?: {
+      human?: Person;
+      message?: { id: string; role: string; text: string; at: string; kind?: string | null };
+    };
+  }) {
+    const human = data.payload?.human;
+    const message = data.payload?.message;
+    if (data.type === "joined" && human) {
+      setAgent(human);
+      setLines((current) => {
+        const withoutWait = current.filter((item) => item.kind !== "wait");
+        if (withoutWait.some((item) => item.kind === "joined")) return withoutWait;
+        return [...withoutWait, { kind: "joined", person: human }];
+      });
+    }
+    if (data.type === "message" && message && message.role !== "CUSTOMER" && !seenLive.current.has(message.id)) {
+      seenLive.current.add(message.id);
+      setLines((current) => [
+        ...current.filter((item) => item.kind !== "wait"),
+        { kind: "msg", role: "agent", text: message.text, at: message.at, agent: human || agent },
+      ]);
+    }
+    if (data.type === "expired") {
+      liveClosed.current = true;
+      liveSocket.current?.close();
+      setLines((current) =>
+        current.some((item) => item.kind === "lead")
+          ? current.filter((item) => item.kind !== "wait")
+          : [...current.filter((item) => item.kind !== "wait"), { kind: "lead" }],
+      );
+    }
+  }
+
+  function watchLive(id: string) {
+    liveClosed.current = false;
+    liveSocket.current?.close();
+    const connect = () => {
+      if (liveClosed.current) return;
+      const socket = new WebSocket(realtimeSocketUrl({ role: "visitor", preview: "1", conversationId: id }));
+      liveSocket.current = socket;
+      socket.onmessage = (event) => {
+        try {
+          applyLiveEvent(JSON.parse(String(event.data)) as Parameters<typeof applyLiveEvent>[0]);
+        } catch {
+          /* ignore */
+        }
+      };
+      socket.onclose = () => {
+        if (!liveClosed.current) window.setTimeout(connect, 1500);
+      };
+    };
+    connect();
+  }
+
   async function send(text = input.trim()) {
     if (!text || thinking) return;
     setInput("");
@@ -178,33 +246,41 @@ export function ChatWidget({
         agent?: Person;
         products?: CatalogCard[];
         leadForm?: boolean;
+        live?: boolean;
+        wait?: { seconds: number; expired?: boolean; human?: Person };
         handoff?: { from: Person; to: Person };
       };
       if (data.conversationId) setConversationId(data.conversationId);
-      const next = data.agent || agent;
-      const switched = Boolean(data.handoff?.to) || (next.name && next.name !== agent.name);
-      if (switched && (data.handoff?.to || next.name)) {
+      if (data.wait && !data.wait.expired) {
+        const to = data.wait.human || data.handoff?.to || agent;
         const from = data.handoff?.from || agent;
-        const to = data.handoff?.to || next;
+        setLines((current) => [...current, { kind: "xfer", from, to }]);
+        await new Promise((resolve) => window.setTimeout(resolve, 1800));
+        setAgent(to);
+        setLines((current) => [
+          ...current.filter((item) => item.kind !== "xfer"),
+          { kind: "wait", person: to, seconds: data.wait?.seconds || 75 },
+        ]);
+        if (data.conversationId) watchLive(data.conversationId);
+      } else if (data.handoff?.to) {
+        const from = data.handoff.from || agent;
+        const to = data.handoff.to;
         setLines((current) => [...current, { kind: "xfer", from, to }]);
         await new Promise((resolve) => window.setTimeout(resolve, 2200));
         setAgent(to);
         setLines((current) => [
           ...current.filter((item) => item.kind !== "xfer"),
           { kind: "joined", person: to },
-          {
-            kind: "msg",
-            role: "agent",
-            text: data.text || "I’m here to help.",
-            at: data.createdAt || new Date().toISOString(),
-            agent: to,
-            products: data.products,
-          },
+          ...(data.text
+            ? [{ kind: "msg" as const, role: "agent" as const, text: data.text, at: data.createdAt || new Date().toISOString(), agent: to, products: data.products }]
+            : []),
         ]);
         if (data.leadForm) {
           setLines((current) => (current.some((item) => item.kind === "lead") ? current : [...current, { kind: "lead" }]));
         }
-        void speak(data.text || "I’m here to help.", to.voiceId);
+        if (data.text) void speak(data.text, to.voiceId);
+      } else if (data.live && !data.text) {
+        /* visitor message stored for the human */
       } else {
         if (data.agent?.name) setAgent(data.agent);
         const reply = data.text || data.error || "I couldn’t reply just then.";
@@ -346,6 +422,8 @@ export function ChatWidget({
                       <div className="h-full w-2/3" style={brandStyle} />
                     </div>
                   </div>
+                ) : line.kind === "wait" ? (
+                  <WaitRing key="wait" person={line.person} seconds={line.seconds} brandStyle={brandStyle} />
                 ) : line.kind === "lead" ? (
                   <LeadCapture
                     key="lead"
@@ -452,6 +530,37 @@ function brandFill(primary: string, useGradient: boolean, gradientTo: string, an
   return { backgroundColor: primary };
 }
 
+function WaitRing({
+  person,
+  seconds,
+  brandStyle,
+}: {
+  person: Person;
+  seconds: number;
+  brandStyle: React.CSSProperties;
+}) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const started = Date.now();
+    const id = window.setInterval(() => {
+      const next = Math.max(0, seconds - Math.floor((Date.now() - started) / 1000));
+      setLeft(next);
+      if (next <= 0) window.clearInterval(id);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [seconds]);
+  const pct = Math.max(0, Math.min(100, (left / Math.max(seconds, 1)) * 100));
+  return (
+    <div className="mx-auto w-[min(280px,100%)] rounded-3xl bg-white px-4 py-5 text-center shadow-sm">
+      <div className="mx-auto grid h-24 w-24 place-items-center rounded-full" style={{ background: `conic-gradient(${(brandStyle as { backgroundColor?: string }).backgroundColor || "#F59E0B"} ${pct}%, #e2e8f0 0)` }}>
+        <div className="grid h-[4.6rem] w-[4.6rem] place-items-center rounded-full bg-white text-xl font-semibold text-slate-800">{left}s</div>
+      </div>
+      <p className="mt-4 text-sm font-semibold text-slate-800">Finding {person.name}</p>
+      <p className="mt-1 text-xs text-slate-500">A real teammate is being notified. Stay here — they’ll join this chat.</p>
+    </div>
+  );
+}
+
 function LeadCapture({
   conversationId,
   preview,
@@ -522,7 +631,12 @@ function ProductCards({ cards }: { cards: CatalogCard[] }) {
             {card.imageUrl ? (
               <img src={card.imageUrl} alt="" className="h-28 w-full object-cover" />
             ) : (
-              <div className="grid h-20 place-items-center bg-slate-100 text-xs text-slate-400">No photo</div>
+              <div className="flex items-center gap-3 bg-gradient-to-br from-slate-50 to-slate-100 px-3 py-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-semibold text-slate-700 shadow-sm">
+                  {(card.name.trim()[0] || "•").toUpperCase()}
+                </span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">From the site</span>
+              </div>
             )}
             <div className="space-y-0.5 p-2.5">
               <p className="text-[13px] font-semibold leading-5 text-slate-900">{card.name}</p>

@@ -11,7 +11,10 @@ import { classifyVisitorIntent, pickAgentForIntent } from "@/modules/agents/team
 import { isWorkflowOn, type AutomationKey, automationAllowedForEntitlements } from "@/modules/automations/catalog";
 import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
 import { reportPrimaryAction } from "@/modules/wix/bi-events";
-import { loadHumanContact, humanWaitingText } from "@/modules/handoff/human";
+import { loadHumanContact } from "@/modules/handoff/human";
+import { HANDOFF_WAIT_SECONDS, handoffState } from "@/modules/handoff/live";
+import { emailHandoffTranscript } from "@/modules/mail/resend";
+import { publishRealtime, scheduleHandoffExpiry } from "@/modules/realtime/publish";
 import { loadCatalogCards, type CatalogCard } from "@/modules/knowledge/catalog-cards";
 import { liveLookupForQuestion } from "@/modules/knowledge/live-lookup";
 import {
@@ -78,7 +81,7 @@ export async function replyToVisitor(input: {
   const alreadyWithHuman =
     conversation.status === "ESCALATED" || Boolean(asRecord(conversation.metadata)?.handedToHuman);
   if (alreadyWithHuman) {
-    await prisma.message.create({
+    const visitorMessage = await prisma.message.create({
       data: {
         organizationId: input.agent.organizationId,
         conversationId: conversation.id,
@@ -86,30 +89,58 @@ export async function replyToVisitor(input: {
         content: message,
       },
     });
-    const wait = human
-      ? humanWaitingText(human.name)
-      : "Thanks — we have your message. Leave your name and contact below if you have not already, and the team will follow up.";
-    await prisma.message.create({
-      data: {
-        organizationId: input.agent.organizationId,
-        conversationId: conversation.id,
-        role: "HUMAN",
-        content: wait,
-        metadata: {
-          agentName: human?.name || "Team",
-          agentRole: human?.role || "Team",
-          avatarUrl: human?.avatarUrl || null,
-          kind: "human",
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() },
+    });
+    publishRealtime({
+      type: "message",
+      organizationId: input.agent.organizationId,
+      conversationId: conversation.id,
+      payload: {
+        message: {
+          id: visitorMessage.id,
+          role: "CUSTOMER",
+          text: message,
+          at: visitorMessage.createdAt.toISOString(),
         },
       },
     });
+    const state = handoffState(conversation.metadata);
+    if (state.joined && human) {
+      return {
+        conversationId: conversation.id,
+        text: "",
+        live: true,
+        createdAt: new Date().toISOString(),
+        products: [],
+        leadForm: false,
+        wait: null,
+        agent: humanPerson(human),
+        handoff: null,
+      };
+    }
+    if (!human || state.expired) {
+      return {
+        conversationId: conversation.id,
+        text: "No one could pick up just then. Leave your details and the team will follow up.",
+        createdAt: new Date().toISOString(),
+        products: [],
+        leadForm: true,
+        wait: { seconds: 0, expired: true },
+        agent: human ? humanPerson(human) : undefined,
+        handoff: null,
+      };
+    }
     return {
       conversationId: conversation.id,
-      text: wait,
+      text: "",
+      live: true,
       createdAt: new Date().toISOString(),
       products: [],
-      leadForm: !human,
-      agent: human ? humanPerson(human) : undefined,
+      leadForm: false,
+      wait: { seconds: state.remaining, expired: false, human: humanPerson(human) },
+      agent: humanPerson(human),
       handoff: null,
     };
   }
@@ -287,7 +318,7 @@ export async function replyToVisitor(input: {
   const leadForm = Boolean(escalateNow && !human) || Boolean(isBookingRequest(message) && unanswered && !human);
 
   let text = humanHandoff
-    ? `I’m connecting you with ${human!.name} now. They have this chat in the inbox.`
+    ? `Connecting you with ${human!.name}…`
     : leadForm
       ? "I can’t finish this in chat. Leave your name and how to reach you — the team will follow up from this conversation."
       : await generateReply({
@@ -357,9 +388,24 @@ export async function replyToVisitor(input: {
           handedToHuman: Boolean(human),
           needsLead: leadForm,
           humanName: human?.name || null,
+          handoffStartedAt: new Date().toISOString(),
+          waitSeconds: HANDOFF_WAIT_SECONDS,
         },
       },
     });
+    publishRealtime({
+      type: "handoff",
+      organizationId: input.agent.organizationId,
+      conversationId: conversation.id,
+      payload: {
+        waiting: Boolean(human),
+        remaining: HANDOFF_WAIT_SECONDS,
+        customer: "Visitor",
+        preview: message.slice(0, 120),
+        human: human ? humanPerson(human) : null,
+      },
+    });
+    if (human) scheduleHandoffExpiry(conversation.id, HANDOFF_WAIT_SECONDS);
   }
 
   await prisma.message.create({
@@ -389,6 +435,13 @@ export async function replyToVisitor(input: {
     },
   });
 
+  if (escalateNow) {
+    void emailHandoffTranscript({
+      organizationId: input.agent.organizationId,
+      conversationId: conversation.id,
+      reason: leadForm ? "lead" : "waiting",
+    }).catch(() => undefined);
+  }
   const { recordConversationTurn } = await import("@/modules/analytics/record");
   await recordConversationTurn({
     organizationId: input.agent.organizationId,
@@ -420,6 +473,10 @@ export async function replyToVisitor(input: {
     createdAt: new Date().toISOString(),
     products,
     leadForm,
+    live: Boolean(humanHandoff),
+    wait: humanHandoff && human
+      ? { seconds: HANDOFF_WAIT_SECONDS, expired: false, human: humanPerson(human) }
+      : null,
     agent: speakingAs,
     handoff: humanHandoff && human
       ? {

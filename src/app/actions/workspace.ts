@@ -175,7 +175,7 @@ export async function addCustomKnowledge(
   const session = await requireSession();
   await requireKnowledgeCapacity(session);
   const titleSafe = z.string().min(2).max(120).parse(title);
-  const contentSafe = z.string().min(8).max(8000).parse(content);
+  const contentSafe = z.string().min(2).max(8000).parse(content);
   const priority = Boolean(options?.priority);
   const sensitive = Boolean(options?.sensitive);
 
@@ -273,16 +273,19 @@ export async function saveSetupPeople(input: {
   humanName: string;
   humanRole?: string;
   humanEmail?: string;
+  humanAvatarUrl?: string;
 }) {
   const session = await requireSession();
   await requirePaidSeat(session);
   const agentName = z.string().min(1).max(60).parse(input.agentName.trim());
+  const avatarUrl = input.humanAvatarUrl && /^https?:\/\//.test(input.humanAvatarUrl) ? input.humanAvatarUrl : null;
   await prisma.organization.update({
     where: { id: session.organizationId },
     data: {
       humanAgentName: z.string().min(2).max(60).parse(input.humanName.trim()),
       humanAgentRole: (input.humanRole?.trim() || "Team").slice(0, 80),
       humanAgentEmail: input.humanEmail?.trim() || null,
+      humanAgentAvatarUrl: avatarUrl,
     },
   });
   const workspace = await getWorkspace(session);

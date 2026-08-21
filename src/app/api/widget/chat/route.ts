@@ -83,6 +83,21 @@ export async function POST(request: Request) {
         createdAt: result.createdAt,
         products: result.products ?? [],
         leadForm: Boolean(result.leadForm),
+        live: Boolean(result.live),
+        wait: result.wait
+          ? {
+              seconds: result.wait.seconds,
+              expired: Boolean(result.wait.expired),
+              human: result.wait.human
+                ? personPayload({
+                    ...result.wait.human,
+                    widgetAvatarUrl: result.wait.human.avatarUrl,
+                    voiceId: result.wait.human.voiceId,
+                    human: true,
+                  })
+                : undefined,
+            }
+          : null,
         agent: result.agent
           ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl, voiceId: result.agent.voiceId })
           : undefined,

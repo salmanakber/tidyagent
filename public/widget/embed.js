@@ -307,25 +307,36 @@
           conversationId = data.conversationId;
           writeStore("conv", conversationId);
         }
-        const nextAgent = data.agent ? personFrom(data.agent) : currentAgent;
-        const switched =
-          Boolean(data.handoff?.to) ||
-          (nextAgent.name && nextAgent.name !== currentAgent.name) ||
-          (nextAgent.id && currentAgent.id && nextAgent.id !== currentAgent.id);
-        if (switched) {
-          await playHandoff(data.handoff || { from: currentAgent, to: nextAgent });
-        } else if (data.agent?.name) {
-          setHeader(data.agent);
+        if (data.wait && !data.wait.expired) {
+          const to = data.wait.human ? personFrom(data.wait.human) : data.handoff?.to ? personFrom(data.handoff.to) : currentAgent;
+          await playHandoff(data.handoff || { from: currentAgent, to });
+          renderWait(to, data.wait.seconds || 75);
+          watchLive();
+        } else if (data.live && !data.text) {
+          /* stored for the human */
+        } else {
+          const nextAgent = data.agent ? personFrom(data.agent) : currentAgent;
+          const switched =
+            Boolean(data.handoff?.to) ||
+            (nextAgent.name && nextAgent.name !== currentAgent.name) ||
+            (nextAgent.id && currentAgent.id && nextAgent.id !== currentAgent.id);
+          if (switched) {
+            await playHandoff(data.handoff || { from: currentAgent, to: nextAgent });
+          } else if (data.agent?.name) {
+            setHeader(data.agent);
+          }
+          if (data.text || data.error) {
+            const reply = data.text || data.error || "I couldn’t reply just then. Please try again.";
+            addMsg("agent", reply, {
+              time: data.createdAt,
+              agent: data.agent ? personFrom(data.agent) : currentAgent,
+              products: data.products,
+            });
+            playReceiveTick();
+            if (voiceOn) void speak(reply);
+          }
+          if (data.leadForm) renderLeadForm();
         }
-        const reply = data.text || data.error || "I couldn’t reply just then. Please try again.";
-        addMsg("agent", reply, {
-          time: data.createdAt,
-          agent: data.agent ? personFrom(data.agent) : currentAgent,
-          products: data.products,
-        });
-        if (data.leadForm) renderLeadForm();
-        playReceiveTick();
-        if (voiceOn) void speak(reply);
         saveInboxMeta(text);
       } catch {
         thinking.remove();
@@ -603,13 +614,93 @@
       return `<div class="cards">${cards
         .slice(0, 4)
         .map((card) => {
-          const body = `<div class="card-photo">${card.imageUrl ? `<img src="${escapeAttr(card.imageUrl)}" alt="">` : ""}</div>
-            <div class="card-copy"><p class="card-name">${escapeHtml(card.name || "")}</p>${card.price ? `<p class="card-price">${escapeHtml(card.price)}</p>` : ""}</div>`;
+          const photo = card.imageUrl
+            ? `<div class="card-photo"><img src="${escapeAttr(card.imageUrl)}" alt=""></div>`
+            : `<div class="card-mark"><span>${escapeHtml((card.name || "•").trim().charAt(0).toUpperCase())}</span><em>From the site</em></div>`;
+          const body = `${photo}<div class="card-copy"><p class="card-name">${escapeHtml(card.name || "")}</p>${card.price ? `<p class="card-price">${escapeHtml(card.price)}</p>` : ""}</div>`;
           return card.url
             ? `<a class="card" href="${escapeAttr(card.url)}" target="_blank" rel="noreferrer">${body}</a>`
             : `<div class="card">${body}</div>`;
         })
         .join("")}</div>`;
+    }
+
+    let liveSocket = null;
+    const seenLive = new Set();
+    let liveClosed = false;
+    function renderWait(person, seconds) {
+      thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
+      const card = document.createElement("div");
+      card.className = "wait-card";
+      card.innerHTML = `<div class="wait-ring"><span>${seconds}s</span></div><p class="wait-title">Finding ${escapeHtml(person.name)}</p><p class="wait-sub">A real teammate is being notified. Stay here — they’ll join this chat.</p>`;
+      thread.appendChild(card);
+      thread.scrollTop = thread.scrollHeight;
+      const started = Date.now();
+      const tick = window.setInterval(() => {
+        const left = Math.max(0, seconds - Math.floor((Date.now() - started) / 1000));
+        const label = card.querySelector(".wait-ring span");
+        if (label) label.textContent = `${left}s`;
+        if (left <= 0) window.clearInterval(tick);
+      }, 250);
+    }
+    function watchLive() {
+      liveClosed = false;
+      try {
+        liveSocket?.close();
+      } catch {
+        /* ignore */
+      }
+      const connect = () => {
+        if (liveClosed || !conversationId) return;
+        const proto = origin.startsWith("https") ? "wss:" : "ws:";
+        const host = origin.replace(/^https?:\/\//, "");
+        const params = new URLSearchParams({
+          role: "visitor",
+          conversationId,
+          token: token || "",
+          instanceId: instance || "",
+          site: site || "",
+        });
+        const socket = new WebSocket(`${proto}//${host}/realtime?${params.toString()}`);
+        liveSocket = socket;
+        socket.onmessage = (event) => {
+          let data = {};
+          try {
+            data = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          if (data.type === "joined" && data.payload?.human) {
+            thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
+            const person = personFrom(data.payload.human);
+            setHeader(data.payload.human);
+            if (!thread.querySelector(".joined")) {
+              const joined = document.createElement("div");
+              joined.className = "joined";
+              joined.innerHTML = `<span class="line"></span><div class="ava xs${person.avatarUrl ? " has-photo" : ""}">${avatarMarkup(person.avatarUrl, person.initials)}</div><span>${escapeHtml(person.name)} joined</span><span class="line"></span>`;
+              thread.appendChild(joined);
+            }
+          }
+          if (data.type === "message" && data.payload?.message) {
+            const message = data.payload.message;
+            if (seenLive.has(message.id) || message.role === "CUSTOMER") return;
+            seenLive.add(message.id);
+            thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
+            addMsg("agent", message.text, { time: message.at, agent: data.payload.human ? personFrom(data.payload.human) : currentAgent });
+            playReceiveTick();
+          }
+          if (data.type === "expired") {
+            liveClosed = true;
+            thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
+            renderLeadForm();
+            socket.close();
+          }
+        };
+        socket.onclose = () => {
+          if (!liveClosed) window.setTimeout(connect, 1500);
+        };
+      };
+      connect();
     }
 
     function renderLeadForm() {
@@ -959,6 +1050,14 @@
       .card { display:block; overflow:hidden; border-radius:16px; background:${noir ? "#151c2b" : "#fff"}; text-decoration:none; color:inherit; box-shadow:0 8px 24px rgba(16,24,40,.08); }
       .card-photo { height:112px; background:${noir ? "#1a2436" : "#eef2f7"}; }
       .card-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+      .card-mark { display:flex; align-items:center; gap:10px; padding:14px 12px; background:${noir ? "linear-gradient(135deg,#1a2436,#121826)" : "linear-gradient(135deg,#f8fafc,#eef2ff)"}; }
+      .card-mark span { height:42px; width:42px; border-radius:14px; display:grid; place-items:center; background:${noir ? "#0b1220" : "#fff"}; font:700 16px/1 ui-sans-serif,system-ui; box-shadow:0 4px 12px rgba(16,24,40,.08); }
+      .card-mark em { font:650 10px/1.2 ui-sans-serif,system-ui; letter-spacing:.12em; text-transform:uppercase; opacity:.55; }
+      .wait-card { margin:8px auto; width:min(280px,100%); text-align:center; background:${noir ? "#151c2b" : "#fff"}; border-radius:24px; padding:18px 16px; box-shadow:0 10px 30px rgba(16,24,40,.08); }
+      .wait-ring { margin:0 auto 12px; height:88px; width:88px; border-radius:999px; display:grid; place-items:center; background:conic-gradient(${color} 100%, ${noir ? "#1a2436" : "#e2e8f0"} 0); }
+      .wait-ring span { height:70px; width:70px; border-radius:999px; display:grid; place-items:center; background:${noir ? "#0b1220" : "#fff"}; font:700 18px/1 ui-sans-serif,system-ui; }
+      .wait-title { margin:0; font:650 14px/1.4 ui-sans-serif,system-ui; }
+      .wait-sub { margin:6px 0 0; font:500 12px/1.4 ui-sans-serif,system-ui; opacity:.65; }
       .card-copy { padding:10px 12px 12px; }
       .card-name { margin:0; font:650 13px/1.35 ui-sans-serif,system-ui; }
       .card-price { margin:4px 0 0; font:600 13px/1.3 ui-sans-serif,system-ui; opacity:.8; }

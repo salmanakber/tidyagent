@@ -24,6 +24,7 @@ export function PlatformSettingsForm({
   reviewerEmail,
   reviewerEmails,
   reviewerPasswordSet,
+  resendFromEmail,
 }: {
   failoverEnabled: boolean;
   order: string;
@@ -39,6 +40,7 @@ export function PlatformSettingsForm({
     adminPassword: boolean;
     googleTts: boolean;
     awsPolly: boolean;
+    resend: boolean;
   };
   googleClientId: string;
   cloudinaryCloudName: string;
@@ -60,6 +62,7 @@ export function PlatformSettingsForm({
   reviewerEmail: string;
   reviewerEmails: string;
   reviewerPasswordSet: boolean;
+  resendFromEmail: string;
 }) {
   const [state, formAction, saving] = useActionState(savePlatformSettings, null);
   const [pending, startTransition] = useTransition();
@@ -279,6 +282,24 @@ export function PlatformSettingsForm({
           <label className="text-sm text-navy-300">
             API secret {configured.cloudinaryApiSecret ? <span className="text-emerald-300">(saved)</span> : null}
             <input className="field mt-2" name="cloudinary_api_secret" type="password" autoComplete="off" />
+          </label>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">Resend email</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          Used to email the site owner when a visitor waits for a person, and again when they leave a lead. Create a
+          Resend API key and a verified from-address.
+        </p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm text-navy-300">
+            API key {configured.resend ? <span className="text-emerald-300">(saved)</span> : null}
+            <input className="field mt-2" name="resend_api_key" type="password" autoComplete="off" placeholder="re_…" />
+          </label>
+          <label className="text-sm text-navy-300">
+            From email
+            <input className="field mt-2" name="resend_from_email" defaultValue={resendFromEmail} placeholder="Chat &lt;hello@yourdomain.com&gt;" />
           </label>
         </div>
       </div>

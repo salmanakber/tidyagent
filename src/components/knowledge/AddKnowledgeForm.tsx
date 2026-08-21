@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addCustomKnowledge } from "@/app/actions/workspace";
+import { OwnerNoteFields, composeOwnerNote, emptyNoteField, type NoteField } from "@/components/knowledge/OwnerNoteFields";
 
 export function AddKnowledgeForm({
   lastSynced,
@@ -11,7 +12,7 @@ export function AddKnowledgeForm({
   notes?: { id: string; title: string; content: string; priority: boolean; sensitive: boolean }[];
 }) {
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [fields, setFields] = useState<NoteField[]>([emptyNoteField()]);
   const [priority, setPriority] = useState(true);
   const [sensitive, setSensitive] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -22,7 +23,7 @@ export function AddKnowledgeForm({
         <div>
           <h2 className="font-display text-xl text-white">Owner notes (priority)</h2>
           <p className="text-sm text-navy-300">
-            Add facts, exceptions, or private instructions the website does not cover. The employee uses these first.
+            Add as many labeled facts as you need. The employee uses these first, before crawled pages.
           </p>
         </div>
         <p className="text-xs text-navy-400">Last synced: {lastSynced ? new Date(lastSynced).toLocaleString() : "Not yet"}</p>
@@ -36,7 +37,7 @@ export function AddKnowledgeForm({
                 {note.priority ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">Priority</span> : null}
                 {note.sensitive ? <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-200">Private</span> : null}
               </div>
-              <p className="mt-1 text-sm text-navy-300">{note.sensitive ? "Private instruction — used, not shown to visitors." : note.content}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-navy-300">{note.sensitive ? "Private instruction — used, not shown to visitors." : note.content}</p>
             </li>
           ))}
         </ul>
@@ -45,15 +46,16 @@ export function AddKnowledgeForm({
         className="mt-6 grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
+          const content = composeOwnerNote(fields);
           startTransition(async () => {
             await addCustomKnowledge(title, content, { priority, sensitive });
             setTitle("");
-            setContent("");
+            setFields([emptyNoteField()]);
           });
         }}
       >
-        <input className="field" placeholder="Title" value={title} onChange={(event) => setTitle(event.target.value)} />
-        <textarea className="field min-h-32" placeholder="Verified business information or private instruction" value={content} onChange={(event) => setContent(event.target.value)} />
+        <input className="field" placeholder="Title (e.g. Seasonal rates)" value={title} onChange={(event) => setTitle(event.target.value)} />
+        <OwnerNoteFields fields={fields} onChange={setFields} />
         <label className="flex items-center gap-2 text-sm text-navy-200">
           <input type="checkbox" checked={priority} onChange={(event) => setPriority(event.target.checked)} />
           Use as priority over crawled pages
@@ -62,7 +64,7 @@ export function AddKnowledgeForm({
           <input type="checkbox" checked={sensitive} onChange={(event) => setSensitive(event.target.checked)} />
           Keep private — visitor never sees this text
         </label>
-        <button className="btn-primary w-fit" disabled={pending}>
+        <button className="btn-primary w-fit" disabled={pending || title.trim().length < 2 || composeOwnerNote(fields).length < 2}>
           {pending ? "Adding…" : "Add owner note"}
         </button>
       </form>

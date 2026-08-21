@@ -32,6 +32,7 @@ export default async function AdminSettingsPage() {
         reviewerEmail={settings.reviewerEmail}
         reviewerEmails={settings.reviewerEmails}
         reviewerPasswordSet={settings.reviewerPasswordSet}
+        resendFromEmail={settings.resendFromEmail}
       />
     </div>
   );
