@@ -22,6 +22,7 @@ import {
   questionTerms,
   textMatchesTerms,
 } from "@/modules/knowledge/match";
+import { rewriteChatLinks } from "@/modules/widget/chat-links";
 
 const OPENER =
   /^(hi+|hii+|hello|hey|hey there|hi there|good morning|good afternoon|good evening|howdy|yo|sup|what'?s up|how are you)\s*[!.?]*$/i;
@@ -281,7 +282,7 @@ export async function replyToVisitor(input: {
     ownerNotes.length === 0 &&
     products.length === 0;
 
-  const escalateNow = Boolean((wantsHuman || unanswered) && on("human_handoff"));
+  const escalateNow = Boolean(wantsHuman || (unanswered && on("human_handoff")));
   const humanHandoff = Boolean(escalateNow && human);
   const leadForm = Boolean(escalateNow && !human) || Boolean(isBookingRequest(message) && unanswered && !human);
 
@@ -645,7 +646,8 @@ You work for this specific business. Never call the business "Prices and offerin
 Answer only from verified facts, owner notes, catalog cards, and page evidence.
 If several packages match the asked item (different durations or sizes), list those packages. That is not a conflict.
 If the visitor asked about one item, do not mention unrelated items.
-Never invent URLs, CMS paths, or booking pages. Only link a URL that appears in the evidence.
+Never invent URLs, CMS paths, or booking pages. Only mention a page that appears in the evidence.
+If you mention a page, write markdown like [book here](url) or [this link](url). Never show https://, www, or a raw URL in the visible text.
 Never say you are connecting the visitor to a person unless the system already did.
 Never add "Anything else I can help with?"
 When prices are in evidence: one short sentence, then bullets with **name** and **price**.
@@ -786,21 +788,22 @@ function priceLinesFrom(content: string) {
 }
 
 function sanitizeReply(text: string) {
-  return text
-    .replace(/PRICES AND ITEMS FROM THIS PAGE:\s*/gi, "")
-    .replace(/Verified prices and named items from the live site and catalog\.?/gi, "")
-    .replace(/^Prices and offerings\s*/i, "")
-    .replace(/\s*Anything else I can help with\??/gi, "")
-    .replace(/https?:\/\/[^\s)]*\/cms\/[^\s)]*/gi, "")
-    .trim();
+  return rewriteChatLinks(
+    text
+      .replace(/PRICES AND ITEMS FROM THIS PAGE:\s*/gi, "")
+      .replace(/Verified prices and named items from the live site and catalog\.?/gi, "")
+      .replace(/^Prices and offerings\s*/i, "")
+      .replace(/\s*Anything else I can help with\??/gi, ""),
+  ).trim();
 }
 
 function looksLikeDump(text: string) {
+  const visible = rewriteChatLinks(text).replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1");
   return (
-    /PRICES AND ITEMS|Verified prices and named items|pageUriSEO|Prices And Offerings/i.test(text) ||
-    (/https?:\/\//i.test(text) && /\$\s*\d/.test(text)) ||
-    (/\|\s*\S+/.test(text) && /\$\s*\d/.test(text)) ||
-    (/\|/.test(text) && !/\$\s*\d/.test(text) && text.length > 180)
+    /PRICES AND ITEMS|Verified prices and named items|pageUriSEO|Prices And Offerings/i.test(visible) ||
+    (/https?:\/\//i.test(visible) && /\$\s*\d/.test(visible)) ||
+    (/\|\s*\S+/.test(visible) && /\$\s*\d/.test(visible)) ||
+    (/\|/.test(visible) && !/\$\s*\d/.test(visible) && visible.length > 180)
   );
 }
 

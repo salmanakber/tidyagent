@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
+import { rewriteChatLinks } from "@/modules/widget/chat-links";
 
 function escapeText(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -17,7 +18,7 @@ function safeHref(value: string) {
 }
 
 function Inline({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*\n]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g);
+  const parts = rewriteChatLinks(text).split(/(\*\*[^*\n]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g);
   return (
     <>
       {parts.map((part, index) => {
@@ -86,7 +87,7 @@ export function AgentRichText({ text }: { text: string }) {
 }
 
 export function stripForVoice(text: string) {
-  return text
+  return rewriteChatLinks(text)
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1")
     .replace(/\*\*/g, "")
     .replace(/^\s*[-*•]\s+/gm, "")

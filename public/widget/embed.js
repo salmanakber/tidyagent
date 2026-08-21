@@ -770,8 +770,50 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  function linkLabel(href, preferred) {
+    const label = String(preferred || "").trim();
+    if (label && !/https?:\/\/|www\.|\.[a-z]{2,}(\/|$)/i.test(label) && label.length <= 48) return label;
+    try {
+      const url = new URL(href.startsWith("http") ? href : `https://${href}`);
+      const hay = `${url.hostname} ${url.pathname} ${url.search}`.toLowerCase();
+      if (/book|reserv|appoint|schedule|subscriber/.test(hay)) return "book here";
+      if (/pric|rate|package|offer/.test(hay)) return "see prices";
+      if (/contact/.test(hay)) return "contact us";
+      if (/about/.test(hay)) return "about page";
+      if (/product|store|shop|catalog|menu/.test(hay)) return "view this";
+      return "this link";
+    } catch {
+      return "this link";
+    }
+  }
+  function rewriteChatLinks(text) {
+    const placeholders = [];
+    let next = String(text || "").replace(/\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi, (_, label, url) => {
+      const token = `%%LINK${placeholders.length}%%`;
+      placeholders.push({ label: linkLabel(url, label), href: url.replace(/[.,;:!?]+$/g, "") });
+      return token;
+    });
+    next = next.replace(/https?:\/\/[^\s)<>"']+|www\.[^\s)<>"']+/gi, (raw) => {
+      const href = (raw.startsWith("www.") ? `https://${raw}` : raw).replace(/[.,;:!?]+$/g, "");
+      const token = `%%LINK${placeholders.length}%%`;
+      placeholders.push({ label: linkLabel(href), href });
+      return token;
+    });
+    next = next
+      .replace(/\b(?:visit|see|open|go to|check(?: out)?)\s+(?:our\s+)?(?:booking page|website|site|page)?\s*(?:online\s*)?(?:at|:)?\s*(%%LINK\d+%%)/gi, "$1")
+      .replace(/\s+(?:at|here)\s*[:.]?\s*(%%LINK\d+%%)/gi, " $1")
+      .replace(/\s{2,}/g, " ");
+    return { text: next, placeholders };
+  }
   function inlineMd(value) {
-    return escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    const rewritten = rewriteChatLinks(value);
+    return escapeHtml(rewritten.text)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/%%LINK(\d+)%%/g, (_, index) => {
+        const item = rewritten.placeholders[Number(index)];
+        if (!item) return "";
+        return `<a href="${escapeAttr(item.href)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`;
+      });
   }
   function formatAgentHtml(value) {
     const raw = String(value || "").replace(/\r/g, "").trim();
@@ -901,7 +943,7 @@
       .row.visitor .msg { background:${fill}; color:${textColor}; border-radius:18px 6px 18px 18px; }
       .tpl-soft .row.agent .msg { background:#fffaf2; border:1px solid rgba(44,36,28,.06); }
       .msg.dim { color:#64748b; }
-      .msg a { color: inherit; }
+      .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
       time { font:500 10px/1 ui-sans-serif,system-ui; color:${noir ? "#8b9bb4" : "#94a3b8"}; padding:0 4px; }
       .xfer { margin:8px auto; width:min(260px,100%); text-align:center; background:${noir ? "#151c2b" : "#fff"}; border-radius:20px; padding:16px 14px; box-shadow:0 10px 30px rgba(16,24,40,.08); }
       .xfer-faces { display:flex; align-items:center; justify-content:center; gap:10px; }
