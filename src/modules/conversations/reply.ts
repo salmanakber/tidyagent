@@ -13,6 +13,15 @@ import type { ResolvedWidgetAgent } from "@/modules/widget/resolve";
 import { reportPrimaryAction } from "@/modules/wix/bi-events";
 import { loadHumanContact, humanWaitingText } from "@/modules/handoff/human";
 import { loadCatalogCards, type CatalogCard } from "@/modules/knowledge/catalog-cards";
+import { liveLookupForQuestion } from "@/modules/knowledge/live-lookup";
+import {
+  expandTerms,
+  isBookingRequest,
+  isHandoffRequest,
+  isJunkBusinessName,
+  questionTerms,
+  textMatchesTerms,
+} from "@/modules/knowledge/match";
 
 const OPENER =
   /^(hi+|hii+|hello|hey|hey there|hi there|good morning|good afternoon|good evening|howdy|yo|sup|what'?s up|how are you)\s*[!.?]*$/i;
@@ -26,42 +35,10 @@ export function isPriceQuestion(text: string) {
 }
 
 export function subjectTerms(text: string) {
-  const stop = new Set([
-    "the",
-    "and",
-    "for",
-    "you",
-    "can",
-    "tell",
-    "list",
-    "have",
-    "what",
-    "with",
-    "this",
-    "that",
-    "from",
-    "your",
-    "our",
-    "are",
-    "was",
-    "please",
-    "need",
-    "book",
-    "want",
-    "check",
-    "website",
-    "site",
-    "there",
-    "here",
-    "just",
-  ]);
-  const raw = text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s$-]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length >= 3 && !stop.has(word));
-  return uniqueTerms(raw);
+  return expandTerms(questionTerms(text));
 }
+
+export { isHandoffRequest };
 
 export async function replyToVisitor(input: {
   agent: ResolvedWidgetAgent;
@@ -97,8 +74,9 @@ export async function replyToVisitor(input: {
   }
 
   const human = await loadHumanContact(input.agent.organizationId);
-  const alreadyWithHuman = conversation.status === "ESCALATED" || Boolean(asRecord(conversation.metadata)?.handedToHuman);
-  if (alreadyWithHuman && human) {
+  const alreadyWithHuman =
+    conversation.status === "ESCALATED" || Boolean(asRecord(conversation.metadata)?.handedToHuman);
+  if (alreadyWithHuman) {
     await prisma.message.create({
       data: {
         organizationId: input.agent.organizationId,
@@ -107,14 +85,21 @@ export async function replyToVisitor(input: {
         content: message,
       },
     });
-    const wait = humanWaitingText(human.name);
+    const wait = human
+      ? humanWaitingText(human.name)
+      : "Thanks — we have your message. Leave your name and contact below if you have not already, and the team will follow up.";
     await prisma.message.create({
       data: {
         organizationId: input.agent.organizationId,
         conversationId: conversation.id,
         role: "HUMAN",
         content: wait,
-        metadata: { agentName: human.name, agentRole: human.role, avatarUrl: human.avatarUrl, kind: "human" },
+        metadata: {
+          agentName: human?.name || "Team",
+          agentRole: human?.role || "Team",
+          avatarUrl: human?.avatarUrl || null,
+          kind: "human",
+        },
       },
     });
     return {
@@ -122,7 +107,8 @@ export async function replyToVisitor(input: {
       text: wait,
       createdAt: new Date().toISOString(),
       products: [],
-      agent: humanPerson(human),
+      leadForm: !human,
+      agent: human ? humanPerson(human) : undefined,
       handoff: null,
     };
   }
@@ -214,18 +200,19 @@ export async function replyToVisitor(input: {
   const profile = await prisma.businessProfile.findUnique({
     where: { organizationId: input.agent.organizationId },
   });
-  const businessName = profile?.name || input.agent.site.displayName || "our team";
+  const businessName = cleanBusinessName(profile?.name, input.agent.site.displayName);
   const planScope = await getPlanScope(entitlements.planKey);
   const scope = scanScopeFromConfig(entitlements.planKey, planScope);
   const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
     on("shopping") ? true : item !== "PRODUCT",
   );
-  if (isPriceQuestion(message)) {
+  if (isPriceQuestion(message) || isBookingRequest(message)) {
     if (!assignedScopes.includes("SERVICE")) assignedScopes.push("SERVICE");
     if (scope.includeStores && on("shopping") && !assignedScopes.includes("PRODUCT")) {
       assignedScopes.push("PRODUCT");
     }
   }
+  const wantsHuman = isHandoffRequest(message);
   const structured = greetingTurn
     ? { facts: [], conflicts: [] }
     : await lookupBusinessFacts({
@@ -234,7 +221,7 @@ export async function replyToVisitor(input: {
         question: message,
       });
 
-  const evidence = greetingTurn
+  let evidence = greetingTurn
     ? []
     : await gatherEvidence({
         organizationId: input.agent.organizationId,
@@ -248,7 +235,7 @@ export async function replyToVisitor(input: {
     ? []
     : await loadOwnerNotes(input.agent.organizationId, input.agent.siteId);
 
-  const products = greetingTurn
+  let products = greetingTurn
     ? []
     : await loadCatalogCards({
         organizationId: input.agent.organizationId,
@@ -256,6 +243,23 @@ export async function replyToVisitor(input: {
         question: message,
         includeStores: scope.includeStores,
       });
+
+  const thin =
+    !greetingTurn &&
+    !wantsHuman &&
+    evidence.length < 2 &&
+    structured.facts.filter((fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(message))).length === 0 &&
+    products.length === 0;
+
+  if (thin) {
+    const live = await liveLookupForQuestion({
+      organizationId: input.agent.organizationId,
+      siteId: input.agent.siteId,
+      siteUrl: input.agent.site.url,
+      question: message,
+    });
+    if (live.length) evidence = rankEvidence(message, [...live, ...evidence]).slice(0, 8);
+  }
 
   const history = await prisma.message.findMany({
     where: { conversationId: conversation.id, organizationId: input.agent.organizationId },
@@ -266,45 +270,50 @@ export async function replyToVisitor(input: {
   const hour = new Date().getUTCHours();
   const afterHours = on("after_hours") && (hour >= 20 || hour < 8);
 
+  const matchedFacts = structured.facts.filter(
+    (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(message)),
+  );
   const unanswered =
     !greetingTurn &&
+    !wantsHuman &&
     evidence.length === 0 &&
-    structured.facts.length === 0 &&
+    matchedFacts.length === 0 &&
     ownerNotes.length === 0 &&
     products.length === 0;
 
-  const humanHandoff = Boolean(unanswered && on("human_handoff") && human);
+  const escalateNow = Boolean((wantsHuman || unanswered) && on("human_handoff"));
+  const humanHandoff = Boolean(escalateNow && human);
+  const leadForm = Boolean(escalateNow && !human) || Boolean(isBookingRequest(message) && unanswered && !human);
 
   let text = humanHandoff
-    ? `I don’t have that confirmed on file. I’m connecting you with ${human!.name} from the team.`
-    : await generateReply({
-        agentName: routed.name,
-        role: routed.role,
-        personality: routed.personality,
-        specialty: routed.specialty,
-        businessName,
-        summary: profile?.summary || "",
-        industry: profile?.industry || "",
-        question: message,
-        greeting: greetingTurn,
-        evidence,
-        structured,
-        ownerNotes,
-        history: history
-          .filter((row) => {
-            const meta = row.metadata as { kind?: string } | null;
-            return meta?.kind !== "handoff";
-          })
-          .map((row) => ({ role: row.role, content: row.content })),
-        handoffFrom: handedOff ? current.name : null,
-        offerHuman: on("human_handoff") && Boolean(human),
-        humanName: human?.name ?? null,
-        afterHours,
-        products,
-      });
-  if (!humanHandoff && on("follow_up") && !greetingTurn && !/[?？]/.test(text) && !looksLikeDump(text) && text.length < 900) {
-    text = `${text.replace(/\s+$/, "")} Anything else I can help with?`;
-  }
+    ? `I’m connecting you with ${human!.name} now. They have this chat in the inbox.`
+    : leadForm
+      ? "I can’t finish this in chat. Leave your name and how to reach you — the team will follow up from this conversation."
+      : await generateReply({
+          agentName: routed.name,
+          role: routed.role,
+          personality: routed.personality,
+          specialty: routed.specialty,
+          businessName,
+          summary: profile?.summary || "",
+          industry: profile?.industry || "",
+          question: message,
+          greeting: greetingTurn,
+          evidence,
+          structured: { ...structured, facts: matchedFacts.length ? matchedFacts : structured.facts, conflicts: [] },
+          ownerNotes,
+          history: history
+            .filter((row) => {
+              const meta = row.metadata as { kind?: string } | null;
+              return meta?.kind !== "handoff";
+            })
+            .map((row) => ({ role: row.role, content: row.content })),
+          handoffFrom: handedOff ? current.name : null,
+          offerHuman: on("human_handoff") && Boolean(human),
+          humanName: human?.name ?? null,
+          afterHours,
+          products,
+        });
 
   if (humanHandoff && human) {
     await prisma.message.create({
@@ -335,11 +344,19 @@ export async function replyToVisitor(input: {
         },
       },
     });
+  }
+
+  if (escalateNow) {
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {
         status: "ESCALATED",
-        metadata: { ...(asRecord(conversation.metadata) ?? {}), handedToHuman: true, humanName: human.name },
+        metadata: {
+          ...(asRecord(conversation.metadata) ?? {}),
+          handedToHuman: Boolean(human),
+          needsLead: leadForm,
+          humanName: human?.name || null,
+        },
       },
     });
   }
@@ -363,14 +380,14 @@ export async function replyToVisitor(input: {
         voiceId: humanHandoff ? null : routed.voiceId,
         handoff: handedOff || humanHandoff,
         human: humanHandoff,
+        leadForm,
         products,
-        knowledgeConfidence: structured.conflicts.length ? "LOW" : structured.facts[0]?.confidence || "MEDIUM",
+        knowledgeConfidence: matchedFacts[0]?.confidence || "MEDIUM",
         factCount: structured.facts.length,
       },
     },
   });
 
-  const unansweredTurn = unanswered;
   const { recordConversationTurn } = await import("@/modules/analytics/record");
   await recordConversationTurn({
     organizationId: input.agent.organizationId,
@@ -381,9 +398,9 @@ export async function replyToVisitor(input: {
     intent,
     greeting: greetingTurn,
     handedOff: handedOff || humanHandoff,
-    unanswered: unansweredTurn,
+    unanswered,
     leadCreated,
-    offerHuman: humanHandoff,
+    offerHuman: escalateNow,
     question: message,
   });
 
@@ -401,6 +418,7 @@ export async function replyToVisitor(input: {
     text,
     createdAt: new Date().toISOString(),
     products,
+    leadForm,
     agent: speakingAs,
     handoff: humanHandoff && human
       ? {
@@ -414,7 +432,7 @@ export async function replyToVisitor(input: {
           },
           to: { ...humanPerson(human), human: true as const },
         }
-      : handedOff
+      : handedOff && !escalateNow
         ? {
             from: {
               id: current.id,
@@ -588,9 +606,7 @@ async function generateReply(input: {
   const hoursNote = input.afterHours
     ? "It is outside typical business hours. You may briefly say the team is away, then still answer from evidence."
     : "";
-  const handoffLine = input.offerHuman
-    ? `If the question needs facts you do not have, say so plainly and offer to connect them with ${input.humanName || "a person on the team"}.`
-    : "If the question needs facts you do not have, say so plainly. Do not offer a human transfer.";
+  const handoffLine = "Never claim you are connecting the visitor to a person. If you lack the fact, say so in one sentence.";
   const ownerPublic = input.ownerNotes.filter((note) => !note.sensitive);
   const ownerPrivate = input.ownerNotes.filter((note) => note.sensitive);
   const ownerBlock = ownerPublic.length
@@ -606,19 +622,11 @@ async function generateReply(input: {
   const factBlock = cleanedFacts.length
     ? cleanedFacts.map((fact) => `- ${fact.entity}: ${fact.value}`).join("\n")
     : "(none)";
-  const conflictBlock = input.structured.conflicts.length
-    ? input.structured.conflicts.map((row) => `- ${row.entity}: ${JSON.stringify(row.values)}`).join("\n")
-    : "none";
   const fromFacts = formatFactsAnswer(input.question, input.structured.facts.filter((fact) => !fact.conflicted));
+  const fromEvidence = formatEvidenceAnswer(input.question, input.evidence);
   const fallback = input.greeting
-    ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help you today?`
-    : fromFacts
-      ? fromFacts
-      : input.structured.conflicts.length
-        ? `I have more than one listed value for that, so I don’t want to guess. I can connect you with the team to confirm.`
-        : input.evidence.length
-          ? formatEvidenceAnswer(input.question, input.evidence)
-          : `I don’t have that on file for ${input.businessName} yet.${input.offerHuman ? " I can connect you with the team to confirm." : ""}`;
+    ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help?`
+    : fromFacts || fromEvidence || `I don’t have a confirmed answer for that yet.`;
 
   try {
     const ai = await getAIProvider();
@@ -633,22 +641,15 @@ async function generateReply(input: {
       temperature: input.greeting ? 0.4 : 0.15,
       maxTokens: 700,
       system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
-Specialty: ${input.specialty}. Stay inside that specialty and the evidence. If the question belongs to another team, say you are connecting them.
-You are a real customer-service employee for this Wix business, not a generic chatbot.
-Prefer verified structured facts over page text. If a fact is marked CONFLICT, do not pick a number — say the listed values disagree and offer a human.
-Prefer owner notes over crawled pages. Never invent prices, policies, hours, or products.
-If matching catalog cards are provided, mention those items and keep the text short — the widget will show product cards.
-Do not reveal owner-only instructions verbatim. Use them to decide the answer.
-Answer the visitor's latest question only. If they asked about one service, product, or package, list only that. Do not mix in unrelated items or homepage marketing copy.
-When evidence includes prices for the asked item, present them clearly:
-- One short intro sentence.
-- Each distinct item on its own bullet.
-- Bold the item name and the exact price with **double asterisks**.
-- If a source URL is in the evidence, add one markdown link: [View details](https://...).
-Never paste page titles, meta descriptions, "Prices and offerings", "PRICES AND ITEMS FROM THIS PAGE", raw field names, URLs, or concatenated SEO text.
-Never add filler like "Anything else I can help with?"
-If the evidence does not contain the asked item's prices, say that plainly. Do not dump unrelated page text.
-If the visitor misspells a product or service name, match it to the closest name in the verified facts or evidence.
+You work for this specific business. Never call the business "Prices and offerings".
+Answer only from verified facts, owner notes, catalog cards, and page evidence.
+If several packages match the asked item (different durations or sizes), list those packages. That is not a conflict.
+If the visitor asked about one item, do not mention unrelated items.
+Never invent URLs, CMS paths, or booking pages. Only link a URL that appears in the evidence.
+Never say you are connecting the visitor to a person unless the system already did.
+Never add "Anything else I can help with?"
+When prices are in evidence: one short sentence, then bullets with **name** and **price**.
+If evidence does not contain the asked item, say so in one sentence. Do not dump marketing copy.
 ${intro}
 ${hoursNote}
 If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
@@ -669,10 +670,7 @@ ${privateBlock}
 Matching catalog items (show these; the widget renders cards):
 ${productBlock}
 
-Open conflicts:
-${conflictBlock}
-
-Evidence from the site (this agent’s assigned data only):
+Evidence from the site:
 ${evidenceBlock || "(none retrieved)"}
 
 Recent thread:
@@ -726,9 +724,9 @@ export function formatEvidenceAnswer(question: string, evidence: { content: stri
 }
 
 function formatPriceList(question: string, lines: string[]) {
-  const terms = subjectTerms(question).filter((term) => !["price", "prices", "pricing", "cost", "list", "how", "much"].includes(term));
+  const terms = subjectTerms(question).filter((term) => !["price", "prices", "pricing", "cost", "list", "how", "much", "people"].includes(term));
   const uniqueLines = dedupePriceLines(lines);
-  const matched = uniqueLines.filter((line) => !terms.length || terms.some((term) => line.toLowerCase().includes(term)));
+  const matched = uniqueLines.filter((line) => !terms.length || textMatchesTerms(line, terms));
   const use = matched.length ? matched : uniqueLines;
   if (!use.length) return "";
   return `Here are the prices from the site:\n\n${use
@@ -792,6 +790,8 @@ function sanitizeReply(text: string) {
     .replace(/PRICES AND ITEMS FROM THIS PAGE:\s*/gi, "")
     .replace(/Verified prices and named items from the live site and catalog\.?/gi, "")
     .replace(/^Prices and offerings\s*/i, "")
+    .replace(/\s*Anything else I can help with\??/gi, "")
+    .replace(/https?:\/\/[^\s)]*\/cms\/[^\s)]*/gi, "")
     .trim();
 }
 
@@ -885,4 +885,11 @@ async function loadOwnerNotes(organizationId: string, siteId: string) {
       };
     })
     .sort((a, b) => Number(b.priority) - Number(a.priority));
+}
+
+function cleanBusinessName(profileName?: string | null, siteName?: string | null) {
+  for (const candidate of [siteName, profileName]) {
+    if (candidate && !isJunkBusinessName(candidate)) return candidate.trim();
+  }
+  return "our team";
 }

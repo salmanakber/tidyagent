@@ -82,6 +82,7 @@ export async function POST(request: Request) {
         text: result.text,
         createdAt: result.createdAt,
         products: result.products ?? [],
+        leadForm: Boolean(result.leadForm),
         agent: result.agent
           ? personPayload({ ...result.agent, widgetAvatarUrl: result.agent.avatarUrl, voiceId: result.agent.voiceId })
           : undefined,

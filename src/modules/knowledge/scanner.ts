@@ -142,7 +142,6 @@ export async function scanOrganizationSite(input: {
   );
 
   const pricesDoc = pricesCatalogPage(pages, products, homeUrl);
-  if (pricesDoc) pages.unshift(pricesDoc);
 
   if (!pages.length && !products.length) {
     warnings.push("No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions.");
@@ -163,6 +162,8 @@ export async function scanOrganizationSite(input: {
     status: "done",
     detail: `${understanding.name} · ${understanding.industry} · ${understanding.confidence} confidence`,
   });
+
+  if (pricesDoc) pages.push(pricesDoc);
 
   const persisted = await persistScan({
     organizationId: input.organizationId,

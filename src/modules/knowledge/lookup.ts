@@ -1,5 +1,6 @@
 import type { KnowledgeFactKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { expandTerms, textMatchesTerms } from "@/modules/knowledge/match";
 
 const PRICE_Q = /price|pricing|cost|how much|fee|rate|package|plan|charge|quote|\$/i;
 const CONTACT_Q = /phone|email|contact|address|where are you|located|location/i;
@@ -40,19 +41,23 @@ export async function lookupBusinessFacts(input: {
     }),
   ]);
 
-  const terms = input.question
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length >= 3 && !["the", "and", "for", "you", "can", "tell", "list", "have", "what", "price", "prices", "pricing", "cost"].includes(word));
+  const terms = expandTerms(
+    input.question
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !["the", "and", "for", "you", "can", "tell", "list", "have", "what", "price", "prices", "pricing", "cost", "people"].includes(word)),
+  );
   const matched = terms.length
     ? facts.filter((fact) => {
-        const hay = `${fact.entity} ${fact.entityKey} ${fact.value}`.toLowerCase();
-        return terms.some((term) => hay.includes(term) || fact.kind === "CONTACT" || fact.kind === "HOURS" || fact.kind === "LOCATION");
+        if (fact.kind === "CONTACT" || fact.kind === "HOURS" || fact.kind === "LOCATION") {
+          return CONTACT_Q.test(input.question) || HOURS_Q.test(input.question);
+        }
+        return textMatchesTerms(`${fact.entity} ${fact.entityKey} ${fact.value}`, terms);
       })
     : facts;
 
-  const ranked = (matched.length ? matched : facts).slice(0, 16);
+  const ranked = (matched.length ? matched : terms.length ? [] : facts).slice(0, 16);
   const conflictKeys = new Set(conflicts.map((row) => `${row.kind}:${row.entityKey}`));
   const openConflicts = conflicts.filter((row) =>
     ranked.some((fact) => fact.kind === row.kind && fact.entityKey === row.entityKey),

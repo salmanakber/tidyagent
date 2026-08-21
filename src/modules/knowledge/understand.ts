@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getAIProvider } from "@/modules/ai/factory";
 import type { ExtractedPage } from "@/modules/knowledge/extract";
 import type { SiteUnderstanding } from "@/modules/knowledge/types";
+import { isJunkBusinessName } from "@/modules/knowledge/match";
 
 export type { SiteUnderstanding } from "@/modules/knowledge/types";
 
@@ -50,6 +51,7 @@ export async function understandSite(input: {
     const merged = understandingSchema.parse({
       ...heuristic,
       ...parsed,
+      name: pickBusinessName(parsed.name, heuristic.name, input.displayName),
       contact: {
         emails: unique([...(parsed.contact?.emails ?? []), ...heuristic.contact.emails]),
         phones: unique([...(parsed.contact?.phones ?? []), ...heuristic.contact.phones]),
@@ -69,7 +71,8 @@ export function heuristicUnderstanding(input: {
   pages: ExtractedPage[];
   products: { name: string; description?: string; price?: string }[];
 }): SiteUnderstanding {
-  const home = input.pages[0];
+  const home =
+    input.pages.find((page) => !isJunkBusinessName(page.title) && !page.url.includes("#prices")) ?? input.pages[0];
   const emails = unique(input.pages.flatMap((page) => page.emails));
   const phones = unique(input.pages.flatMap((page) => page.phones));
   const offerings = unique([
@@ -90,7 +93,7 @@ export function heuristicUnderstanding(input: {
     `${input.displayName} is connected. Core pages were read so the AI employee can speak from the live site instead of guesses.`;
 
   return {
-    name: home?.title || input.displayName,
+    name: pickBusinessName(home?.title, input.displayName),
     industry: inferIndustry(`${home?.title ?? ""} ${home?.description ?? ""} ${offerings.join(" ")}`),
     businessType: input.products.length ? "Ecommerce / catalog" : inferType(input.pages),
     businessModel: input.products.length ? "Catalog + customer service" : "Service or content site",
@@ -151,6 +154,13 @@ function inferType(pages: ExtractedPage[]) {
   if (pages.some((page) => /book|appoint/.test(page.url.toLowerCase()))) return "Appointments / bookings";
   if (pages.some((page) => page.contentType === "SERVICE")) return "Services";
   return "Website / brochure";
+}
+
+function pickBusinessName(...candidates: (string | null | undefined)[]) {
+  for (const candidate of candidates) {
+    if (candidate && !isJunkBusinessName(candidate)) return candidate.trim().slice(0, 120);
+  }
+  return "Local business";
 }
 
 function unique(values: string[]) {

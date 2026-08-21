@@ -323,6 +323,7 @@
           agent: data.agent ? personFrom(data.agent) : currentAgent,
           products: data.products,
         });
+        if (data.leadForm) renderLeadForm();
         playReceiveTick();
         if (voiceOn) void speak(reply);
         saveInboxMeta(text);
@@ -611,6 +612,46 @@
         .join("")}</div>`;
     }
 
+    function renderLeadForm() {
+      if (thread.querySelector(".lead-form")) return;
+      const wrap = document.createElement("form");
+      wrap.className = "lead-form";
+      wrap.innerHTML = `
+        <p class="lead-title">Leave your details</p>
+        <input name="name" required placeholder="Name">
+        <input name="email" type="email" required placeholder="Email">
+        <input name="phone" placeholder="Phone (optional)">
+        <textarea name="note" rows="2" placeholder="What do you need?"></textarea>
+        <button type="submit">Send to the team</button>`;
+      wrap.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(wrap);
+        wrap.querySelector("button").disabled = true;
+        try {
+          const response = await fetch(`${origin}/api/widget/lead`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              conversationId,
+              name: String(form.get("name") || ""),
+              email: String(form.get("email") || ""),
+              phone: String(form.get("phone") || ""),
+              note: String(form.get("note") || ""),
+              token,
+              instanceId: instance,
+              site,
+            }),
+          });
+          if (response.ok) wrap.innerHTML = `<p class="lead-title">Thanks. The team has your details and will follow up.</p>`;
+        } finally {
+          const btn = wrap.querySelector("button");
+          if (btn) btn.disabled = false;
+        }
+      });
+      thread.appendChild(wrap);
+      thread.scrollTop = thread.scrollHeight;
+    }
+
     function readStore(suffix) {
       try {
         return window.localStorage.getItem(`${storageKey}:${suffix}`) || "";
@@ -879,6 +920,10 @@
       .card-copy { padding:10px 12px 12px; }
       .card-name { margin:0; font:650 13px/1.35 ui-sans-serif,system-ui; }
       .card-price { margin:4px 0 0; font:600 13px/1.3 ui-sans-serif,system-ui; opacity:.8; }
+      .lead-form { display:grid; gap:8px; background:${noir ? "#151c2b" : "#fff"}; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(16,24,40,.08); }
+      .lead-title { margin:0; font:650 12px/1.3 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.6; }
+      .lead-form input, .lead-form textarea { border:0; border-radius:12px; background:${noir ? "#1a2436" : "#f1f5f9"}; padding:10px 12px; font:500 14px/1.3 ui-sans-serif,system-ui; color:inherit; }
+      .lead-form button { border:0; border-radius:999px; padding:10px 12px; background:${fill}; color:${textColor}; font:650 13px/1 ui-sans-serif,system-ui; cursor:pointer; }
       .joined { display:flex; align-items:center; gap:8px; color:#64748b; font:650 11px/1 ui-sans-serif,system-ui; letter-spacing:.04em; text-transform:uppercase; margin:4px 0 2px; }
       .joined .line { flex:1; height:1px; background:currentColor; opacity:.25; }
       .composer { display:flex; gap:8px; padding:8px 8px 10px; border-top:1px solid ${noir ? "rgba(255,255,255,.06)" : "#e8eef5"}; background:${paper}; align-items:center; flex:none; }

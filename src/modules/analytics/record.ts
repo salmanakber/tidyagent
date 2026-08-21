@@ -37,7 +37,7 @@ export async function recordConversationTurn(input: {
       where: { id: input.conversationId },
       data: {
         lastMessageAt: new Date(),
-        status: input.offerHuman && input.unanswered ? "ESCALATED" : input.unanswered ? "OPEN" : "RESOLVED",
+        ...(input.offerHuman ? { status: "ESCALATED" as const } : {}),
       },
     });
 
@@ -86,7 +86,7 @@ export async function recordConversationTurn(input: {
       });
     }
 
-    if (input.offerHuman && input.unanswered && !input.greeting) {
+    if (input.offerHuman && !input.greeting) {
       const existing = await prisma.humanEscalation.findFirst({
         where: { conversationId: input.conversationId, status: "open" },
       });

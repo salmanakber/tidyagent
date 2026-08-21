@@ -21,8 +21,8 @@ export default async function ConversationsPage() {
         title="Conversations"
         description={
           humanName
-            ? `When the AI cannot verify an answer, visitors are connected to ${humanName}. Open a thread to read the full chat.`
-            : "Every visitor chat lands here. Escalated threads need a person from your team."
+            ? `When a visitor asks for a person, that chat is marked waiting for ${humanName}. Open it here — it is not another AI.`
+            : "When a visitor asks for a person and no teammate is set, they get a lead form. Those chats land here too."
         }
       />
       <HumanHandoffForm
@@ -37,8 +37,9 @@ export default async function ConversationsPage() {
           <ul className="divide-y divide-white/5">
             {conversations.map((conversation) => {
               const waiting = conversation.status === "ESCALATED";
+              const visitorLine = conversation.messages.find((item) => item.role === "CUSTOMER");
               return (
-                <li key={conversation.id}>
+                <li key={conversation.id} className={waiting ? "bg-amber-500/5" : undefined}>
                   <Link
                     href={`/conversations/${conversation.id}`}
                     className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-white/5"
@@ -48,10 +49,13 @@ export default async function ConversationsPage() {
                         {conversation.customer?.name || conversation.customer?.email || "Anonymous visitor"}
                       </p>
                       <p className="truncate text-sm text-navy-300">
-                        {conversation.messages[0]?.content ?? "No messages yet"}
+                        {visitorLine?.content ?? conversation.messages[0]?.content ?? "No messages yet"}
                       </p>
-                      {waiting && humanName ? (
-                        <p className="mt-1 text-xs text-amber-200">Waiting for {humanName}</p>
+                      {waiting ? (
+                        <p className="mt-1 text-xs text-amber-200">
+                          {humanName ? `Waiting for ${humanName}` : "Needs a person — open this thread"}
+                          {conversation.escalations[0]?.summary ? ` · ${conversation.escalations[0].summary}` : ""}
+                        </p>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">

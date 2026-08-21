@@ -129,10 +129,16 @@ export function isUsefulOfferName(name: string) {
   const n = collapse(name);
   if (n.length < 3 || n.length > 56) return false;
   const words = n.split(/\s+/);
-  if (words.length < 1 || words.length > 7) return false;
+  if (words.length < 1 || words.length > 8) return false;
   if (/https?:|www\.|\|/i.test(n)) return false;
   if (/prices and offerings|verified prices|from this page|pageuriseo|anything else/i.test(n)) return false;
+  if (/^(rental|package|plan|offer|service|the|a|an)\s+(in|the|a|an|of)?$/i.test(n)) return false;
+  if (/^(rental|package)\s+(the\s+)?(all|full)(\s+day)+$/i.test(n)) return false;
   if (/\b(enjoy|allowing|exhilarating|click here|learn more)\b/i.test(n)) return false;
+  const content = words.filter(
+    (word) => !/^(the|a|an|of|on|with|for|rental|rentals|package|packages|plan|plans|hour|hours|hr|day|full|all)$/i.test(word),
+  );
+  if (!content.length) return false;
   return /[a-z]/i.test(n);
 }
 

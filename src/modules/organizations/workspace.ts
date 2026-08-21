@@ -73,18 +73,23 @@ export async function scopedKnowledge(session: AppSession) {
 }
 
 export async function scopedConversations(session: AppSession) {
-  return prisma.conversation.findMany({
+  const rows = await prisma.conversation.findMany({
     where: tenantWhere(session),
     include: {
       customer: true,
       messages: {
         orderBy: { createdAt: "desc" },
+        take: 8,
+      },
+      escalations: {
+        where: { status: "open" },
         take: 1,
       },
     },
     orderBy: { lastMessageAt: "desc" },
-    take: 50,
+    take: 80,
   });
+  return rows.sort((a, b) => Number(b.status === "ESCALATED") - Number(a.status === "ESCALATED"));
 }
 
 export async function scopedCustomers(session: AppSession) {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { productImageFromRecord } from "@/modules/knowledge/media";
+import { expandTerms, questionTerms, textMatchesTerms } from "@/modules/knowledge/match";
 
 export type CatalogCard = {
   name: string;
@@ -33,13 +34,13 @@ export function cardFromMetadata(input: {
 
 export function matchCatalogCards(question: string, cards: CatalogCard[], limit = 4): CatalogCard[] {
   if (!cards.length) return [];
-  const terms = subjectTerms(question).filter(
-    (term) => !["price", "prices", "pricing", "cost", "list", "show", "have", "what"].includes(term),
+  const terms = expandTerms(questionTerms(question)).filter(
+    (term) => !["price", "prices", "pricing", "cost", "list", "show", "have", "what", "people"].includes(term),
   );
   const scored = cards
     .map((card) => ({ card, score: cardScore(question, terms, card) }))
     .sort((a, b) => b.score - a.score);
-  const matched = scored.filter((row) => terms.some((term) => row.card.name.toLowerCase().includes(term)));
+  const matched = scored.filter((row) => terms.some((term) => textMatchesTerms(row.card.name, [term]) || textMatchesTerms(row.card.name, terms)));
   if (matched.length) return uniqueCards(matched.map((row) => row.card)).slice(0, limit);
   if (/what do you (have|sell|offer)|show me (your )?(products|menu|packages)|catalog|all products/i.test(question)) {
     return uniqueCards(cards).slice(0, limit);
@@ -99,9 +100,8 @@ export async function loadCatalogCards(input: {
 }
 
 function cardScore(question: string, terms: string[], card: CatalogCard) {
-  const hay = `${card.name} ${card.price ?? ""}`.toLowerCase();
   let score = 0;
-  for (const term of terms) if (hay.includes(term)) score += 4;
+  if (textMatchesTerms(`${card.name} ${card.price ?? ""}`, terms)) score += 8;
   if (card.imageUrl) score += 1;
   if (card.price) score += 1;
   if (!terms.length && isCatalogQuestion(question)) score += 1;
@@ -137,15 +137,4 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function asOptionalString(value: unknown) {
   if (typeof value === "string" && value.trim()) return value.trim();
   return null;
-}
-
-function subjectTerms(text: string) {
-  const stop = new Set(["the", "and", "for", "you", "can", "tell", "list", "have", "what", "with", "this", "that", "from"]);
-  return [...new Set(
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s$-]/g, " ")
-      .split(/\s+/)
-      .filter((word) => word.length >= 3 && !stop.has(word)),
-  )];
 }
