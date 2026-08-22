@@ -42,6 +42,7 @@ export async function getPlatformSettingsView() {
   const planPricePro = await getSetting("plan_price_pro");
   const planPriceCurrency = await getSetting("plan_price_currency", "USD");
   const planTrialDays = await getSetting("plan_trial_days", "7");
+  const productFounder = await getSetting("product_founder");
   const googleTtsVoice = await getSetting("google_tts_voice", env.GOOGLE_TTS_VOICE);
   const reviewer = await getReviewerConfig();
   const reviewerPasswordSet = await settingExists("wix_reviewer_password");
@@ -78,6 +79,7 @@ export async function getPlatformSettingsView() {
     planPricePro,
     planPriceCurrency,
     planTrialDays,
+    productFounder,
     googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
     reviewMode: reviewer.reviewMode,
     reviewerEmail: reviewer.emails[0] ?? env.WIX_REVIEWER_EMAIL,
@@ -138,6 +140,7 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     await setSetting("plan_price_pro", String(formData.get("plan_price_pro") ?? "").trim());
     await setSetting("plan_price_currency", String(formData.get("plan_price_currency") ?? "USD").trim() || "USD");
     await setSetting("plan_trial_days", String(formData.get("plan_trial_days") ?? "7").trim() || "7");
+    await setSetting("product_founder", String(formData.get("product_founder") ?? "").trim());
     const googleTts = String(formData.get("google_tts_api_key") ?? "").trim();
     const googleTtsVoice = String(formData.get("google_tts_voice") ?? "").trim();
     const awsKey = String(formData.get("aws_access_key_id") ?? "").trim();

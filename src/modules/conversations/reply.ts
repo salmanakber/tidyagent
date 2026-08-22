@@ -26,6 +26,7 @@ import {
   textMatchesTerms,
 } from "@/modules/knowledge/match";
 import { rewriteChatLinks } from "@/modules/widget/chat-links";
+import { answerTidyAgentQuestion, isTidyAgentQuestion } from "@/modules/product/about";
 
 const OPENER =
   /^(hi+|hii+|hello|hey|hey there|hi there|good morning|good afternoon|good evening|howdy|yo|sup|what'?s up|how are you)\s*[!.?]*$/i;
@@ -198,7 +199,8 @@ export async function replyToVisitor(input: {
     .filter((row) => (row.metadata as { kind?: string } | null)?.kind !== "handoff")
     .map((row) => ({ role: row.role, content: row.content }));
   const priorCustomer = timeline.filter((row) => row.role === "CUSTOMER").map((row) => row.content);
-  const greetingTurn = isCasualOpener(message) && on("greeting") && priorCustomer.length === 0;
+  const aboutProduct = isTidyAgentQuestion(message, priorCustomer);
+  const greetingTurn = isCasualOpener(message) && on("greeting") && priorCustomer.length === 0 && !aboutProduct;
   const searchQuery = searchQueryFromThread(message, priorCustomer);
   const intent = greetingTurn ? "GENERAL" : classifyVisitorIntent(searchQuery);
   let routed = current;
@@ -281,7 +283,7 @@ export async function replyToVisitor(input: {
     }
   }
   const wantsHuman = isHandoffRequest(message);
-  const structured = greetingTurn
+  const structured = greetingTurn || aboutProduct
     ? { facts: [], conflicts: [] }
     : await lookupBusinessFacts({
         organizationId: input.agent.organizationId,
@@ -289,7 +291,7 @@ export async function replyToVisitor(input: {
         question: searchQuery,
       });
 
-  let evidence = greetingTurn
+  let evidence = greetingTurn || aboutProduct
     ? []
     : await gatherEvidence({
         organizationId: input.agent.organizationId,
@@ -299,11 +301,11 @@ export async function replyToVisitor(input: {
         contentTypes: assignedScopes,
       });
 
-  const ownerNotes = greetingTurn
+  const ownerNotes = greetingTurn || aboutProduct
     ? []
     : await loadOwnerNotes(input.agent.organizationId, input.agent.siteId);
 
-  let products = greetingTurn
+  let products = greetingTurn || aboutProduct
     ? []
     : await loadCatalogCards({
         organizationId: input.agent.organizationId,
@@ -313,6 +315,7 @@ export async function replyToVisitor(input: {
       });
 
   const thin =
+    !aboutProduct &&
     !greetingTurn &&
     !wantsHuman &&
     evidence.length < 2 &&
@@ -336,6 +339,7 @@ export async function replyToVisitor(input: {
     (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery)),
   );
   const unanswered =
+    !aboutProduct &&
     !greetingTurn &&
     !wantsHuman &&
     evidence.length === 0 &&
@@ -351,7 +355,9 @@ export async function replyToVisitor(input: {
     ? `Connecting you with ${human!.name}…`
     : leadForm
       ? "I can’t finish this in chat. Leave your name and how to reach you — the team will follow up from this conversation."
-      : await generateReply({
+      : aboutProduct
+        ? await answerTidyAgentQuestion(message)
+        : await generateReply({
           agentName: routed.name,
           role: routed.role,
           personality: routed.personality,

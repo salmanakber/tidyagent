@@ -19,6 +19,7 @@ export function PlatformSettingsForm({
   planPricePro,
   planPriceCurrency,
   planTrialDays,
+  productFounder,
   googleTtsVoice,
   reviewMode,
   reviewerEmail,
@@ -57,6 +58,7 @@ export function PlatformSettingsForm({
   planPricePro: string;
   planPriceCurrency: string;
   planTrialDays: string;
+  productFounder: string;
   googleTtsVoice: string;
   reviewMode: boolean;
   reviewerEmail: string;
@@ -373,6 +375,19 @@ export function PlatformSettingsForm({
             <input className="field mt-2" name="plan_trial_days" defaultValue={planTrialDays} placeholder="7" />
           </label>
         </div>
+        <label className="mt-5 block text-sm text-navy-300">
+          Founder / who built tidyAgent
+          <input
+            className="field mt-2"
+            name="product_founder"
+            defaultValue={productFounder}
+            placeholder="The tidyFlow team"
+          />
+          <span className="mt-1 block text-xs text-navy-400">
+            Used when a visitor asks who founded tidyAgent, what the plans cost, or why it is a good fit. Prices above
+            (or live Wix App Plans) are what the chat reads.
+          </span>
+        </label>
       </div>
 
       <div className="flex flex-wrap gap-2">
