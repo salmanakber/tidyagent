@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isPriceQuestion, subjectTerms } from "@/modules/conversations/reply";
+import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isFollowUp, isPriceQuestion, searchQueryFromThread, subjectTerms } from "@/modules/conversations/reply";
 
 describe("visitor openers", () => {
   it("treats hi/hello as greetings, not missing knowledge", () => {
@@ -49,5 +49,14 @@ describe("visitor openers", () => {
     expect(reply.toLowerCase()).not.toContain("enjoy");
     expect((reply.match(/\$250/g) || []).length).toBe(1);
     expect(reply).toMatch(/\$1500|\$1,500/);
+  });
+
+  it("treats short follow-ups as the same thread, not a new topic", () => {
+    expect(isFollowUp("how much is that?")).toBe(true);
+    expect(isFollowUp("and the 2 hour one")).toBe(true);
+    expect(isFollowUp("the other package")).toBe(true);
+    expect(isFollowUp("What time is jet ski rental?")).toBe(false);
+    expect(searchQueryFromThread("how much is that", ["Do you rent jet skis?"])).toMatch(/jet ski/i);
+    expect(searchQueryFromThread("What time is flyboard", ["Do you rent jet skis?"])).toBe("What time is flyboard");
   });
 });

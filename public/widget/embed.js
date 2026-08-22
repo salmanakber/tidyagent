@@ -73,10 +73,17 @@
           </div>
           <div class="thread"></div>
           <form class="composer">
-            ${voiceOffered ? `<button type="button" class="mic" aria-label="Speak">${iconMic()}</button>` : ""}
+            ${voiceOffered ? `<button type="button" class="mic" aria-label="Start voice message"><span class="mic-pulse"></span>${iconMic()}</button>` : ""}
             <input class="box" type="text" maxlength="1200" placeholder="Write a message" aria-label="Message" enterkeyhint="send" autocomplete="off">
             <button type="submit" class="go" aria-label="Send">${iconSend()}</button>
           </form>
+          ${voiceOffered ? `<div class="listen" hidden>
+            <button type="button" class="listen-x" aria-label="Cancel recording">${iconClose()}</button>
+            <div class="listen-orb" aria-hidden="true"><span></span></div>
+            <div class="listen-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <p class="listen-caption">Listening…</p>
+            <button type="button" class="listen-go" aria-label="Send recording">${iconSend()}</button>
+          </div>` : ""}
         </div>
         <div class="teaser" hidden>
           <button type="button" class="teaser-x" aria-label="Dismiss">${iconClose()}</button>
@@ -111,6 +118,10 @@
     const voiceTog = shadow.querySelector(".voice-tog");
     const voiceStop = shadow.querySelector(".voice-stop");
     const micBtn = shadow.querySelector(".mic");
+    const listenDock = shadow.querySelector(".listen");
+    const listenCaption = shadow.querySelector(".listen-caption");
+    const listenCancel = shadow.querySelector(".listen-x");
+    const listenSend = shadow.querySelector(".listen-go");
     const nameEl = shadow.querySelector(".nm");
     const statusEl = shadow.querySelector(".st-label");
     const headAva = shadow.querySelector(".head-ava");
@@ -213,7 +224,9 @@
     if (voiceStop) {
       voiceStop.addEventListener("click", () => stopSpeech());
     }
-    if (micBtn) micBtn.addEventListener("click", () => (listening ? stopListen() : startListen()));
+    if (micBtn) micBtn.addEventListener("click", () => (listening ? finishListen(false) : startListen()));
+    listenCancel?.addEventListener("click", () => finishListen(false));
+    listenSend?.addEventListener("click", () => finishListen(true));
 
     requestAnimationFrame(() => {
       launch.classList.add("in");
@@ -580,36 +593,83 @@
       writeStore("inbox", JSON.stringify(rows.slice(0, 24)));
     }
 
+    let voiceDraft = "";
+    const voiceLang = String(config.voiceId || "en-US").match(/^[a-z]{2}-[A-Z]{2}/)?.[0] || "en-US";
+
+    function setListenUi(on) {
+      if (!listenDock) return;
+      if (on) {
+        composer.setAttribute("hidden", "");
+        listenDock.removeAttribute("hidden");
+        micBtn?.classList.add("live");
+      } else {
+        listenDock.setAttribute("hidden", "");
+        composer.removeAttribute("hidden");
+        micBtn?.classList.remove("live");
+        if (listenCaption) listenCaption.textContent = "Listening…";
+      }
+    }
+
     function startListen() {
       const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!Rec) {
         addNotice("Voice typing isn’t available in this browser. You can still type.");
         return;
       }
-      recognition = new Rec();
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.onresult = (event) => {
-        const text = event.results?.[0]?.[0]?.transcript;
-        if (text) void sendChat(text);
-      };
-      recognition.onend = () => {
-        listening = false;
-        micBtn?.classList.remove("live");
-      };
-      recognition.start();
-      listening = true;
-      micBtn?.classList.add("live");
-    }
-
-    function stopListen() {
+      stopSpeech();
       try {
         recognition?.stop();
       } catch {
         /* ignore */
       }
+      voiceDraft = "";
+      recognition = new Rec();
+      recognition.lang = voiceLang;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let interim = "";
+        let finalBit = "";
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const piece = event.results[i][0]?.transcript || "";
+          if (event.results[i].isFinal) finalBit += `${piece} `;
+          else interim += piece;
+        }
+        if (finalBit) voiceDraft = `${voiceDraft} ${finalBit}`.replace(/\s+/g, " ").trim();
+        const shown = `${voiceDraft} ${interim}`.replace(/\s+/g, " ").trim();
+        if (listenCaption) listenCaption.textContent = shown || "Listening…";
+        if (shown) box.value = shown;
+      };
+      recognition.onerror = () => finishListen(Boolean(voiceDraft));
+      recognition.onend = () => {
+        if (listening) finishListen(Boolean(voiceDraft || box.value.trim()));
+      };
+      try {
+        recognition.start();
+      } catch {
+        addNotice("Could not start the microphone. Check browser permission.");
+        return;
+      }
+      listening = true;
+      setListenUi(true);
+    }
+
+    function finishListen(sendIt) {
       listening = false;
-      micBtn?.classList.remove("live");
+      try {
+        recognition?.stop();
+      } catch {
+        /* ignore */
+      }
+      recognition = null;
+      setListenUi(false);
+      const text = (voiceDraft || String(box.value || "")).replace(/\s+/g, " ").trim();
+      voiceDraft = "";
+      if (sendIt && text) void sendChat(text);
+    }
+
+    function stopListen() {
+      finishListen(false);
     }
 
     function setSpeaking(on) {
@@ -1203,10 +1263,26 @@
       .joined .line { flex:1; height:1px; background:currentColor; opacity:.25; }
       .composer { display:flex; gap:8px; padding:8px 8px 10px; border-top:1px solid ${noir ? "rgba(255,255,255,.06)" : "#e8eef5"}; background:${paper}; align-items:center; flex:none; }
       .box { flex:1; border:0; border-radius:999px; background:${noir ? "#1a2436" : atelier ? "#efe6d6" : "#f1f5f9"}; padding:10px 12px; font:500 16px/1.3 ui-sans-serif,system-ui; outline:none; color:${noir ? "#e8edf5" : "#122033"}; min-width:0; }
-      .go, .mic { border:0; height:40px; width:40px; border-radius:999px; display:grid; place-items:center; cursor:pointer; color:${textColor}; flex:none; }
+      .go, .mic { border:0; height:40px; width:40px; border-radius:999px; display:grid; place-items:center; cursor:pointer; color:${textColor}; flex:none; position:relative; }
       .go { background:${fill}; }
-      .mic { background:${noir ? "#1a2436" : "#0f172a"}; color:#fff; }
-      .mic.live { background:#dc2626; animation: ta-ava .9s ease-out infinite; }
+      .mic { background:${noir ? "#1a2436" : "#0f172a"}; color:#fff; box-shadow:0 8px 18px rgba(15,23,42,.18); }
+      .mic-pulse { position:absolute; inset:-5px; border-radius:999px; border:2px solid ${color}; opacity:0; pointer-events:none; }
+      .mic.live { background:#dc2626; color:#fff; }
+      .mic.live .mic-pulse { animation: ta-mic-ring 1.4s ease-out infinite; opacity:.7; }
+      .listen { display:flex; align-items:center; gap:10px; padding:10px 12px 12px; border-top:1px solid ${noir ? "rgba(255,255,255,.06)" : "#e8eef5"}; background:${paper}; flex:none; }
+      .listen-orb { height:36px; width:36px; border-radius:999px; background:${fill}; display:grid; place-items:center; flex:none; box-shadow:0 0 0 6px rgba(220,38,38,.12); }
+      .listen-orb span { height:12px; width:12px; border-radius:999px; background:#fff; animation: ta-mic-blob .9s ease-in-out infinite; }
+      .listen-wave { display:flex; align-items:center; gap:3px; height:28px; flex:none; }
+      .listen-wave i { width:3px; height:8px; border-radius:99px; background:${color}; transform-origin:center; animation: ta-wave .9s ease-in-out infinite; }
+      .listen-wave i:nth-child(2) { animation-delay:.08s; }
+      .listen-wave i:nth-child(3) { animation-delay:.16s; }
+      .listen-wave i:nth-child(4) { animation-delay:.24s; }
+      .listen-wave i:nth-child(5) { animation-delay:.32s; }
+      .listen-caption { margin:0; flex:1; min-width:0; font:500 12px/1.35 ui-sans-serif,system-ui; color:${noir ? "#cbd5e1" : "#334155"}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .listen-x, .listen-go { border:0; height:36px; width:36px; border-radius:999px; display:grid; place-items:center; cursor:pointer; flex:none; }
+      .listen-x { background:${noir ? "#1a2436" : "#e8eef5"}; color:${noir ? "#e8edf5" : "#334155"}; }
+      .listen-go { background:${fill}; color:${textColor}; }
+      .listen-x svg, .listen-go svg { width:15px; height:15px; }
       .go svg, .mic svg { width:16px; height:16px; }
       .inbox { position:absolute; inset:52px 0 0; background:${paper}; z-index:3; display:flex; flex-direction:column; }
       .inbox-bar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font:650 13px/1 ui-sans-serif,system-ui; }
@@ -1247,6 +1323,9 @@
       @keyframes ta-dot { 0%,100% { opacity:.25; transform:translateY(0); } 50% { opacity:1; transform:translateY(-3px); } }
       @keyframes ta-bar { to { width:100%; } }
       @keyframes ta-ava { 0% { box-shadow:0 0 0 0 rgba(220,38,38,.45); } 100% { box-shadow:0 0 0 10px rgba(220,38,38,0); } }
+      @keyframes ta-wave { 0%,100% { height:8px; opacity:.45; } 50% { height:24px; opacity:1; } }
+      @keyframes ta-mic-ring { 0% { transform:scale(.85); opacity:.55; } 100% { transform:scale(1.35); opacity:0; } }
+      @keyframes ta-mic-blob { 0%,100% { transform:scale(.7); } 50% { transform:scale(1); } }
     `;
   }
 })();

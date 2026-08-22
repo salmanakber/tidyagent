@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Volume2 } from "lucide-react";
-import { AGENT_VOICES } from "@/modules/voice/voices";
+import { voicesByRegion } from "@/modules/voice/voices";
 
 export function VoiceTestButton({
   voiceId,
@@ -89,10 +89,14 @@ export function VoiceSelect({
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
-      {AGENT_VOICES.map((voice) => (
-        <option key={voice.id} value={voice.id}>
-          {voice.label} — {voice.note}
-        </option>
+      {voicesByRegion().map((group) => (
+        <optgroup key={group.region} label={group.region}>
+          {group.voices.map((voice) => (
+            <option key={voice.id} value={voice.id}>
+              {voice.label} — {voice.note}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   );

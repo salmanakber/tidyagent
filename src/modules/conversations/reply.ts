@@ -34,6 +34,30 @@ export function isCasualOpener(text: string) {
   return OPENER.test(text.trim().replace(/[^\w\s'!?]/g, ""));
 }
 
+export function isFollowUp(text: string) {
+  const t = text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s'?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return false;
+  if (
+    /^(and|also|what about|how about|how much|the other|that one|this one|those|them|yes|yep|yeah|nope|no|ok|okay|same|another|more|which one)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  const words = t.split(" ").filter(Boolean);
+  return words.length <= 8 && /\b(that|those|them|it|this one|the other|same|too|as well)\b/.test(t) && subjectTerms(t).length < 2;
+}
+
+export function searchQueryFromThread(current: string, previousCustomer: string[]) {
+  if (!previousCustomer.length || !isFollowUp(current)) return current;
+  return `${previousCustomer.slice(-2).join(" ")} ${current}`.replace(/\s+/g, " ").trim().slice(0, 400);
+}
+
 export function isPriceQuestion(text: string) {
   return /price|pricing|cost|how much|fee|rate|package|plan|charge|quote|\$/.test(text.toLowerCase());
 }
@@ -163,8 +187,20 @@ export async function replyToVisitor(input: {
     team.find((row) => row.id === conversation.agentId) ??
     team.find((row) => row.isPrimary) ??
     input.agent;
-  const greetingTurn = isCasualOpener(message) && on("greeting");
-  const intent = greetingTurn ? "GENERAL" : classifyVisitorIntent(message);
+  const priorRows = await prisma.message.findMany({
+    where: { conversationId: conversation.id, organizationId: input.agent.organizationId },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+    select: { role: true, content: true, metadata: true },
+  });
+  const timeline = priorRows
+    .reverse()
+    .filter((row) => (row.metadata as { kind?: string } | null)?.kind !== "handoff")
+    .map((row) => ({ role: row.role, content: row.content }));
+  const priorCustomer = timeline.filter((row) => row.role === "CUSTOMER").map((row) => row.content);
+  const greetingTurn = isCasualOpener(message) && on("greeting") && priorCustomer.length === 0;
+  const searchQuery = searchQueryFromThread(message, priorCustomer);
+  const intent = greetingTurn ? "GENERAL" : classifyVisitorIntent(searchQuery);
   let routed = current;
   if (on("specialist_routing") && !greetingTurn && !(intent === "ECOMMERCE" && !on("shopping"))) {
     routed = pickAgentForIntent(team, intent) ?? current;
@@ -238,7 +274,7 @@ export async function replyToVisitor(input: {
   const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
     on("shopping") ? true : item !== "PRODUCT",
   );
-  if (isPriceQuestion(message) || isBookingRequest(message)) {
+  if (isPriceQuestion(searchQuery) || isBookingRequest(searchQuery) || isPriceQuestion(message) || isBookingRequest(message)) {
     if (!assignedScopes.includes("SERVICE")) assignedScopes.push("SERVICE");
     if (scope.includeStores && on("shopping") && !assignedScopes.includes("PRODUCT")) {
       assignedScopes.push("PRODUCT");
@@ -250,7 +286,7 @@ export async function replyToVisitor(input: {
     : await lookupBusinessFacts({
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
-        question: message,
+        question: searchQuery,
       });
 
   let evidence = greetingTurn
@@ -258,7 +294,7 @@ export async function replyToVisitor(input: {
     : await gatherEvidence({
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
-        question: message,
+        question: searchQuery,
         includeStores: scope.includeStores && on("shopping"),
         contentTypes: assignedScopes,
       });
@@ -272,7 +308,7 @@ export async function replyToVisitor(input: {
     : await loadCatalogCards({
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
-        question: message,
+        question: searchQuery,
         includeStores: scope.includeStores,
       });
 
@@ -280,7 +316,7 @@ export async function replyToVisitor(input: {
     !greetingTurn &&
     !wantsHuman &&
     evidence.length < 2 &&
-    structured.facts.filter((fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(message))).length === 0 &&
+    structured.facts.filter((fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery))).length === 0 &&
     products.length === 0;
 
   if (thin) {
@@ -288,22 +324,16 @@ export async function replyToVisitor(input: {
       organizationId: input.agent.organizationId,
       siteId: input.agent.siteId,
       siteUrl: input.agent.site.url,
-      question: message,
+      question: searchQuery,
     });
-    if (live.length) evidence = rankEvidence(message, [...live, ...evidence]).slice(0, 8);
+    if (live.length) evidence = rankEvidence(searchQuery, [...live, ...evidence]).slice(0, 8);
   }
-
-  const history = await prisma.message.findMany({
-    where: { conversationId: conversation.id, organizationId: input.agent.organizationId },
-    orderBy: { createdAt: "asc" },
-    take: 12,
-  });
 
   const hour = new Date().getUTCHours();
   const afterHours = on("after_hours") && (hour >= 20 || hour < 8);
 
   const matchedFacts = structured.facts.filter(
-    (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(message)),
+    (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery)),
   );
   const unanswered =
     !greetingTurn &&
@@ -330,16 +360,12 @@ export async function replyToVisitor(input: {
           summary: profile?.summary || "",
           industry: profile?.industry || "",
           question: message,
+          lookup: searchQuery,
           greeting: greetingTurn,
           evidence,
           structured: { ...structured, facts: matchedFacts.length ? matchedFacts : structured.facts, conflicts: [] },
           ownerNotes,
-          history: history
-            .filter((row) => {
-              const meta = row.metadata as { kind?: string } | null;
-              return meta?.kind !== "handoff";
-            })
-            .map((row) => ({ role: row.role, content: row.content })),
+          history: timeline,
           handoffFrom: handedOff ? current.name : null,
           offerHuman: on("human_handoff") && Boolean(human),
           humanName: human?.name ?? null,
@@ -647,6 +673,7 @@ async function generateReply(input: {
   summary: string;
   industry: string;
   question: string;
+  lookup?: string;
   greeting: boolean;
   evidence: { content: string; title: string | null; sourceUrl?: string | null }[];
   structured: Awaited<ReturnType<typeof lookupBusinessFacts>>;
@@ -680,19 +707,20 @@ async function generateReply(input: {
   const factBlock = cleanedFacts.length
     ? cleanedFacts.map((fact) => `- ${fact.entity}: ${fact.value}`).join("\n")
     : "(none)";
-  const fromFacts = formatFactsAnswer(input.question, input.structured.facts.filter((fact) => !fact.conflicted));
-  const fromEvidence = formatEvidenceAnswer(input.question, input.evidence);
+  const lookup = input.lookup || input.question;
+  const fromFacts = formatFactsAnswer(lookup, input.structured.facts.filter((fact) => !fact.conflicted));
+  const fromEvidence = formatEvidenceAnswer(lookup, input.evidence);
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help?`
     : fromFacts || fromEvidence || `I don’t have a confirmed answer for that yet.`;
 
   try {
     const ai = await getAIProvider();
-    const evidenceBlock = rankEvidence(input.question, input.evidence)
+    const evidenceBlock = rankEvidence(lookup, input.evidence)
       .map((item, index) => `${index + 1}. ${item.title || "Source"}${item.sourceUrl ? ` (${item.sourceUrl})` : ""}\n${item.content.slice(0, 900)}`)
       .join("\n\n");
     const historyBlock = input.history
-      .slice(-8)
+      .slice(-20)
       .map((row) => `${row.role === "CUSTOMER" ? "Visitor" : "Agent"}: ${row.content}`)
       .join("\n");
     const result = await ai.generate({
@@ -700,6 +728,8 @@ async function generateReply(input: {
       maxTokens: 700,
       system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
 You work for this specific business. Never call the business "Prices and offerings".
+This is one ongoing chat. The Recent thread is the timeline — read every prior turn the way ChatGPT keeps history.
+Follow-ups such as "that", "how much", "the other one", or "and for 4 people" refer to earlier visitor messages. Do not restart, re-introduce yourself, or ignore prior turns unless the visitor clearly changes topic.
 Answer only from verified facts, owner notes, catalog cards, and page evidence.
 If several packages match the asked item (different durations or sizes), list those packages. That is not a conflict.
 If the visitor asked about one item, do not mention unrelated items.
@@ -732,12 +762,12 @@ ${productBlock}
 Evidence from the site:
 ${evidenceBlock || "(none retrieved)"}
 
-Recent thread:
-${historyBlock}
+Recent thread (oldest to newest):
+${historyBlock || "(this is the first visitor message)"}
 
 Visitor just said: ${input.question}
 
-Answer the question. Prefer a short intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles.`,
+Answer in context of the thread. Prefer a short intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles.`,
     });
     const text = sanitizeReply(result.text.trim());
     if (text && !looksLikeDump(text)) return text.slice(0, 2800);

@@ -27,6 +27,16 @@ export type WidgetProps = {
 
 type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null; human?: boolean };
 type CatalogCard = { name: string; price?: string | null; imageUrl?: string | null; url?: string | null };
+type BrowserSpeech = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<{ 0?: { transcript?: string }; isFinal: boolean }> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
 type Line =
   | { kind: "msg"; role: "agent" | "customer"; text: string; at: string; agent?: Person; products?: CatalogCard[] }
   | { kind: "xfer"; from: Person; to: Person; done?: boolean }
@@ -64,6 +74,11 @@ export function ChatWidget({
   const [inboxOpen, setInboxOpen] = useState(false);
   const [large, setLarge] = useState(false);
   const [humanTyping, setHumanTyping] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [listenCaption, setListenCaption] = useState("Listening…");
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const voiceDraftRef = useRef("");
+  const listeningRef = useRef(false);
   const ctxRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speakGenRef = useRef(0);
@@ -255,6 +270,64 @@ export function ChatWidget({
     setThinking(false);
     setAgent({ name, avatarUrl, role: "Online", voiceId });
     setLines([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
+  }
+
+  function finishListen(sendIt: boolean) {
+    listeningRef.current = false;
+    setListening(false);
+    setListenCaption("Listening…");
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+    const text = (voiceDraftRef.current || input).replace(/\s+/g, " ").trim();
+    voiceDraftRef.current = "";
+    if (sendIt && text) void send(text);
+  }
+
+  function startListen() {
+    const Rec = (window as typeof window & { SpeechRecognition?: new () => BrowserSpeech; webkitSpeechRecognition?: new () => BrowserSpeech }).SpeechRecognition
+      || (window as typeof window & { webkitSpeechRecognition?: new () => BrowserSpeech }).webkitSpeechRecognition;
+    if (!Rec) return;
+    stopSpeech();
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    voiceDraftRef.current = "";
+    const recognition = new Rec();
+    recognition.lang = String(voiceId || "en-US").match(/^[a-z]{2}-[A-Z]{2}/)?.[0] || "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let interim = "";
+      let finalBit = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const piece = event.results[i][0]?.transcript || "";
+        if (event.results[i].isFinal) finalBit += `${piece} `;
+        else interim += piece;
+      }
+      if (finalBit) voiceDraftRef.current = `${voiceDraftRef.current} ${finalBit}`.replace(/\s+/g, " ").trim();
+      const shown = `${voiceDraftRef.current} ${interim}`.replace(/\s+/g, " ").trim();
+      setListenCaption(shown || "Listening…");
+      if (shown) setInput(shown);
+    };
+    recognition.onerror = () => finishListen(Boolean(voiceDraftRef.current));
+    recognition.onend = () => {
+      if (listeningRef.current) finishListen(Boolean(voiceDraftRef.current || input.trim()));
+    };
+    try {
+      recognition.start();
+    } catch {
+      return;
+    }
+    recognitionRef.current = recognition;
+    listeningRef.current = true;
+    setListening(true);
+    setListenCaption("Listening…");
   }
 
   async function send(text = input.trim()) {
@@ -511,26 +584,57 @@ export function ChatWidget({
               {humanTyping ? <TypingDots label={`${humanTyping} is typing`} /> : null}
             </div>
             <div className={cn("flex shrink-0 items-center gap-2 border-t p-2.5 sm:p-3", template === "MINIMAL" ? "border-white/10" : "border-slate-100")}>
-              {voiceEnabled ? (
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white sm:h-10 sm:w-10">
-                  <Mic className="h-4 w-4" />
-                </span>
-              ) : null}
-              <input
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void send();
-                }}
-                placeholder="Write a message"
-                className={cn(
-                  "min-w-0 flex-1 rounded-full px-3 py-2 text-base outline-none sm:px-4 sm:text-sm",
-                  template === "MINIMAL" ? "bg-[#1a2436] text-[#e8edf5]" : "bg-slate-100 text-slate-800",
-                )}
-              />
-              <button type="button" onClick={() => void send()} className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10" style={visitorStyle}>
-                <Send className="h-4 w-4" />
-              </button>
+              {listening ? (
+                <>
+                  <button type="button" onClick={() => finishListen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-200 text-slate-700" aria-label="Cancel recording">
+                    <X className="h-4 w-4" />
+                  </button>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={visitorStyle}>
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" />
+                  </span>
+                  <span className="flex h-7 items-end gap-0.5">
+                    {[0, 1, 2, 3, 4].map((beat) => (
+                      <span
+                        key={beat}
+                        className="w-0.5 animate-pulse rounded-full bg-current"
+                        style={{ height: `${8 + ((beat * 7) % 16)}px`, color: primaryColor, animationDelay: `${beat * 80}ms` }}
+                      />
+                    ))}
+                  </span>
+                  <p className="min-w-0 flex-1 truncate text-[12px] text-slate-500">{listenCaption}</p>
+                  <button type="button" onClick={() => finishListen(true)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={visitorStyle} aria-label="Send recording">
+                    <Send className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  {voiceEnabled ? (
+                    <button
+                      type="button"
+                      onClick={startListen}
+                      className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white shadow-sm sm:h-10 sm:w-10"
+                      aria-label="Start voice message"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  <input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void send();
+                    }}
+                    placeholder="Write a message"
+                    className={cn(
+                      "min-w-0 flex-1 rounded-full px-3 py-2 text-base outline-none sm:px-4 sm:text-sm",
+                      template === "MINIMAL" ? "bg-[#1a2436] text-[#e8edf5]" : "bg-slate-100 text-slate-800",
+                    )}
+                  />
+                  <button type="button" onClick={() => void send()} className="grid h-9 w-9 shrink-0 place-items-center rounded-full sm:h-10 sm:w-10" style={visitorStyle}>
+                    <Send className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : teaserOn && template !== "MINIMAL" ? (
