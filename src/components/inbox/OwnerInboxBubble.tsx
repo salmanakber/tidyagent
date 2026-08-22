@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageSquare, Send, X } from "lucide-react";
+import { ChevronLeft, MessageSquare, Send, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { realtimeSocketUrl } from "@/modules/realtime/publish";
 
@@ -41,6 +41,15 @@ function chime() {
   }
 }
 
+function formatTime(value?: string) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
 export function OwnerInboxBubble() {
   const [open, setOpen] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -50,6 +59,7 @@ export function OwnerInboxBubble() {
   const primed = useRef(false);
   const socketRef = useRef<WebSocket | null>(null);
   const typingTimer = useRef<number>(0);
+  const scroller = useRef<HTMLDivElement>(null);
   const [peerTyping, setPeerTyping] = useState(false);
   const activeIdRef = useRef<string | null>(null);
   activeIdRef.current = activeId;
@@ -165,6 +175,10 @@ export function OwnerInboxBubble() {
     }
   }, [activeId]);
 
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
+  }, [active?.messages.length, peerTyping, activeId]);
+
   function emitTyping(on: boolean) {
     const socket = socketRef.current;
     if (!activeId || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -186,77 +200,100 @@ export function OwnerInboxBubble() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex flex-col items-end gap-3 lg:bottom-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] right-[max(1.15rem,env(safe-area-inset-right))] z-40 flex flex-col items-end gap-3 lg:bottom-[max(1.15rem,env(safe-area-inset-bottom))]">
       {open ? (
-        <div className="inbox-bubble pointer-events-auto flex h-[min(72dvh,560px)] w-[min(100vw-1.5rem,380px)] flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#0f172a] shadow-panel">
-          <div className="flex items-center justify-between bg-amber-500 px-4 py-3 text-navy-950">
-            <div>
-              <p className="text-sm font-semibold">{active ? active.customer : "Live inbox"}</p>
-              <p className="text-[11px] opacity-80">{waiting ? `${waiting} waiting` : "Take over from here"}</p>
+        <div className="inbox-bubble pointer-events-auto flex h-[min(74dvh,580px)] w-[min(100vw-1.75rem,400px)] flex-col overflow-hidden">
+          <div className="inbox-head">
+            <div className="inbox-avatar">{initials(active?.customer || "Live")}</div>
+            <div className="min-w-0 flex-1">
+              <p className="inbox-title">{active ? active.customer : "Live inbox"}</p>
+              <p className="inbox-sub">
+                {active?.waiting ? (
+                  <span className="inbox-wait-dot">Waiting · {active.remaining}s</span>
+                ) : active?.joined ? (
+                  <span className="inbox-live-dot">You’re in this chat</span>
+                ) : waiting ? (
+                  `${waiting} waiting for you`
+                ) : (
+                  "Visitor handoffs land here"
+                )}
+              </p>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-black/10" aria-label="Close">
+            <button type="button" className="inbox-icon" onClick={() => setOpen(false)} aria-label="Close inbox">
               <X className="h-4 w-4" />
             </button>
           </div>
+
           {!active ? (
-            <div className="flex-1 space-y-2 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {threads.length === 0 ? (
-                <p className="p-6 text-sm text-navy-300">When a visitor asks for a person, the chat opens here with a sound.</p>
+                <div className="inbox-empty">
+                  <span className="inbox-empty-icon">
+                    <MessageSquare className="h-5 w-5" />
+                  </span>
+                  <p>No live chats yet</p>
+                  <span>When a visitor asks for a person, it opens here with a sound so you can take over.</span>
+                </div>
               ) : (
-                threads.map((thread) => (
-                  <button
-                    key={thread.id}
-                    type="button"
-                    onClick={() => setActiveId(thread.id)}
-                    className="w-full rounded-2xl bg-white/5 px-3 py-3 text-left"
-                  >
-                    <p className="text-sm font-medium text-white">{thread.customer}</p>
-                    <p className="truncate text-xs text-navy-300">{thread.preview}</p>
-                    {thread.waiting ? <p className="mt-1 text-[11px] text-amber-200">Waiting · {thread.remaining}s</p> : null}
-                  </button>
-                ))
+                <ul className="space-y-2">
+                  {threads.map((thread) => (
+                    <li key={thread.id}>
+                      <button type="button" className="inbox-row" onClick={() => setActiveId(thread.id)}>
+                        <span className="inbox-avatar sm">{initials(thread.customer)}</span>
+                        <span className="min-w-0 flex-1 text-left">
+                          <span className="inbox-row-top">
+                            <span className="inbox-row-name">{thread.customer}</span>
+                            {thread.waiting ? <span className="inbox-pill wait">Waiting</span> : thread.joined ? <span className="inbox-pill live">Live</span> : null}
+                          </span>
+                          <span className="inbox-row-preview">{thread.preview || "New handoff"}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           ) : (
             <>
-              <button type="button" className="px-4 py-2 text-left text-xs text-navy-400" onClick={() => setActiveId(null)}>
-                All waiting chats
+              <button type="button" className="inbox-back" onClick={() => setActiveId(null)}>
+                <ChevronLeft className="h-4 w-4" />
+                All chats
               </button>
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
-                {active.messages.map((message) => (
-                  <div key={message.id} className={cn("flex", message.role === "CUSTOMER" ? "justify-end" : "justify-start")}>
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
-                        message.role === "CUSTOMER" ? "bg-amber-500 text-navy-950" : "inbox-reply bg-white/10 text-white",
-                      )}
-                    >
-                      {message.text}
+              {active.waiting && !active.joined ? (
+                <p className="inbox-banner">Visitor is waiting. Send a message to join this chat.</p>
+              ) : null}
+              <div ref={scroller} className="inbox-thread min-h-0 flex-1 overflow-y-auto">
+                {active.messages.length === 0 ? (
+                  <p className="inbox-thread-empty">No messages in this thread yet.</p>
+                ) : (
+                  active.messages.map((message) => (
+                    <div key={message.id} className={cn("inbox-line", message.role === "CUSTOMER" ? "visitor" : "agent")}>
+                      <div className={cn("inbox-msg", message.role === "CUSTOMER" ? "visitor" : "agent")}>{message.text}</div>
+                      {message.at ? <time>{formatTime(message.at)}</time> : null}
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
                 {peerTyping ? (
-                  <div className="flex justify-end">
-                    <div className="flex items-center gap-2 rounded-2xl bg-amber-500/15 px-3 py-2">
-                      <span className="flex gap-1">
-                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300 [animation-delay:-0.3s]" />
-                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300 [animation-delay:-0.15s]" />
-                        <i className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-300" />
+                  <div className="inbox-line visitor">
+                    <div className="inbox-typing">
+                      <span>
+                        <i />
+                        <i />
+                        <i />
                       </span>
-                      <span className="text-[11px] text-amber-200">Visitor is typing</span>
+                      Visitor is typing
                     </div>
                   </div>
                 ) : null}
               </div>
               <form
-                className="flex gap-2 border-t border-white/10 p-3"
+                className="inbox-composer"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void send();
                 }}
               >
                 <input
-                  className="field flex-1 bg-white/5"
                   value={draft}
                   onChange={(event) => {
                     setDraft(event.target.value);
@@ -264,9 +301,9 @@ export function OwnerInboxBubble() {
                     window.clearTimeout(typingTimer.current);
                     typingTimer.current = window.setTimeout(() => emitTyping(false), 1400);
                   }}
-                  placeholder={active.joined ? "Reply as you" : `Hi — this is me. I’ve got your chat now. How can I help?`}
+                  placeholder={active.joined ? "Reply as you" : "Take over this chat…"}
                 />
-                <button type="submit" className="grid h-11 w-11 place-items-center rounded-full bg-amber-500 text-navy-950" disabled={!draft.trim()}>
+                <button type="submit" disabled={!draft.trim()} aria-label="Send">
                   <Send className="h-4 w-4" />
                 </button>
               </form>
@@ -277,15 +314,11 @@ export function OwnerInboxBubble() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="pointer-events-auto relative grid h-14 w-14 place-items-center rounded-full bg-amber-500 text-navy-950 shadow-panel"
-        aria-label="Open live inbox"
+        className={cn("inbox-launch pointer-events-auto", waiting && !open ? "has-wait" : "")}
+        aria-label={open ? "Close live inbox" : "Open live inbox"}
       >
         {open ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
-        {waiting && !open ? (
-          <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-            {waiting}
-          </span>
-        ) : null}
+        {waiting && !open ? <span className="inbox-badge">{waiting}</span> : null}
       </button>
     </div>
   );
