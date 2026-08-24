@@ -5,6 +5,7 @@ import { getImpersonation } from "@/lib/security/admin-session";
 import { getWorkspace } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { AppShell } from "@/components/layout/AppShell";
+import { platformLabel } from "@/modules/platforms";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       suspendedReason={workspace.organization.suspendedReason}
       locked={!paid}
       setupIncomplete={paid && !setupComplete}
+      platformLabel={platformLabel(session.platform)}
     >
       {children}
     </AppShell>

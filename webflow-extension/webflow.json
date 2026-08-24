@@ -1,0 +1,6 @@
+{
+  "name": "tidyAgent",
+  "apiVersion": "2",
+  "size": "comfortable",
+  "publicDir": "."
+}

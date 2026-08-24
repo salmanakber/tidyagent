@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { webflowAuthorizeUrl } from "@/modules/webflow/oauth";
+import { isWebflowOpenRequest } from "@/modules/webflow/open";
 import { pickWebflowSite, sitePublicUrl, widgetInlineSource } from "@/modules/webflow/sites";
 import { syntheticInstanceId } from "@/modules/platforms/types";
 
@@ -45,5 +46,15 @@ describe("webflow oauth helpers", () => {
     expect(source).toContain("https://agent.tidyflowapp.com/widget.js");
     expect(source).toContain("wf:site-99");
     expect(source).not.toContain("<script");
+  });
+});
+
+describe("webflow app home detection", () => {
+  it("treats webflow.com referers and site ids as Open app", () => {
+    expect(isWebflowOpenRequest({ referer: "https://webflow.com/dashboard" })).toBe(true);
+    expect(isWebflowOpenRequest({ referer: "https://design.webflow.com/site/abc" })).toBe(true);
+    expect(isWebflowOpenRequest({ siteId: "site-1" })).toBe(true);
+    expect(isWebflowOpenRequest({ referer: "https://agent.tidyflowapp.com/" })).toBe(false);
+    expect(isWebflowOpenRequest({})).toBe(false);
   });
 });

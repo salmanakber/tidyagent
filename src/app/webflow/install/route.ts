@@ -18,7 +18,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/webflow/missing?error=not_configured", origin));
   }
 
-  const state = await createWebflowOAuthState();
+  const url = new URL(request.url);
+  const state = await createWebflowOAuthState({
+    embed: url.searchParams.get("embed") === "1",
+    siteId: url.searchParams.get("siteId") || url.searchParams.get("site") || undefined,
+  });
   return NextResponse.redirect(
     webflowAuthorizeUrl({
       clientId: config.clientId,

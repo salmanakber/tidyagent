@@ -81,6 +81,7 @@ export function PlatformSettingsForm({
       clientSecretSet: boolean;
       redirectUri: string;
       installPath: string;
+      appHomeUrl: string;
     };
     shopify: {
       enabled: boolean;
@@ -213,16 +214,24 @@ export function PlatformSettingsForm({
           <h3 className="text-sm font-medium text-white">Webflow setup</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
             <li>
-              In Webflow: Workspace settings → Apps &amp; Integrations → Register app. Building block:{" "}
-              <strong className="text-white">Data Client only</strong> (do not add a Designer Extension).
+              In Webflow: Workspace settings → Apps &amp; Integrations → Register app. Building blocks:{" "}
+              <strong className="text-white">Data Client</strong> plus a{" "}
+              <strong className="text-white">Designer Extension</strong> so site owners get Launch inside the
+              Designer, not only Open app.
             </li>
             <li>
-              Homepage / App home URL:
-              <code className="mt-1 block break-all text-amber-200">{marketplace.origin}</code>
+              Homepage / App home URL (Open app uses this — paste this, not the marketing site):
+              <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.appHomeUrl}</code>
             </li>
             <li>
               Redirect URL (paste this exactly):
               <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.redirectUri}</code>
+            </li>
+            <li>
+              Designer Extension development URL (Launch in Designer):
+              <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.appHomeUrl}</code>
+              Upload <code className="text-amber-200">webflow-extension/</code> when you publish the marketplace
+              listing. The extension iframes the same dashboard.
             </li>
             <li>
               Data Client permissions — turn <strong className="text-white">on</strong>: Sites (read + write), Pages
@@ -235,7 +244,9 @@ export function PlatformSettingsForm({
             <li>
               Tick <strong className="text-white">Enable Webflow</strong> only when you are ready to test OAuth.
               Site owners will later install from{" "}
-              <code className="text-amber-200">{marketplace.webflow.installPath}</code>.
+              <code className="text-amber-200">{marketplace.webflow.installPath}</code>. After install, Open app
+              should show the dashboard. Custom code is injected automatically; they still need to{" "}
+              <strong className="text-white">Publish</strong> the Webflow site for the widget to appear.
             </li>
             <li>
               Widget script for Webflow Custom Code:

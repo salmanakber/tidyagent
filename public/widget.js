@@ -7,7 +7,9 @@
 
   const origin = new URL(script.src).origin;
   const token = script.getAttribute("data-token") || "";
-  const rawInstance = script.getAttribute("data-instance") || "";
+  const srcUrl = new URL(script.src);
+  const rawInstance =
+    script.getAttribute("data-instance") || srcUrl.searchParams.get("instance") || "";
   const instance = rawInstance.includes("{") ? "" : rawInstance;
 
   const boot = () => {

@@ -9,6 +9,7 @@ export type MarketplaceAdapterConfig = {
     clientSecretSet: boolean;
     redirectUri: string;
     installPath: string;
+    appHomeUrl: string;
   };
   shopify: {
     enabled: boolean;
@@ -51,6 +52,7 @@ export async function getMarketplaceAdapterConfig(): Promise<MarketplaceAdapterC
       clientSecretSet: webflowSecretSet,
       redirectUri: `${origin}/api/webflow/oauth/callback`,
       installPath: `${origin}/webflow/install`,
+      appHomeUrl: `${origin}/webflow`,
     },
     shopify: {
       enabled: truthyFlag(shopifyEnabled),

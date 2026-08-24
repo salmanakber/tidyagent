@@ -1,7 +1,8 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
 import { isWixReviewMode } from "@/modules/auth/reviewer";
-import { platformLabel } from "@/modules/platforms";
+import { platformLabel, isWebflowPlatform } from "@/modules/platforms";
+import { webflowWidgetStatus } from "@/modules/webflow/embed";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -16,6 +17,9 @@ export default async function DashboardPage() {
   if (!session) redirect("/");
   const [data, testingMode] = await Promise.all([getDashboardOverview(session), isWixReviewMode()]);
   const siteName = data.site.displayName ?? `Your ${platformLabel(session.platform)} site`;
+  const webflowWidget = isWebflowPlatform(session.platform)
+    ? await webflowWidgetStatus(session.siteId)
+    : null;
 
   return (
     <div className="space-y-8">
@@ -37,6 +41,23 @@ export default async function DashboardPage() {
           </>
         }
       />
+
+      {webflowWidget ? (
+        <div className="panel p-4 text-sm leading-6 text-navy-300">
+          {webflowWidget.error ? (
+            <>
+              Custom code was not applied ({webflowWidget.error}). Open the app again after confirming Custom
+              code permission in Webflow, then publish the site.
+            </>
+          ) : (
+            <>
+              The chat widget is attached as Webflow custom code
+              {webflowWidget.injectedAt ? ` (updated ${webflowWidget.injectedAt})` : ""}. Publish the Webflow
+              site if visitors do not see the bubble yet.
+            </>
+          )}
+        </div>
+      ) : null}
 
       {testingMode && data.agent ? (
         <div id="test-ai">

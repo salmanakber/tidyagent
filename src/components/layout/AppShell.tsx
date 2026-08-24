@@ -55,6 +55,7 @@ export function AppShell({
   suspendedReason,
   locked,
   setupIncomplete,
+  platformLabel = "Wix",
 }: {
   children: React.ReactNode;
   orgName: string;
@@ -66,6 +67,7 @@ export function AppShell({
   suspendedReason?: string | null;
   locked?: boolean;
   setupIncomplete?: boolean;
+  platformLabel?: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -183,7 +185,7 @@ export function AppShell({
             )}
             <div className="hidden items-center gap-2 text-sm text-navy-300 lg:flex">
               <Sparkles className="h-4 w-4 text-amber-400" />
-              Wix-connected workspace
+              {platformLabel}-connected workspace
             </div>
             <div className="lg:hidden">
               <Logo compact />

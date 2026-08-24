@@ -1,11 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
 import { getEnv } from "@/lib/env";
 import type { AppSession } from "@/lib/security/session";
-import { prisma } from "@/lib/prisma";
-import { entitlementsForOrganization } from "@/modules/billing/service";
 import { getWebflowOAuthConfig } from "@/modules/platforms/marketplace";
 import { exchangeWebflowCode, webflowGet } from "@/modules/webflow/client";
-import { injectWebflowWidget } from "@/modules/webflow/embed";
+import { workspacePathForOrganization } from "@/modules/auth/workspace-path";
+import { ensureWebflowWidgetForSite } from "@/modules/webflow/embed";
 import { provisionTenantFromWebflow, type WebflowAuthorizedUser } from "@/modules/webflow/provision";
 import { WEBFLOW_SCOPE_STRING } from "@/modules/webflow/scopes";
 import { pickWebflowSite, type WebflowSiteRecord } from "@/modules/webflow/sites";
@@ -30,8 +29,12 @@ export function webflowAuthorizeUrl(input: { clientId: string; redirectUri: stri
   return url.toString();
 }
 
-export async function createWebflowOAuthState() {
-  return new SignJWT({ intent: "webflow-install" })
+export async function createWebflowOAuthState(input?: { embed?: boolean; siteId?: string }) {
+  return new SignJWT({
+    intent: "webflow-install",
+    embed: Boolean(input?.embed),
+    siteId: input?.siteId || null,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("15m")
@@ -51,9 +54,13 @@ export async function completeWebflowLogin(input: {
     );
   }
 
+  let preferredSiteId = input.preferredSiteId;
   if (input.state) {
     try {
-      await jwtVerify(input.state, new TextEncoder().encode(getEnv().SESSION_SECRET));
+      const { payload } = await jwtVerify(input.state, new TextEncoder().encode(getEnv().SESSION_SECRET));
+      if (!preferredSiteId && typeof payload.siteId === "string" && payload.siteId) {
+        preferredSiteId = payload.siteId;
+      }
     } catch {
       throw new WebflowInstallError("invalid_state", "OAuth state did not match.");
     }
@@ -76,7 +83,7 @@ export async function completeWebflowLogin(input: {
     "/v2/sites",
   );
   const sites = Array.isArray(listed) ? listed : (listed.sites ?? []);
-  const site = pickWebflowSite(sites, input.preferredSiteId);
+  const site = pickWebflowSite(sites, preferredSiteId);
   if (!site) {
     throw new WebflowInstallError(
       "no_site",
@@ -91,29 +98,10 @@ export async function completeWebflowLogin(input: {
     scope: tokens.scope,
   });
 
-  try {
-    await injectWebflowWidget({
-      accessToken: tokens.accessToken,
-      webflowSiteId: site.id,
-      widgetSrc: config.widgetSrc,
-      instanceId: session.wixInstanceId,
-    });
-  } catch (error) {
-    console.error("Webflow widget inject failed", error);
-  }
-
-  const organization = await prisma.organization.findUniqueOrThrow({
-    where: { id: session.organizationId },
-  });
-  const entitlements = await entitlementsForOrganization(session.organizationId);
-  const setupComplete = organization.onboardingStatus === "PUBLISHED";
+  await ensureWebflowWidgetForSite(session.siteId, tokens.accessToken);
 
   return {
     session,
-    destination: !entitlements.isPaidSeat
-      ? "/billing"
-      : setupComplete
-        ? "/dashboard"
-        : "/onboarding",
+    destination: await workspacePathForOrganization(session.organizationId),
   };
 }
