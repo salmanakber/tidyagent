@@ -40,4 +40,36 @@ describe("catalog cards", () => {
     expect(card?.price).toBe("$1500");
     expect(card?.imageUrl).toContain("boat.jpg");
   });
+
+  it("does not turn page titles into offer cards", () => {
+    expect(
+      cardFromMetadata({
+        title: "406watersports | Boat and Jet Ski Rental | Whitefish, MT, USA",
+        sourceUrl: "https://example.com/",
+      }),
+    ).toBeNull();
+    expect(
+      cardFromMetadata({
+        title: "Top Whitefish Montana Watersports: Jet Ski, Flyboarding &amp; Lake Adventures",
+        sourceUrl: "https://example.com/about",
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps priced offers and drops priceless page cards on a price-list question", () => {
+    const cards = matchCatalogCards("tell me the price list", [
+      { name: "406watersports | Boat and Jet Ski Rental | Whitefish, MT, USA" },
+      { name: "JET SKI", price: "$500", imageUrl: "https://cdn.example.com/ski.jpg" },
+      { name: "Top Whitefish Montana Watersports: Jet Ski, Flyboarding & Lake Adventures" },
+      { name: "4-Hour Rental", price: "$500" },
+      { name: "Deep Clean", price: "$149" },
+    ]);
+    expect(cards.every((card) => card.price)).toBe(true);
+    expect(cards.map((card) => card.name)).not.toEqual(
+      expect.arrayContaining([
+        "406watersports | Boat and Jet Ski Rental | Whitefish, MT, USA",
+        "Top Whitefish Montana Watersports: Jet Ski, Flyboarding & Lake Adventures",
+      ]),
+    );
+  });
 });

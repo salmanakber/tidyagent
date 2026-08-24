@@ -23,29 +23,53 @@ export function cardFromMetadata(input: {
   cleanedContent?: string | null;
 }): CatalogCard | null {
   const meta = asRecord(input.metadata);
-  const name = String(meta?.name || stripPriceSuffix(input.title) || "").trim();
-  if (!name) return null;
+  const name = decodeEntities(String(meta?.name || stripPriceSuffix(input.title) || "")).trim();
+  if (!name || isPageTitleName(name)) return null;
   const price = asOptionalString(meta?.price) || priceFromText(input.cleanedContent || input.title);
   const imageUrl = asOptionalString(meta?.imageUrl) || productImageFromRecord(meta?.data ?? meta);
   const url = asOptionalString(meta?.url) || input.sourceUrl || null;
-  if (!imageUrl && !price) return { name, url };
+  if (!price && !imageUrl) return null;
   return { name, price, imageUrl, url };
 }
 
+export function isPageTitleName(name: string) {
+  const value = name.trim();
+  if (value.length < 2 || value.length > 72) return true;
+  if (/[|]/.test(value)) return true;
+  if (/&amp;|&#\w+;/.test(value)) return true;
+  if ((value.match(/,/g) || []).length >= 2) return true;
+  if (/, [A-Z]{2}\b/.test(value) && /\b(usa|united states|uk|canada|australia)\b/i.test(value)) return true;
+  if (/^(home|homepage|welcome|about us|contact|blog|untitled|new site)\b/i.test(value)) return true;
+  if (/:\s+.+\s+(&|and)\s+/i.test(value) && value.split(/\s+/).length >= 8) return true;
+  return /^(prices and offerings|verified prices|page)$/i.test(value);
+}
+
 export function matchCatalogCards(question: string, cards: CatalogCard[], limit = 4): CatalogCard[] {
-  if (!cards.length) return [];
+  const pool = offerCardsForQuestion(question, cards);
+  if (!pool.length) return [];
   const terms = expandTerms(questionTerms(question)).filter(
     (term) => !["price", "prices", "pricing", "cost", "list", "show", "have", "what", "people"].includes(term),
   );
-  const scored = cards
+  const scored = pool
     .map((card) => ({ card, score: cardScore(question, terms, card) }))
     .sort((a, b) => b.score - a.score);
   const matched = scored.filter((row) => terms.some((term) => textMatchesTerms(row.card.name, [term]) || textMatchesTerms(row.card.name, terms)));
   if (matched.length) return uniqueCards(matched.map((row) => row.card)).slice(0, limit);
   if (/what do you (have|sell|offer)|show me (your )?(products|menu|packages)|catalog|all products/i.test(question)) {
-    return uniqueCards(cards).slice(0, limit);
+    return uniqueCards(pool).slice(0, limit);
   }
+  if (!terms.length && isPriceListQuestion(question)) return uniqueCards(pool).slice(0, limit);
   return scored.filter((row) => row.score >= 4).map((row) => row.card).slice(0, limit);
+}
+
+function offerCardsForQuestion(question: string, cards: CatalogCard[]) {
+  const usable = cards.filter((card) => card.name && !isPageTitleName(card.name));
+  if (isPriceListQuestion(question)) return usable.filter((card) => Boolean(card.price));
+  return usable.filter((card) => Boolean(card.price || card.imageUrl));
+}
+
+export function isPriceListQuestion(text: string) {
+  return /price|pricing|cost|how much|fee|rate|list|quote|plan|plans|package|charge|\$/.test(text.toLowerCase());
 }
 
 export async function loadCatalogCards(input: {
@@ -89,7 +113,7 @@ export async function loadCatalogCards(input: {
       [asOptionalString(pageUrl?.base), asOptionalString(pageUrl?.path)].filter(Boolean).join("") ||
       null;
     return {
-      name: row.name,
+      name: decodeEntities(row.name).trim(),
       price,
       imageUrl: productImageFromRecord(data),
       url,
@@ -132,6 +156,10 @@ function priceFromText(value: string) {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+function decodeEntities(value: string) {
+  return value.replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
 function asOptionalString(value: unknown) {

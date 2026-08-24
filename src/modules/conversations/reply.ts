@@ -355,7 +355,9 @@ export async function replyToVisitor(input: {
       (term) => !["price", "prices", "pricing", "cost", "list", "plan", "plans", "how", "much", "fee", "rate"].includes(term),
     );
     if (itemTerms.length) {
-      products = products.filter((card) => textMatchesTerms(`${card.name} ${card.price ?? ""}`, itemTerms));
+      products = products.filter((card) => Boolean(card.price) && textMatchesTerms(`${card.name} ${card.price ?? ""}`, itemTerms));
+    } else {
+      products = products.filter((card) => Boolean(card.price));
     }
   }
   const factsForReply = sensitive ? matchedFacts : matchedFacts.length ? matchedFacts : structured.facts;
