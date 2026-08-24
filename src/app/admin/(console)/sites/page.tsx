@@ -18,6 +18,7 @@ export default async function AdminSitesPage() {
           <thead className="text-[11px] uppercase tracking-[0.14em] text-navy-400">
             <tr>
               <th className="px-4 py-3">Site</th>
+              <th className="px-4 py-3">Platform</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Wix</th>
               <th className="px-4 py-3">Access</th>
@@ -33,6 +34,7 @@ export default async function AdminSitesPage() {
                   </Link>
                   <p className="text-xs text-navy-400">{site.ownerEmail || site.url || site.wixInstanceId}</p>
                 </td>
+                <td className="px-4 py-4">{site.platform === "WEBFLOW" ? "Webflow" : site.platform === "SHOPIFY" ? "Shopify" : "Wix"}</td>
                 <td className="px-4 py-4">
                   {site.isFree ? "FREE" : site.planKey}
                   {site.compPlanKey ? (

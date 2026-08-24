@@ -14,6 +14,7 @@ import {
   type PlatformAdminRole,
 } from "@/lib/security/admin-session";
 import { syncSubscriptionFromWix } from "@/modules/billing/service";
+import { isWixPlatform } from "@/modules/platforms";
 
 export async function loginPlatformAdmin(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -97,8 +98,10 @@ export async function restoreSite(siteId: string) {
 export async function syncSiteBilling(siteId: string) {
   await requireAdminSession("SUPPORT");
   const site = await prisma.wixSite.findUniqueOrThrow({ where: { id: siteId } });
-  await syncSubscriptionFromWix(site.wixInstanceId);
-  await writeAudit("billing.sync", { siteId, organizationId: site.organizationId, wixInstanceId: site.wixInstanceId });
+  if (isWixPlatform(site.platform)) {
+    await syncSubscriptionFromWix(site.wixInstanceId);
+  }
+  await writeAudit("billing.sync", { siteId, organizationId: site.organizationId, wixInstanceId: site.wixInstanceId, platform: site.platform });
 }
 
 export async function grantComplimentaryPlan(siteId: string, planKey: "STARTER" | "GROWTH" | "PRO", note?: string) {
@@ -159,6 +162,7 @@ export async function openSiteAsOwner(siteId: string) {
     organizationId: site.organizationId,
     siteId: site.id,
     wixInstanceId: site.wixInstanceId,
+    platform: site.platform,
     role: "OWNER",
     email: site.ownerEmail ?? undefined,
     name: site.displayName ?? site.organization.name,

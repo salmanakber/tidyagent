@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/security/session";
-import { syncSubscriptionFromWix } from "@/modules/billing/service";
+import { syncWixBillingForSession } from "@/modules/platforms";
 
 export async function refreshWixBilling() {
   const session = await requireSession();
-  await syncSubscriptionFromWix(session.wixInstanceId);
+  await syncWixBillingForSession(session);
   revalidatePath("/billing");
   revalidatePath("/dashboard");
   revalidatePath("/settings");

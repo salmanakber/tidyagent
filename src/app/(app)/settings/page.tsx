@@ -5,22 +5,28 @@ import { logout } from "@/app/actions/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { planLabel } from "@/modules/billing/catalog";
+import { isWixPlatform } from "@/modules/platforms";
 
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/");
   const data = await getDashboardOverview(session);
+  const wix = isWixPlatform(session.platform);
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Workspace"
         title="Settings"
-        description="Wix is the source of truth for install and billing. Widget look is your brand, not tidyAgent’s."
+        description={
+          wix
+            ? "Wix is the source of truth for install and billing. Widget look is your brand, not tidyAgent’s."
+            : "Workspace settings and widget branding for this site."
+        }
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">Wix connection</h2>
+          <h2 className="font-display text-xl text-white">{wix ? "Wix connection" : "Site connection"}</h2>
           <dl className="mt-5 space-y-3 text-sm">
             <Row label="Site" value={data.site.displayName || "Unnamed site"} />
             <Row label="URL" value={data.site.url || "Unpublished"} />
@@ -37,8 +43,9 @@ export default async function SettingsPage() {
             <button className="btn-secondary">Disconnect this site</button>
           </form>
           <p className="mt-3 text-xs leading-5 text-navy-400">
-            Clears this browser session. Reopen tidyAgent from Wix, or use Reconnect with Wix on the sign-in page, to
-            authenticate again.
+            {wix
+              ? "Clears this browser session. Reopen tidyAgent from Wix, or use Reconnect with Wix on the sign-in page, to authenticate again."
+              : "Clears this browser session."}
           </p>
         </div>
         <div className="panel p-6">

@@ -19,6 +19,10 @@ const envSchema = z.object({
   WIX_REVIEWER_EMAILS: z.string().optional().default(""),
   WIX_REVIEW_MODE: z.string().optional().default("false"),
   TIDYAGENT_DEV_MODE: z.string().optional().default("false"),
+  /// Off in production until Webflow OAuth ships. Wix is unaffected.
+  WEBFLOW_ENABLED: z.string().optional().default("false"),
+  /// Off until the Shopify adapter is built after Webflow.
+  SHOPIFY_ENABLED: z.string().optional().default("false"),
   PLATFORM_ADMIN_EMAIL: z.string().optional().default("owner@tidyagent.local"),
   PLATFORM_ADMIN_PASSWORD: z.string().optional().default(""),
   PLATFORM_ADMIN_EMAILS: z.string().optional().default(""),

@@ -8,6 +8,8 @@ describe("Wix BI events", () => {
     expect(shouldSendWixBiEvent("pending:user-1")).toBe(false);
     expect(shouldSendWixBiEvent("")).toBe(false);
     expect(shouldSendWixBiEvent(null)).toBe(false);
+    expect(shouldSendWixBiEvent("wf:webflow-site")).toBe(false);
+    expect(shouldSendWixBiEvent("shopify:store.myshopify.com")).toBe(false);
   });
 
   it("maps Wix billing cycles to BI cycle_name values", () => {

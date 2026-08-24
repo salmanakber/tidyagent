@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { getAppOrigin, getEnv } from "@/lib/env";
+import { resolveSitePlatform, type SitePlatform } from "@/modules/platforms/types";
 
 export const SESSION_COOKIE = "tidyagent_session";
 
@@ -12,6 +13,8 @@ export type AppSession = {
   siteId: string;
   wixInstanceId: string;
   wixUserId?: string;
+  /** Absent on cookies issued before multi-platform support — treated as Wix. */
+  platform?: SitePlatform;
   role: SessionRole;
   email?: string;
   name?: string;
@@ -44,6 +47,7 @@ export async function readSessionToken(token: string): Promise<AppSession | null
       siteId: claims.siteId,
       wixInstanceId: claims.wixInstanceId,
       wixUserId: claims.wixUserId,
+      platform: resolveSitePlatform(claims.platform),
       role: claims.role,
       email: claims.email,
       name: claims.name,

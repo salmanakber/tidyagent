@@ -4,6 +4,7 @@ import { getAppOrigin, getEnv } from "@/lib/env";
 import { parseWixInstance } from "@/lib/security/instance";
 import { getSession } from "@/lib/security/session";
 import { wixCheckoutUrl } from "@/modules/billing/checkout";
+import { isWixPlatform } from "@/modules/platforms";
 
 const PLANS: Record<string, PlanKey> = {
   STARTER: "STARTER",
@@ -17,6 +18,11 @@ export async function GET(request: Request) {
   const planKey = PLANS[(url.searchParams.get("plan") ?? "").toUpperCase()];
   if (!planKey) {
     return NextResponse.redirect(new URL("/pricing", getAppOrigin()));
+  }
+
+  const session = await getSession();
+  if (session && !isWixPlatform(session.platform) && !url.searchParams.get("instance")) {
+    return NextResponse.redirect(new URL("/billing", getAppOrigin()));
   }
 
   const instanceId = await resolveInstanceId(url);

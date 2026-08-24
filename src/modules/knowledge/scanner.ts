@@ -21,6 +21,7 @@ import { contentHash, factsFromPage, factsFromProduct } from "@/modules/knowledg
 import { persistSiteFacts } from "@/modules/knowledge/fact-store";
 import { getAIProvider } from "@/modules/ai/factory";
 import { detectWixCapabilities } from "@/modules/wix/capabilities";
+import { isWixPlatform } from "@/modules/platforms/types";
 import type { CrawlItem, ScanResult, ScanStage } from "@/modules/knowledge/types";
 
 const FETCH_TIMEOUT_MS = 9000;
@@ -54,46 +55,66 @@ export async function scanOrganizationSite(input: {
     throw new Error("Site not found");
   }
 
+  const wixSite = isWixPlatform(site.platform);
   let siteUrl = site.url;
-  try {
-    const snapshot = await fetchWixAppInstance(input.wixInstanceId);
-    siteUrl = snapshot.site.url || siteUrl;
-    await prisma.wixSite.update({
-      where: { id: site.id },
-      data: {
-        url: snapshot.site.url ?? site.url,
-        displayName: snapshot.site.displayName ?? site.displayName,
-        locale: snapshot.site.locale ?? site.locale,
-        currency: snapshot.site.currency ?? site.currency,
-        installedWixApps: snapshot.site.installedWixApps as Prisma.JsonArray,
-        capabilities: detectWixCapabilities(snapshot.site.installedWixApps) as unknown as Prisma.InputJsonValue,
-        lastSyncedAt: new Date(),
-      },
-    });
+  if (wixSite) {
+    try {
+      const snapshot = await fetchWixAppInstance(input.wixInstanceId);
+      siteUrl = snapshot.site.url || siteUrl;
+      await prisma.wixSite.update({
+        where: { id: site.id },
+        data: {
+          url: snapshot.site.url ?? site.url,
+          displayName: snapshot.site.displayName ?? site.displayName,
+          locale: snapshot.site.locale ?? site.locale,
+          currency: snapshot.site.currency ?? site.currency,
+          installedWixApps: snapshot.site.installedWixApps as Prisma.JsonArray,
+          capabilities: detectWixCapabilities(snapshot.site.installedWixApps) as unknown as Prisma.InputJsonValue,
+          lastSyncedAt: new Date(),
+        },
+      });
+      stages.push({
+        key: "identity",
+        label: "Confirmed Wix site identity",
+        status: "done",
+        detail: snapshot.site.displayName || snapshot.site.url || site.wixInstanceId,
+      });
+    } catch (error) {
+      stages.push({
+        key: "identity",
+        label: "Confirmed Wix site identity",
+        status: "failed",
+        detail: error instanceof Error ? error.message : "Could not refresh Wix instance",
+      });
+      warnings.push("Wix identity refresh failed. Scanning the last known site URL.");
+    }
+  } else {
     stages.push({
       key: "identity",
-      label: "Confirmed Wix site identity",
-      status: "done",
-      detail: snapshot.site.displayName || snapshot.site.url || site.wixInstanceId,
+      label: "Confirmed site identity",
+      status: siteUrl ? "done" : "skipped",
+      detail: site.displayName || site.url || site.wixInstanceId,
     });
-  } catch (error) {
-    stages.push({
-      key: "identity",
-      label: "Confirmed Wix site identity",
-      status: "failed",
-      detail: error instanceof Error ? error.message : "Could not refresh Wix instance",
-    });
-    warnings.push("Wix identity refresh failed. Scanning the last known site URL.");
   }
 
   if (!siteUrl || !isSafeHttpUrl(siteUrl)) {
-    warnings.push("This Wix site does not have a public URL yet. Wix APIs will still be read in plan scope if available.");
-    stages.push({
-      key: "homepage",
-      label: "Read the live website",
-      status: "skipped",
-      detail: "No public URL — using Wix APIs only",
-    });
+    if (wixSite) {
+      warnings.push("This Wix site does not have a public URL yet. Wix APIs will still be read in plan scope if available.");
+      stages.push({
+        key: "homepage",
+        label: "Read the live website",
+        status: "skipped",
+        detail: "No public URL — using Wix APIs only",
+      });
+    } else {
+      warnings.push("This site does not have a public URL yet.");
+      stages.push({
+        key: "homepage",
+        label: "Read the live website",
+        status: "skipped",
+        detail: "No public URL",
+      });
+    }
   }
 
   const origin = siteUrl && isSafeHttpUrl(siteUrl)
@@ -114,11 +135,13 @@ export async function scanOrganizationSite(input: {
     skipped.push("Domain crawl is included after a paid plan is purchased.");
   }
 
-  const apiHarvest = await harvestWixApis({
-    wixInstanceId: input.wixInstanceId,
-    siteUrl: homeUrl,
-    scope,
-  });
+  const apiHarvest = wixSite
+    ? await harvestWixApis({
+        wixInstanceId: input.wixInstanceId,
+        siteUrl: homeUrl,
+        scope,
+      })
+    : { pages: [], products: [], stages: [], skipped: [], warnings: [] };
   pages.push(...apiHarvest.pages);
   const products = apiHarvest.products;
   stages.push(...apiHarvest.stages);
@@ -144,12 +167,16 @@ export async function scanOrganizationSite(input: {
   const pricesDoc = pricesCatalogPage(pages, products, homeUrl);
 
   if (!pages.length && !products.length) {
-    warnings.push("No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions.");
+    warnings.push(
+      wixSite
+        ? "No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions."
+        : "No public pages could be read yet. Publish the site and try again.",
+    );
     return emptyResult(scope, homeUrl === "wix://site" ? null : homeUrl, stages, skipped, warnings);
   }
 
   const understanding = await understandSite({
-    displayName: site.displayName || host || "Wix site",
+    displayName: site.displayName || host || (wixSite ? "Wix site" : "Site"),
     siteUrl: homeUrl,
     locale: site.locale,
     currency: site.currency,

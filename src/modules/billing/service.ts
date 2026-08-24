@@ -15,6 +15,7 @@ import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes"
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
 import { getReviewerConfig, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
+import { isWixPlatform } from "@/modules/platforms/types";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -66,6 +67,9 @@ export async function applyWixBillingWebhook(envelope: WixWebhookEnvelope) {
     return;
   }
 
+  const existing = await prisma.wixSite.findUnique({ where: { wixInstanceId: instanceId } });
+  if (existing && !isWixPlatform(existing.platform)) return;
+
   const snapshot = await fetchWixAppInstance(instanceId).catch(() => null);
   const event: BillingEventInput = {
     eventType,
@@ -88,6 +92,8 @@ export async function applyWixBillingWebhook(envelope: WixWebhookEnvelope) {
 }
 
 export async function syncSubscriptionFromWix(instanceId: string) {
+  const site = await prisma.wixSite.findUnique({ where: { wixInstanceId: instanceId } });
+  if (site && !isWixPlatform(site.platform)) return null;
   const snapshot = await fetchWixAppInstance(instanceId);
   await upsertSubscriptionFromWix({
     instanceId,
@@ -106,7 +112,7 @@ async function upsertSubscriptionFromWix(input: {
   const site = await prisma.wixSite.findUnique({
     where: { wixInstanceId: input.instanceId },
   });
-  if (!site) return;
+  if (!site || !isWixPlatform(site.platform)) return;
 
   const currentRow = await prisma.subscription.findFirst({
     where: { organizationId: site.organizationId },

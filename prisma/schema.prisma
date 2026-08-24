@@ -47,6 +47,17 @@ enum OnboardingStatus {
   PUBLISHED
 }
 
+enum SitePlatform {
+  WIX
+  WEBFLOW
+  SHOPIFY
+}
+
+enum BillingProvider {
+  WIX
+  STRIPE
+}
+
 enum WidgetPosition {
   BOTTOM_RIGHT
   BOTTOM_LEFT
@@ -208,8 +219,12 @@ model OrganizationMember {
 model WixSite {
   id                 String   @id @default(cuid())
   organizationId     String
+  /// Physical table stays WixSite so production Wix rows are untouched.
+  platform           SitePlatform @default(WIX)
   wixInstanceId      String   @unique
   wixSiteId          String?
+  webflowSiteId      String?  @unique
+  shopifyShopDomain  String?  @unique
   displayName        String?
   url                String?
   locale             String?
@@ -234,6 +249,7 @@ model WixSite {
 
   @@index([organizationId])
   @@index([wixSiteId])
+  @@index([platform])
 }
 
 model WixCredential {
@@ -287,6 +303,7 @@ model Subscription {
   couponName         String?
   previousVendorProductId String?
   billingIssue       Boolean            @default(false)
+  billingProvider    BillingProvider    @default(WIX)
   rawBilling         Json?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

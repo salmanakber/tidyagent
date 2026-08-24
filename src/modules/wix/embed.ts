@@ -1,7 +1,9 @@
 import { createWixAppClient } from "@/services/wix/client";
 import { getEnv } from "@/lib/env";
+import { isWixInstanceTarget } from "@/modules/platforms/types";
 
 export async function embedSiteWidget(instanceId: string, disabled = false) {
+  if (!isWixInstanceTarget(instanceId)) return;
   try {
     const client = createWixAppClient(instanceId);
     const componentId = getEnv().WIX_EMBEDDED_SCRIPT_COMPONENT_ID || undefined;

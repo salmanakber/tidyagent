@@ -60,8 +60,8 @@ export async function updateAgent(input: z.infer<typeof agentUpdateSchema>) {
   });
 
   if (widgetEmbedMode) {
-    const { embedSiteWidget } = await import("@/modules/wix/embed");
-    await embedSiteWidget(session.wixInstanceId, widgetEmbedMode === "MANUAL");
+    const { embedWidgetForSession } = await import("@/modules/platforms");
+    await embedWidgetForSession(session, widgetEmbedMode === "MANUAL");
   }
 
   revalidatePath("/agent");
@@ -396,10 +396,9 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
       where: { organizationId: session.organizationId, siteId: session.siteId },
       data: { status: "ACTIVE", publishedAt: new Date() },
     });
-    const { embedSiteWidget } = await import("@/modules/wix/embed");
-    await embedSiteWidget(session.wixInstanceId, false);
-    const { reportSetupFinished } = await import("@/modules/wix/bi-events");
-    await reportSetupFinished(session.wixInstanceId);
+    const { embedWidgetForSession, reportWixSetupFinishedForSession } = await import("@/modules/platforms");
+    await embedWidgetForSession(session, false);
+    await reportWixSetupFinishedForSession(session);
   }
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");

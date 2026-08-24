@@ -35,6 +35,7 @@ export async function enterDevWorkspace() {
     organizationId: site.organizationId,
     siteId: site.id,
     wixInstanceId: site.wixInstanceId,
+    platform: site.platform,
     role: "OWNER",
     email: site.ownerEmail ?? undefined,
     name: site.displayName ?? "Demo owner",

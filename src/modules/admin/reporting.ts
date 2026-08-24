@@ -80,6 +80,7 @@ export async function listManagedSites() {
       connectionStatus: site.connectionStatus,
       accessStatus: site.organization.accessStatus,
       wixInstanceId: site.wixInstanceId,
+      platform: site.platform,
       lastSyncedAt: site.lastSyncedAt,
       lastBillingSyncedAt: site.lastBillingSyncedAt,
       planKey: subscription?.planKey ?? "FREE",

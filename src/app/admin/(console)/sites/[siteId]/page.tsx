@@ -32,6 +32,7 @@ export default async function AdminSiteDetailPage({
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Connection</h2>
           <dl className="mt-4 space-y-3 text-sm">
+            <Row label="Platform" value={site.platform === "WEBFLOW" ? "Webflow" : site.platform === "SHOPIFY" ? "Shopify" : "Wix"} />
             <Row label="Instance" value={site.wixInstanceId} />
             <Row label="Owner" value={site.ownerEmail || "—"} />
             <Row label="URL" value={site.url || "Unpublished"} />

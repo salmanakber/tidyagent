@@ -7,6 +7,7 @@ import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { refreshWixBilling } from "@/app/actions/billing";
+import { isWixPlatform, platformLabel } from "@/modules/platforms";
 
 const PAID_PLANS: PlanKey[] = ["STARTER", "GROWTH", "PRO"];
 
@@ -15,8 +16,21 @@ export default async function BillingPage() {
   if (!session) redirect("/");
   const data = await getDashboardOverview(session);
   const e = data.entitlements;
-  const upgradeUrl = wixUpgradeUrl(session.wixInstanceId);
   const scopes = await getAllPlanScopes();
+
+  if (!isWixPlatform(session.platform)) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow={`${platformLabel(session.platform)} billing`}
+          title="Billing for this platform is next"
+          description={`${platformLabel(session.platform)} checkout is not wired yet. Existing Wix customers still pay only through Wix. Complimentary seats still work.`}
+        />
+      </div>
+    );
+  }
+
+  const upgradeUrl = wixUpgradeUrl(session.wixInstanceId);
 
   return (
     <div className="space-y-8">

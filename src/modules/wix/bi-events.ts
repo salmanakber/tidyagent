@@ -16,6 +16,8 @@ export function shouldSendWixBiEvent(instanceId?: string | null) {
   if (!instanceId) return false;
   if (instanceId.startsWith("pending:")) return false;
   if (instanceId.startsWith("demo-")) return false;
+  if (instanceId.startsWith("wf:")) return false;
+  if (instanceId.startsWith("shopify:")) return false;
   return true;
 }
 

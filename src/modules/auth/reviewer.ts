@@ -204,6 +204,7 @@ export async function signInReviewer(user: User) {
     organizationId: site.organizationId,
     siteId: site.id,
     wixInstanceId: site.wixInstanceId,
+    platform: site.platform,
     role: "OWNER",
     email: user.email ?? undefined,
     name: user.name ?? undefined,
