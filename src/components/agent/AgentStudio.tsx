@@ -50,6 +50,7 @@ export function AgentStudio({
   hasEvents = false,
   contentTypes = ["PAGE", "FAQ", "POLICY", "CUSTOM"],
   presentCapabilities,
+  whatsappDigits,
 }: {
   agent: AgentView;
   agents?: AgentView[];
@@ -63,6 +64,7 @@ export function AgentStudio({
   hasEvents?: boolean;
   contentTypes?: KnowledgeContentType[];
   presentCapabilities?: string[];
+  whatsappDigits?: string | null;
 }) {
   const [name, setName] = useState(agent.name);
   const [role, setRole] = useState(agent.role);
@@ -327,6 +329,7 @@ export function AgentStudio({
             template={template}
             voiceEnabled={voiceOnPlan && voiceOn}
             voiceId={voiceId}
+            whatsappDigits={whatsappDigits}
           />
         </div>
       </div>

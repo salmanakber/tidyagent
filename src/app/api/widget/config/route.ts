@@ -3,6 +3,7 @@ import { verifyWidgetInitToken } from "@/lib/security/widget-token";
 import { prisma } from "@/lib/prisma";
 import { getAppOrigin } from "@/lib/env";
 import { entitlementsForOrganization } from "@/modules/billing/service";
+import { publicSupportChannels } from "@/modules/support/channels";
 
 function corsHeaders() {
   return {
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
       voiceEnabled: Boolean(live && entitlements.voiceEnabled && agent.voiceEnabled),
       voiceId: agent.voiceId || "en-US-Neural2-F",
       id: agent.id,
+      channels: publicSupportChannels(agent.organization.humanAgentWhatsapp),
     },
     { headers: { ...corsHeaders(), "Cache-Control": "no-store" } },
   );

@@ -91,6 +91,7 @@ export async function getDashboardOverview(session: AppSession) {
       id: organization.id,
       name: organization.name,
       onboardingStatus: organization.onboardingStatus,
+      humanAgentWhatsapp: organization.humanAgentWhatsapp,
     },
     site: {
       id: site.id,

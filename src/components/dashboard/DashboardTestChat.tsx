@@ -17,6 +17,7 @@ export function DashboardTestChat({
   template,
   voiceEnabled,
   voiceId,
+  whatsappDigits,
 }: {
   name: string;
   greeting: string;
@@ -31,6 +32,7 @@ export function DashboardTestChat({
   template?: WidgetTemplate | null;
   voiceEnabled?: boolean;
   voiceId?: string | null;
+  whatsappDigits?: string | null;
 }) {
   return (
     <section className="panel overflow-hidden p-6">
@@ -58,6 +60,7 @@ export function DashboardTestChat({
           template={template ?? "CLASSIC"}
           voiceEnabled={Boolean(voiceEnabled)}
           voiceId={voiceId}
+          whatsappDigits={whatsappDigits}
         />
       </div>
     </section>

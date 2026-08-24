@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, History, Maximize2, Mic, Minimize2, Plus, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
+import { LeadCaptureCard, SupportChoiceCard, WhatsAppOpenedCard } from "@/components/widget/HumanSupportCard";
 import { widgetGradientCss } from "@/modules/widget/gradient";
 import { realtimeSocketUrl } from "@/modules/realtime/publish";
 
@@ -23,6 +24,7 @@ export type WidgetProps = {
   template?: "CLASSIC" | "SOFT" | "BAR" | "MINIMAL";
   voiceEnabled?: boolean;
   voiceId?: string | null;
+  whatsappDigits?: string | null;
 };
 
 type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null; human?: boolean };
@@ -42,7 +44,9 @@ type Line =
   | { kind: "xfer"; from: Person; to: Person; done?: boolean }
   | { kind: "joined"; person: Person }
   | { kind: "wait"; person: Person; seconds: number }
-  | { kind: "lead" };
+  | { kind: "lead" }
+  | { kind: "support" }
+  | { kind: "whatsapp" };
 
 export function ChatWidget({
   name,
@@ -60,6 +64,7 @@ export function ChatWidget({
   template = "CLASSIC",
   voiceEnabled = false,
   voiceId,
+  whatsappDigits: whatsappDigitsProp,
 }: WidgetProps) {
   const left = position === "BOTTOM_LEFT";
   const [open, setOpen] = useState(Boolean(startOpen));
@@ -76,6 +81,9 @@ export function ChatWidget({
   const [humanTyping, setHumanTyping] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [listenCaption, setListenCaption] = useState("Listening…");
+  const [whatsappDigits, setWhatsappDigits] = useState(whatsappDigitsProp || "");
+  const [supportBusy, setSupportBusy] = useState(false);
+  const [supportError, setSupportError] = useState<string | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const voiceDraftRef = useRef("");
   const listeningRef = useRef(false);
@@ -122,6 +130,10 @@ export function ChatWidget({
     }, 22);
     return () => window.clearInterval(id);
   }, [greeting, name, template, voiceEnabled, avatarUrl, voiceId, startOpen]);
+
+  useEffect(() => {
+    setWhatsappDigits(whatsappDigitsProp || "");
+  }, [whatsappDigitsProp]);
 
   function unlock() {
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -232,11 +244,42 @@ export function ChatWidget({
     if (data.type === "expired") {
       liveClosed.current = true;
       liveSocket.current?.close();
-      setLines((current) =>
-        current.some((item) => item.kind === "lead")
-          ? current.filter((item) => item.kind !== "wait")
-          : [...current.filter((item) => item.kind !== "wait"), { kind: "lead" }],
-      );
+      offerHumanSupport();
+    }
+  }
+
+  function hasSupportCard(items: Line[]) {
+    return items.some((item) => item.kind === "lead" || item.kind === "support" || item.kind === "whatsapp");
+  }
+
+  function offerHumanSupport(digits = whatsappDigits) {
+    setLines((current) => {
+      if (hasSupportCard(current)) return current.filter((item) => item.kind !== "wait");
+      return [...current.filter((item) => item.kind !== "wait"), { kind: digits ? "support" : "lead" }];
+    });
+  }
+
+  async function openWhatsApp() {
+    if (!conversationId || supportBusy) return;
+    setSupportBusy(true);
+    setSupportError(null);
+    try {
+      const response = await fetch("/api/widget/whatsapp-handoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, preview }),
+      });
+      const data = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !data.url) {
+        setSupportError(data.error || "Could not open WhatsApp just then.");
+        return;
+      }
+      window.open(data.url, "_blank", "noopener,noreferrer");
+      setLines((current) => [...current.filter((item) => item.kind !== "support" && item.kind !== "lead"), { kind: "whatsapp" }]);
+    } catch {
+      setSupportError("Could not open WhatsApp just then.");
+    } finally {
+      setSupportBusy(false);
     }
   }
 
@@ -354,8 +397,10 @@ export function ChatWidget({
         live?: boolean;
         wait?: { seconds: number; expired?: boolean; human?: Person };
         handoff?: { from: Person; to: Person };
+        support?: { whatsapp?: { digits?: string } | null };
       };
       if (data.conversationId) setConversationId(data.conversationId);
+      if (data.support?.whatsapp?.digits) setWhatsappDigits(data.support.whatsapp.digits);
       if (data.wait && !data.wait.expired) {
         const to = data.wait.human || data.handoff?.to || agent;
         const from = data.handoff?.from || agent;
@@ -380,9 +425,7 @@ export function ChatWidget({
             ? [{ kind: "msg" as const, role: "agent" as const, text: data.text, at: data.createdAt || new Date().toISOString(), agent: to, products: data.products }]
             : []),
         ]);
-        if (data.leadForm) {
-          setLines((current) => (current.some((item) => item.kind === "lead") ? current : [...current, { kind: "lead" }]));
-        }
+        if (data.leadForm) offerHumanSupport(data.support?.whatsapp?.digits || whatsappDigits);
         if (data.text) void speak(data.text, to.voiceId);
       } else if (data.live && !data.text) {
         /* visitor message stored for the human */
@@ -400,9 +443,7 @@ export function ChatWidget({
             products: data.products,
           },
         ]);
-        if (data.leadForm) {
-          setLines((current) => (current.some((item) => item.kind === "lead") ? current : [...current, { kind: "lead" }]));
-        }
+        if (data.leadForm) offerHumanSupport(data.support?.whatsapp?.digits || whatsappDigits);
         void speak(reply, data.agent?.voiceId);
       }
     } catch {
@@ -545,12 +586,29 @@ export function ChatWidget({
                   </div>
                 ) : line.kind === "wait" ? (
                   <WaitRing key="wait" person={line.person} seconds={line.seconds} brandStyle={brandStyle} />
+                ) : line.kind === "support" ? (
+                  <SupportChoiceCard
+                    key="support"
+                    brandStyle={visitorStyle}
+                    busy={supportBusy}
+                    error={supportError}
+                    onChooseForm={() => setLines((current) => [...current.filter((item) => item.kind !== "support"), { kind: "lead" }])}
+                    onChooseWhatsApp={() => void openWhatsApp()}
+                  />
+                ) : line.kind === "whatsapp" ? (
+                  <WhatsAppOpenedCard
+                    key="whatsapp"
+                    brandStyle={visitorStyle}
+                    onDismiss={() => setLines((current) => current.filter((item) => item.kind !== "whatsapp"))}
+                  />
                 ) : line.kind === "lead" ? (
-                  <LeadCapture
+                  <LeadCaptureCard
                     key="lead"
                     conversationId={conversationId}
                     preview={preview}
                     brandStyle={visitorStyle}
+                    onBack={whatsappDigits ? () => setLines((current) => [...current.filter((item) => item.kind !== "lead"), { kind: "support" }]) : undefined}
+                    onDismiss={() => setLines((current) => current.filter((item) => item.kind !== "lead"))}
                   />
                 ) : line.kind === "joined" ? (
                   <div key={index} className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-slate-400">
@@ -728,61 +786,6 @@ function WaitRing({
       <p className="mt-4 text-sm font-semibold text-slate-800">Finding {person.name}</p>
       <p className="mt-1 text-xs text-slate-500">A real teammate is being notified. Stay here — they’ll join this chat.</p>
     </div>
-  );
-}
-
-function LeadCapture({
-  conversationId,
-  preview,
-  brandStyle,
-}: {
-  conversationId: string | null;
-  preview: boolean;
-  brandStyle: React.CSSProperties;
-}) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [note, setNote] = useState("");
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  if (sent) {
-    return (
-      <div className="rounded-2xl bg-white p-3 text-sm text-slate-700 shadow-sm">
-        Thanks. The team has your details and will follow up.
-      </div>
-    );
-  }
-
-  return (
-    <form
-      className="space-y-2 rounded-2xl bg-white p-3 shadow-sm"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (!conversationId || busy) return;
-        setBusy(true);
-        try {
-          const response = await fetch("/api/widget/lead", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ conversationId, name, email, phone, note, preview }),
-          });
-          if (response.ok) setSent(true);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Leave your details</p>
-      <input className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} required />
-      <input className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm" placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-      <input className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm" placeholder="Phone (optional)" value={phone} onChange={(event) => setPhone(event.target.value)} />
-      <textarea className="w-full rounded-xl bg-slate-100 px-3 py-2 text-sm" placeholder="What do you need?" value={note} onChange={(event) => setNote(event.target.value)} rows={2} />
-      <button type="submit" className="w-full rounded-full py-2 text-sm font-semibold" style={brandStyle} disabled={busy}>
-        {busy ? "Sending…" : "Send to the team"}
-      </button>
-    </form>
   );
 }
 

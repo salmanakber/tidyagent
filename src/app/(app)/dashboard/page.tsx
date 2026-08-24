@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DashboardTestChat } from "@/components/dashboard/DashboardTestChat";
+import { publicSupportChannels } from "@/modules/support/channels";
 import { formatNumber } from "@/lib/utils";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
             avatarUrl={data.agent.widgetAvatarUrl}
             template={data.agent.widgetTemplate}
             voiceEnabled={data.entitlements.voiceEnabled && data.agent.voiceEnabled}
+            whatsappDigits={publicSupportChannels(data.organization.humanAgentWhatsapp).whatsapp?.digits}
           />
         </div>
       ) : null}

@@ -30,6 +30,7 @@ export default async function ConversationsPage() {
         role={workspace.organization.humanAgentRole}
         email={workspace.organization.humanAgentEmail}
         avatarUrl={workspace.organization.humanAgentAvatarUrl}
+        whatsapp={workspace.organization.humanAgentWhatsapp}
       />
       <div className="panel overflow-hidden">
         {conversations.length === 0 ? (

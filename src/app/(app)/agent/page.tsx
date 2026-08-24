@@ -5,6 +5,7 @@ import { entitlementsForOrganization } from "@/modules/billing/service";
 import { siteFactsFromApps } from "@/modules/knowledge/site-facts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AgentStudio } from "@/components/agent/AgentStudio";
+import { publicSupportChannels } from "@/modules/support/channels";
 
 export default async function AgentPage() {
   const session = await getSession();
@@ -59,6 +60,7 @@ export default async function AgentPage() {
         hasEvents={facts.hasEvents}
         contentTypes={facts.contentTypes}
         presentCapabilities={facts.toolsPresent.map((tool) => tool.key)}
+        whatsappDigits={publicSupportChannels(workspace.organization.humanAgentWhatsapp).whatsapp?.digits}
       />
     </div>
   );

@@ -40,6 +40,7 @@ export default async function OnboardingPage() {
       humanRole={workspace.organization.humanAgentRole}
       humanEmail={workspace.organization.humanAgentEmail}
       humanAvatarUrl={workspace.organization.humanAgentAvatarUrl}
+      humanWhatsapp={workspace.organization.humanAgentWhatsapp}
     />
   );
 }

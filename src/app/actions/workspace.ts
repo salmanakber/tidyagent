@@ -245,7 +245,9 @@ export async function saveHumanHandoff(input: {
   role?: string;
   avatarUrl?: string;
   email?: string;
-}) {
+  whatsapp?: string | null;
+  whatsappCountry?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await requireSession();
   await requirePaidSeat(session);
   const name = z.string().min(2).max(60).parse(input.name.trim());
@@ -253,6 +255,9 @@ export async function saveHumanHandoff(input: {
   const avatarUrl = z.union([z.string().url(), z.literal("")]).optional().parse(input.avatarUrl || "");
   const rawEmail = (input.email || "").trim();
   const email = rawEmail && rawEmail.includes("@") && rawEmail.includes(".") ? rawEmail : "";
+  const { optionalWhatsAppE164 } = await import("@/modules/support/phone");
+  const whatsapp = optionalWhatsAppE164(input.whatsapp, input.whatsappCountry);
+  if (!whatsapp.ok) return { ok: false, error: whatsapp.error };
   await prisma.organization.update({
     where: { id: session.organizationId },
     data: {
@@ -260,12 +265,14 @@ export async function saveHumanHandoff(input: {
       humanAgentRole: role || "Team",
       humanAgentAvatarUrl: avatarUrl || null,
       humanAgentEmail: email || null,
+      humanAgentWhatsapp: whatsapp.e164,
     },
   });
   revalidatePath("/onboarding");
   revalidatePath("/conversations");
   revalidatePath("/agent");
   revalidatePath("/dashboard");
+  return { ok: true };
 }
 
 export async function saveSetupPeople(input: {
@@ -274,11 +281,16 @@ export async function saveSetupPeople(input: {
   humanRole?: string;
   humanEmail?: string;
   humanAvatarUrl?: string;
-}) {
+  humanWhatsapp?: string | null;
+  humanWhatsappCountry?: string | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await requireSession();
   await requirePaidSeat(session);
   const agentName = z.string().min(1).max(60).parse(input.agentName.trim());
   const avatarUrl = input.humanAvatarUrl && /^https?:\/\//.test(input.humanAvatarUrl) ? input.humanAvatarUrl : null;
+  const { optionalWhatsAppE164 } = await import("@/modules/support/phone");
+  const whatsapp = optionalWhatsAppE164(input.humanWhatsapp, input.humanWhatsappCountry);
+  if (!whatsapp.ok) return { ok: false, error: whatsapp.error };
   await prisma.organization.update({
     where: { id: session.organizationId },
     data: {
@@ -286,6 +298,7 @@ export async function saveSetupPeople(input: {
       humanAgentRole: (input.humanRole?.trim() || "Team").slice(0, 80),
       humanAgentEmail: input.humanEmail?.trim() || null,
       humanAgentAvatarUrl: avatarUrl,
+      humanAgentWhatsapp: whatsapp.e164,
     },
   });
   const workspace = await getWorkspace(session);
@@ -302,6 +315,7 @@ export async function saveSetupPeople(input: {
   }
   revalidatePath("/onboarding");
   revalidatePath("/agent");
+  return { ok: true };
 }
 
 export async function resolveConversation(conversationId: string) {

@@ -54,7 +54,7 @@ export async function ownerNotifyEmails(organizationId: string) {
 export async function emailHandoffTranscript(input: {
   organizationId: string;
   conversationId: string;
-  reason: "waiting" | "lead";
+  reason: "waiting" | "lead" | "whatsapp";
   lead?: { name?: string; email?: string; phone?: string | null; note?: string | null };
 }) {
   const [to, conversation] = await Promise.all([
@@ -79,9 +79,20 @@ export async function emailHandoffTranscript(input: {
     : "";
   await sendResendEmail({
     to,
-    subject: input.reason === "lead" ? "New chat lead from your website" : "A visitor is waiting to talk to you",
+    subject:
+      input.reason === "lead"
+        ? "New chat lead from your website"
+        : input.reason === "whatsapp"
+          ? "A visitor continued a chat on WhatsApp"
+          : "A visitor is waiting to talk to you",
     html: `<div style="font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.5">
-      <p>${input.reason === "lead" ? "A visitor left their details after waiting for a person." : "A visitor asked to speak with a person. Open tidyAgent to take over the chat."}</p>
+      <p>${
+        input.reason === "lead"
+          ? "A visitor left their details after waiting for a person."
+          : input.reason === "whatsapp"
+            ? "A visitor opened WhatsApp with a summary of the website chat. The original conversation is still in tidyAgent."
+            : "A visitor asked to speak with a person. Open tidyAgent to take over the chat."
+      }</p>
       ${leadBlock}
       <hr>
       ${lines || "<p>No messages yet.</p>"}

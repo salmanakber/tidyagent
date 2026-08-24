@@ -5,6 +5,7 @@ import { resolveWidgetAgent } from "@/modules/widget/resolve";
 import { replyToVisitor } from "@/modules/conversations/reply";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { personPayload } from "@/modules/widget/avatar";
+import { publicSupportChannels } from "@/modules/support/channels";
 
 function corsHeaders() {
   return {
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
         createdAt: result.createdAt,
         products: result.products ?? [],
         leadForm: Boolean(result.leadForm),
+        support: result.leadForm ? publicSupportChannels(agent.organization.humanAgentWhatsapp) : undefined,
         live: Boolean(result.live),
         wait: result.wait
           ? {

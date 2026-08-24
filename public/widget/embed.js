@@ -36,6 +36,7 @@
     const voiceId = String(config.voiceId || "en-US-Neural2-F");
     const startAvatar = absoluteUrl(config.avatarUrl, origin);
     const startInitials = initialsOf(startName);
+    let whatsappDigits = String(config.channels?.whatsapp?.digits || "");
     const host = document.documentElement || document.body;
     const storageKey = `tidyagent:${instance || site || "local"}`;
     let open = false;
@@ -368,6 +369,7 @@
           writeStore("lastAt", String(Date.now()));
           watchLive();
         }
+        if (data.support?.whatsapp?.digits) whatsappDigits = data.support.whatsapp.digits;
         if (data.wait && !data.wait.expired) {
           const to = data.wait.human ? personFrom(data.wait.human) : data.handoff?.to ? personFrom(data.handoff.to) : currentAgent;
           await playHandoff(data.handoff || { from: currentAgent, to });
@@ -396,7 +398,7 @@
             playReceiveTick();
             if (voiceOn) void speak(reply);
           }
-          if (data.leadForm) renderLeadForm();
+          if (data.leadForm) offerHumanSupport(data.support);
         }
         saveInboxMeta(text);
       } catch {
@@ -864,7 +866,7 @@
           if (data.type === "expired") {
             liveClosed = true;
             thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
-            renderLeadForm();
+            offerHumanSupport();
             socket.close();
           }
         };
@@ -875,40 +877,205 @@
       connect();
     }
 
-    function renderLeadForm() {
-      if (thread.querySelector(".lead-form")) return;
+    function offerHumanSupport(support) {
+      const digits = (support && support.whatsapp && support.whatsapp.digits) || whatsappDigits;
+      if (digits) {
+        whatsappDigits = digits;
+        renderSupportChoice();
+        return;
+      }
+      renderLeadForm();
+    }
+
+    function supportCardOpen() {
+      return Boolean(thread.querySelector(".lead-form, .support-choice, .lead-success, .wa-ready"));
+    }
+
+    function renderSupportChoice() {
+      if (supportCardOpen()) return;
+      const wrap = document.createElement("div");
+      wrap.className = "support-choice";
+      wrap.innerHTML = `
+        <p class="lead-kicker">Human support</p>
+        <p class="lead-heading">How would you like to get help from our team?</p>
+        <p class="lead-copy">Choose how a teammate should pick this up. Your chat here stays saved.</p>
+        <button type="button" class="support-opt" data-opt="form">
+          <strong>Submit a support request</strong>
+          <span>Leave your details. The team will follow up by email.</span>
+        </button>
+        <button type="button" class="support-opt primary" data-opt="whatsapp">
+          <strong>Continue on WhatsApp</strong>
+          <span>Opens WhatsApp with a short summary of this chat. You review and send it.</span>
+        </button>
+        <p class="lead-error" hidden></p>`;
+      wrap.querySelectorAll("[data-opt]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const opt = btn.getAttribute("data-opt");
+          if (opt === "form") {
+            wrap.remove();
+            renderLeadForm(true);
+            return;
+          }
+          void openWhatsApp(wrap);
+        });
+      });
+      thread.appendChild(wrap);
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    async function openWhatsApp(wrap) {
+      if (!conversationId || wrap.dataset.busy === "1") return;
+      wrap.dataset.busy = "1";
+      const errorEl = wrap.querySelector(".lead-error");
+      const waBtn = wrap.querySelector('[data-opt="whatsapp"]');
+      if (waBtn) waBtn.disabled = true;
+      if (errorEl) errorEl.hidden = true;
+      try {
+        const response = await fetch(`${origin}/api/widget/whatsapp-handoff`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            token,
+            instanceId: instance,
+            site,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.url) {
+          if (errorEl) {
+            errorEl.hidden = false;
+            errorEl.textContent = data.error || "Could not open WhatsApp just then.";
+          }
+          wrap.dataset.busy = "";
+          if (waBtn) waBtn.disabled = false;
+          return;
+        }
+        window.open(data.url, "_blank", "noopener,noreferrer");
+        wrap.className = "wa-ready";
+        wrap.innerHTML = `
+          <div class="lead-check">✓</div>
+          <p class="lead-heading">WhatsApp is ready</p>
+          <p class="lead-copy">A short summary of this chat is pre-filled. Review it, then send it yourself. This website conversation stays here.</p>
+          <button type="button" class="lead-submit">Back to chat</button>`;
+        wrap.querySelector("button").addEventListener("click", () => wrap.remove());
+      } catch {
+        if (errorEl) {
+          errorEl.hidden = false;
+          errorEl.textContent = "Could not open WhatsApp just then.";
+        }
+        wrap.dataset.busy = "";
+        if (waBtn) waBtn.disabled = false;
+      }
+    }
+
+    function renderLeadForm(fromChoice) {
+      if (thread.querySelector(".lead-form, .lead-success")) return;
+      thread.querySelectorAll(".support-choice").forEach((el) => el.remove());
       const wrap = document.createElement("form");
       wrap.className = "lead-form";
       wrap.innerHTML = `
-        <p class="lead-title">Leave your details</p>
-        <input name="name" required placeholder="Name">
-        <input name="email" type="email" required placeholder="Email">
-        <input name="phone" placeholder="Phone (optional)">
-        <textarea name="note" rows="2" placeholder="What do you need?"></textarea>
-        <button type="submit">Send to the team</button>`;
+        <div class="lead-head">
+          <span class="lead-icon">✉</span>
+          <div>
+            <p class="lead-kicker">Support request</p>
+            <p class="lead-heading">Send a note to the team</p>
+            <p class="lead-copy">We’ll follow up using the details you leave here.</p>
+          </div>
+        </div>
+        <label><span>Name</span><input name="name" autocomplete="name" placeholder="Your name"><em></em></label>
+        <label><span>Email</span><input name="email" type="email" autocomplete="email" placeholder="you@email.com"><em></em></label>
+        <label><span>Phone (optional)</span><input name="phone" autocomplete="tel" placeholder="Mobile number"><em></em></label>
+        <label><span>How can we help?</span><textarea name="note" rows="3" maxlength="800" placeholder="A short note about what you need"></textarea><em></em></label>
+        <p class="lead-error" hidden></p>
+        <button type="submit" class="lead-submit">Send to the team</button>
+        ${fromChoice && whatsappDigits ? `<button type="button" class="lead-back">← Back to options</button>` : ""}`;
+      const back = wrap.querySelector(".lead-back");
+      if (back) {
+        back.addEventListener("click", () => {
+          wrap.remove();
+          renderSupportChoice();
+        });
+      }
       wrap.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (wrap.dataset.busy === "1") return;
         const form = new FormData(wrap);
-        wrap.querySelector("button").disabled = true;
+        const name = String(form.get("name") || "").trim();
+        const email = String(form.get("email") || "").trim();
+        const phone = String(form.get("phone") || "").trim();
+        const note = String(form.get("note") || "").trim();
+        const errors = {};
+        if (name.length < 2) errors.name = "Please enter your name.";
+        if (name.length > 80) errors.name = "Name is too long.";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 120) errors.email = "Enter a valid email address.";
+        if (phone.length > 40) errors.phone = "Phone number is too long.";
+        if (note.length > 800) errors.note = "Please keep this under 800 characters.";
+        wrap.querySelectorAll("label").forEach((label) => {
+          const field = label.querySelector("input, textarea");
+          const hint = label.querySelector("em");
+          const key = field && field.getAttribute("name");
+          const message = key ? errors[key] : "";
+          label.classList.toggle("invalid", Boolean(message));
+          if (hint) hint.textContent = message || "";
+        });
+        const formError = wrap.querySelector(".lead-error");
+        if (formError) formError.hidden = true;
+        if (Object.keys(errors).length) return;
+        wrap.dataset.busy = "1";
+        const btn = wrap.querySelector(".lead-submit");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Sending…";
+        }
+        wrap.querySelectorAll("input, textarea, button").forEach((el) => {
+          if (el !== btn && !el.classList.contains("lead-back")) el.disabled = true;
+        });
         try {
           const response = await fetch(`${origin}/api/widget/lead`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               conversationId,
-              name: String(form.get("name") || ""),
-              email: String(form.get("email") || ""),
-              phone: String(form.get("phone") || ""),
-              note: String(form.get("note") || ""),
+              name,
+              email,
+              phone,
+              note,
               token,
               instanceId: instance,
               site,
             }),
           });
-          if (response.ok) wrap.innerHTML = `<p class="lead-title">Thanks. The team has your details and will follow up.</p>`;
+          const data = await response.json().catch(() => ({}));
+          if (response.ok) {
+            wrap.className = "lead-success";
+            wrap.innerHTML = `
+              <div class="lead-check">✓</div>
+              <p class="lead-heading">Request received</p>
+              <p class="lead-copy">Your support request was submitted. The team has your details and will follow up by email.</p>
+              <p class="lead-copy muted">You can keep chatting here if you have more to add.</p>
+              <button type="button" class="lead-submit">Continue chatting</button>`;
+            wrap.querySelector("button").addEventListener("click", () => wrap.remove());
+            return;
+          }
+          if (formError) {
+            formError.hidden = false;
+            formError.textContent = data.error || "Check the highlighted fields and try again.";
+          }
+        } catch {
+          if (formError) {
+            formError.hidden = false;
+            formError.textContent = "Could not send just then. Please try again.";
+          }
         } finally {
-          const btn = wrap.querySelector("button");
-          if (btn) btn.disabled = false;
+          wrap.dataset.busy = "";
+          wrap.querySelectorAll("input, textarea, button").forEach((el) => {
+            el.disabled = false;
+          });
+          if (btn && wrap.classList.contains("lead-form")) {
+            btn.disabled = false;
+            btn.textContent = "Send to the team";
+          }
         }
       });
       thread.appendChild(wrap);
@@ -1255,10 +1422,29 @@
       .card-copy { padding:10px 12px 12px; }
       .card-name { margin:0; font:650 13px/1.35 ui-sans-serif,system-ui; }
       .card-price { margin:4px 0 0; font:600 13px/1.3 ui-sans-serif,system-ui; opacity:.8; }
-      .lead-form { display:grid; gap:8px; background:${noir ? "#151c2b" : "#fff"}; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(16,24,40,.08); }
-      .lead-title { margin:0; font:650 12px/1.3 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.6; }
-      .lead-form input, .lead-form textarea { border:0; border-radius:12px; background:${noir ? "#1a2436" : "#f1f5f9"}; padding:10px 12px; font:500 14px/1.3 ui-sans-serif,system-ui; color:inherit; }
-      .lead-form button { border:0; border-radius:999px; padding:10px 12px; background:${fill}; color:${textColor}; font:650 13px/1 ui-sans-serif,system-ui; cursor:pointer; }
+      .lead-form, .support-choice, .lead-success, .wa-ready { display:grid; gap:10px; background:${noir ? "#151c2b" : "#fff"}; border-radius:22px; padding:14px; box-shadow:0 10px 28px rgba(16,24,40,.08); }
+      .lead-head { display:flex; gap:10px; align-items:flex-start; }
+      .lead-icon, .lead-check { height:32px; width:32px; border-radius:12px; display:grid; place-items:center; background:${fill}; color:${textColor}; font:700 14px/1 ui-sans-serif,system-ui; flex:none; }
+      .lead-check { height:48px; width:48px; border-radius:999px; margin:4px auto 0; font-size:22px; }
+      .lead-kicker { margin:0; font:700 10px/1.2 ui-sans-serif,system-ui; letter-spacing:.16em; text-transform:uppercase; color:${noir ? "#8b9bb4" : "#94a3b8"}; }
+      .lead-heading { margin:2px 0 0; font:700 14px/1.35 ui-sans-serif,system-ui; }
+      .lead-copy { margin:4px 0 0; font:500 12px/1.45 ui-sans-serif,system-ui; color:${noir ? "#8b9bb4" : "#64748b"}; }
+      .lead-copy.muted { margin-top:0; }
+      .lead-form label { display:grid; gap:6px; }
+      .lead-form label span { font:700 10px/1 ui-sans-serif,system-ui; letter-spacing:.12em; text-transform:uppercase; color:${noir ? "#8b9bb4" : "#64748b"}; }
+      .lead-form input, .lead-form textarea { border:1px solid ${noir ? "rgba(255,255,255,.08)" : "#e2e8f0"}; border-radius:14px; background:${noir ? "#1a2436" : "#f8fafc"}; padding:11px 12px; font:500 14px/1.3 ui-sans-serif,system-ui; color:inherit; outline:none; }
+      .lead-form input:focus, .lead-form textarea:focus { border-color:${color}; background:${noir ? "#121826" : "#fff"}; }
+      .lead-form label.invalid input, .lead-form label.invalid textarea { border-color:#f43f5e; background:${noir ? "#2a1620" : "#fff1f2"}; }
+      .lead-form em { min-height:0; font:600 11px/1.3 ui-sans-serif,system-ui; color:#e11d48; }
+      .lead-error { margin:0; font:600 12px/1.35 ui-sans-serif,system-ui; color:#e11d48; }
+      .lead-submit { border:0; border-radius:999px; padding:11px 12px; background:${fill}; color:${textColor}; font:650 13px/1 ui-sans-serif,system-ui; cursor:pointer; }
+      .lead-submit:disabled { opacity:.6; cursor:wait; }
+      .lead-back { border:0; background:transparent; color:${noir ? "#8b9bb4" : "#64748b"}; font:600 12px/1 ui-sans-serif,system-ui; cursor:pointer; padding:2px; }
+      .support-opt { border:1px solid ${noir ? "rgba(255,255,255,.08)" : "#e2e8f0"}; background:${noir ? "#1a2436" : "#f8fafc"}; border-radius:16px; padding:12px; text-align:left; cursor:pointer; color:inherit; }
+      .support-opt strong { display:block; font:700 13px/1.3 ui-sans-serif,system-ui; }
+      .support-opt span { display:block; margin-top:4px; font:500 11px/1.4 ui-sans-serif,system-ui; opacity:.72; }
+      .support-opt.primary { background:${fill}; color:${textColor}; border-color:transparent; }
+      .lead-success, .wa-ready { text-align:center; padding:18px 14px; }
       .joined { display:flex; align-items:center; gap:8px; color:#64748b; font:650 11px/1 ui-sans-serif,system-ui; letter-spacing:.04em; text-transform:uppercase; margin:4px 0 2px; }
       .joined .line { flex:1; height:1px; background:currentColor; opacity:.25; }
       .composer { display:flex; gap:8px; padding:8px 8px 10px; border-top:1px solid ${noir ? "rgba(255,255,255,.06)" : "#e8eef5"}; background:${paper}; align-items:center; flex:none; }
