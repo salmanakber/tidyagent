@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isFollowUp, isPriceQuestion, isSensitiveQuestion, searchQueryFromThread, subjectTerms } from "@/modules/conversations/reply";
+import {
+  formatEvidenceAnswer,
+  formatFactsAnswer,
+  isCasualOpener,
+  isChatMetaQuestion,
+  isFollowUp,
+  isIdentityQuestion,
+  isOpenAdviceQuestion,
+  isPriceQuestion,
+  isSensitiveQuestion,
+  searchQueryFromThread,
+  subjectTerms,
+} from "@/modules/conversations/reply";
 
 describe("visitor openers", () => {
   it("treats hi/hello as greetings, not missing knowledge", () => {
@@ -61,8 +73,23 @@ describe("visitor openers", () => {
     expect(isFollowUp("how much is that?")).toBe(true);
     expect(isFollowUp("and the 2 hour one")).toBe(true);
     expect(isFollowUp("the other package")).toBe(true);
+    expect(isFollowUp("yes the other one")).toBe(true);
+    expect(isChatMetaQuestion("ok")).toBe(true);
     expect(isFollowUp("What time is jet ski rental?")).toBe(false);
     expect(searchQueryFromThread("how much is that", ["Do you rent jet skis?"])).toMatch(/jet ski/i);
     expect(searchQueryFromThread("What time is flyboard", ["Do you rent jet skis?"])).toBe("What time is flyboard");
+  });
+
+  it("answers identity and general questions without inheriting a prior price search", () => {
+    expect(isIdentityQuestion("Okay what is your name")).toBe(true);
+    expect(isFollowUp("Okay what is your name")).toBe(false);
+    expect(isChatMetaQuestion("Why?")).toBe(true);
+    expect(isChatMetaQuestion("ITs just general question i am asking")).toBe(true);
+    expect(isChatMetaQuestion("its not releated to website")).toBe(true);
+    expect(isOpenAdviceQuestion("what is good time to book i mean in 12 months what is the best time to book")).toBe(true);
+    expect(isOpenAdviceQuestion("how much is the pontoon")).toBe(false);
+    expect(searchQueryFromThread("Okay what is your name", ["can you please show me the price list for pontoon"])).toBe(
+      "Okay what is your name",
+    );
   });
 });

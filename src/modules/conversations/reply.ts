@@ -35,20 +35,59 @@ export function isCasualOpener(text: string) {
   return OPENER.test(text.trim().replace(/[^\w\s'!?]/g, ""));
 }
 
-export function isFollowUp(text: string) {
-  const t = text
+function normalizeChat(text: string) {
+  return text
     .trim()
     .toLowerCase()
     .replace(/[^\w\s'?]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function isIdentityQuestion(text: string) {
+  return /\b(what('?s| is) your name|who are you|what('?s| is) (your|the) (name|role)|are you (a |an )?(real )?(human|person|bot|ai|assistant)|do you have a name)\b/i.test(
+    text,
+  );
+}
+
+export function isChatMetaQuestion(text: string) {
+  const t = normalizeChat(text);
   if (!t) return false;
+  if (/^(why|why not|how come)\??$/.test(t)) return true;
   if (
-    /^(and|also|what about|how about|how much|the other|that one|this one|those|them|yes|yep|yeah|nope|no|ok|okay|same|another|more|which one)\b/.test(
+    /\b(just (a )?general( question)?|not rel[ae]+ted to (the )?(website|site|page)|i('m| am) just asking|doesn'?t have to be on (the )?(website|site)|its not rel[ae]+ted)\b/.test(
       t,
     )
   ) {
     return true;
+  }
+  return /^(thanks|thank you|thx|ok|okay|cool|great|got it|bye|goodbye|see you)[\s!.]*$/.test(t);
+}
+
+export function isOpenAdviceQuestion(text: string) {
+  return /\b((best|good|right|peak) time|when (should i (come|visit|go|book)|is (the )?(best|good|peak))|what season|which month|time of year|weather|what to (bring|wear|pack)|is it (worth( it)?|fun|busy|crowded)|any tips)\b/i.test(
+    text,
+  );
+}
+
+export function isConversationalTurn(text: string) {
+  return isIdentityQuestion(text) || isChatMetaQuestion(text) || isOpenAdviceQuestion(text);
+}
+
+export function isFollowUp(text: string) {
+  const t = normalizeChat(text);
+  if (!t) return false;
+  if (isIdentityQuestion(text) || isChatMetaQuestion(text) || isOpenAdviceQuestion(text)) return false;
+  if (/^(and|also|what about|how about|how much|the other|that one|this one|those|them|same|another|more|which one)\b/.test(t)) {
+    return true;
+  }
+  if (/^(yes|yep|yeah|yup|nope|no|ok|okay)\b/.test(t)) {
+    const rest = t.replace(/^(yes|yep|yeah|yup|nope|no|ok|okay)\s*/, "").trim();
+    if (!rest) return true;
+    if (/^(thanks|thank you|thx|cool|great|got it|sure)[\s!.]*$/.test(rest)) return true;
+    if (/\b(that|those|them|it|this one|the other|same|too|as well)\b/.test(rest)) return true;
+    if (rest.split(" ").length <= 6 && /^(the |and |also )/.test(rest)) return true;
+    return false;
   }
   const words = t.split(" ").filter(Boolean);
   return words.length <= 8 && /\b(that|those|them|it|this one|the other|same|too|as well)\b/.test(t) && subjectTerms(t).length < 2;
@@ -56,6 +95,7 @@ export function isFollowUp(text: string) {
 
 export function searchQueryFromThread(current: string, previousCustomer: string[]) {
   if (!previousCustomer.length || !isFollowUp(current)) return current;
+  if (isConversationalTurn(current)) return current;
   return `${previousCustomer.slice(-2).join(" ")} ${current}`.replace(/\s+/g, " ").trim().slice(0, 400);
 }
 
@@ -209,8 +249,10 @@ export async function replyToVisitor(input: {
     .map((row) => ({ role: row.role, content: row.content }));
   const priorCustomer = timeline.filter((row) => row.role === "CUSTOMER").map((row) => row.content);
   const aboutProduct = isTidyAgentQuestion(message, priorCustomer);
+  const chatTurn = isConversationalTurn(message);
   const greetingTurn = isCasualOpener(message) && on("greeting") && priorCustomer.length === 0 && !aboutProduct;
   const searchQuery = searchQueryFromThread(message, priorCustomer);
+  const skipKnowledge = greetingTurn || aboutProduct || isIdentityQuestion(message) || isChatMetaQuestion(message);
   const intent = greetingTurn ? "GENERAL" : classifyVisitorIntent(searchQuery);
   let routed = current;
   if (on("specialist_routing") && !greetingTurn && !(intent === "ECOMMERCE" && !on("shopping"))) {
@@ -294,7 +336,7 @@ export async function replyToVisitor(input: {
     }
   }
   const wantsHuman = isHandoffRequest(message);
-  const structured = greetingTurn || aboutProduct
+  const structured = skipKnowledge
     ? { facts: [], conflicts: [] }
     : await lookupBusinessFacts({
         organizationId: input.agent.organizationId,
@@ -302,7 +344,7 @@ export async function replyToVisitor(input: {
         question: searchQuery,
       });
 
-  let evidence = greetingTurn || aboutProduct
+  let evidence = skipKnowledge
     ? []
     : await gatherEvidence({
         organizationId: input.agent.organizationId,
@@ -312,11 +354,11 @@ export async function replyToVisitor(input: {
         contentTypes: assignedScopes,
       });
 
-  const ownerNotes = greetingTurn || aboutProduct
+  const ownerNotes = skipKnowledge
     ? []
     : await loadOwnerNotes(input.agent.organizationId, input.agent.siteId);
 
-  let products = greetingTurn || aboutProduct
+  let products = skipKnowledge
     ? []
     : await loadCatalogCards({
         organizationId: input.agent.organizationId,
@@ -326,8 +368,8 @@ export async function replyToVisitor(input: {
       });
 
   const thin =
-    !aboutProduct &&
-    !greetingTurn &&
+    !skipKnowledge &&
+    !chatTurn &&
     !wantsHuman &&
     evidence.length < 2 &&
     structured.facts.filter((fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery))).length === 0 &&
@@ -349,7 +391,8 @@ export async function replyToVisitor(input: {
   const matchedFacts = structured.facts.filter(
     (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery)),
   );
-  const sensitive = isSensitiveQuestion(searchQuery) || isSensitiveQuestion(message);
+  const sensitive =
+    !chatTurn && (isSensitiveQuestion(message) || (isFollowUp(message) && isSensitiveQuestion(searchQuery)));
   if (sensitive) {
     const itemTerms = subjectTerms(searchQuery).filter(
       (term) => !["price", "prices", "pricing", "cost", "list", "plan", "plans", "how", "much", "fee", "rate"].includes(term),
@@ -364,6 +407,7 @@ export async function replyToVisitor(input: {
   const unanswered =
     !aboutProduct &&
     !greetingTurn &&
+    !chatTurn &&
     !wantsHuman &&
     evidence.length === 0 &&
     matchedFacts.length === 0 &&
@@ -401,6 +445,7 @@ export async function replyToVisitor(input: {
           afterHours,
           products,
           sensitive,
+          conversational: chatTurn,
         });
 
   if (humanHandoff && human) {
@@ -716,6 +761,7 @@ async function generateReply(input: {
   afterHours: boolean;
   products: CatalogCard[];
   sensitive?: boolean;
+  conversational?: boolean;
 }) {
   const intro = input.handoffFrom
     ? `The visitor was just transferred to you from ${input.handoffFrom}. Do not mention the transfer, introductions, or that you were connected. Answer the question immediately as ${input.agentName}.`
@@ -723,7 +769,6 @@ async function generateReply(input: {
   const hoursNote = input.afterHours
     ? "It is outside typical business hours. You may briefly say the team is away, then still answer from evidence."
     : "";
-  const handoffLine = "Never claim you are connecting the visitor to a person. If you lack the fact, say so in one sentence.";
   const ownerPublic = input.ownerNotes.filter((note) => !note.sensitive);
   const ownerPrivate = input.ownerNotes.filter((note) => note.sensitive);
   const ownerBlock = ownerPublic.length
@@ -748,7 +793,13 @@ async function generateReply(input: {
   const fromEvidence = formatEvidenceAnswer(lookup, input.evidence);
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help?`
-    : fromFacts || fromEvidence || `I don’t have a confirmed answer for that yet.`;
+    : isIdentityQuestion(input.question)
+      ? `I’m ${input.agentName} with ${input.businessName}. How can I help?`
+      : fromFacts ||
+        fromEvidence ||
+        (input.conversational
+          ? `I’m ${input.agentName} — happy to help with that. What are you trying to plan?`
+          : `I don’t have a confirmed answer for that yet.`);
   const sensitiveRule = input.sensitive
     ? `This is a pricing or commercial-fact question. Be precise and professional.
 Owner notes marked [PRIORITY] override crawled pages when they disagree.
@@ -767,13 +818,19 @@ Do not invent, round, or combine figures.`
       .map((row) => `${row.role === "CUSTOMER" ? "Visitor" : "Agent"}: ${row.content}`)
       .join("\n");
     const result = await ai.generate({
-      temperature: input.greeting ? 0.4 : input.sensitive ? 0.05 : 0.15,
+      temperature: input.greeting || input.conversational ? 0.4 : input.sensitive ? 0.05 : 0.25,
       maxTokens: 700,
-      system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
+      system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly, like a helpful teammate"}.
 You work for this specific business. Never call the business "Prices and offerings".
-This is one ongoing chat. The Recent thread is the timeline — read every prior turn the way ChatGPT keeps history.
-Follow-ups such as "that", "how much", "the other one", or "and for 4 people" refer to earlier visitor messages. Do not restart, re-introduce yourself, or ignore prior turns unless the visitor clearly changes topic.
-Answer only from verified facts, owner notes, catalog cards, and page evidence.
+This is one ongoing chat. The Recent thread is the timeline — read every prior turn the way a person at the desk remembers the conversation. Stay with the topic unless the visitor clearly changes it.
+Follow-ups such as "that", "how much", "the other one", or "and for 4 people" refer to earlier visitor messages. Do not restart, re-introduce yourself, or ignore prior turns.
+
+How to answer:
+- Who you are: your name is ${input.agentName}. You help visitors with ${input.businessName}. If they ask your name, who you are, or whether you are a person, answer directly. Never say you lack that information.
+- Chat about the conversation ("why?", "I'm just asking", "it's a general question"): answer in context. Do not loop "I don't have that information."
+- General questions a teammate could answer without a price sheet (best time of year, season, weather in this area, what to bring, what's busy or fun, recommendations): give a short practical answer using the business industry, location, and ordinary common sense. Call it general guidance, not a website policy. Do not refuse just because the page does not print it.
+- Business facts the site would confirm (prices, packages, hours, policies, availability, addresses, whether you offer something): answer only from verified facts, owner notes, catalog cards, and page evidence. Never invent, round, or combine figures. If that fact is missing, say so once, then suggest a next step.
+
 If several packages match the asked item (different durations or sizes), list those packages. That is not a conflict.
 If the visitor asked about one item, do not mention unrelated items.
 Never invent URLs, CMS paths, or booking pages. Only mention a page that appears in the evidence.
@@ -781,12 +838,11 @@ If you mention a page, write markdown like [book here](url) or [this link](url).
 Never say you are connecting the visitor to a person unless the system already did.
 Never add "Anything else I can help with?"
 When prices are in evidence: one short sentence, then bullets with **name** and **price**.
-If evidence does not contain the asked item, say so in one sentence. Do not dump marketing copy.
+Do not dump marketing copy.
 ${sensitiveRule}
 ${intro}
 ${hoursNote}
-If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
-${handoffLine}`,
+If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.`,
       prompt: `Business: ${input.businessName}
 Industry: ${input.industry || "unknown"}
 Profile: ${input.summary || "none"}
@@ -811,7 +867,7 @@ ${historyBlock || "(this is the first visitor message)"}
 
 Visitor just said: ${input.question}
 
-Read the owner notes and evidence carefully before answering. Prefer a short professional intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles. Do not answer a different question than the one asked.`,
+Read the thread, owner notes, and evidence before answering. Prefer a short professional intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles. Answer the question that was asked — including general questions — using chat context.`,
     });
     const text = sanitizeReply(result.text.trim());
     if (text && !looksLikeDump(text)) return text.slice(0, 2800);
