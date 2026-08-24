@@ -26,9 +26,13 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
     title: "No Webflow site was authorized",
     body: "Install again and select the site that should get tidyAgent.",
   },
+  api: {
+    title: "Webflow connected, but we could not load the site",
+    body: "The login token arrived, then Webflow did not return the site list. Click Connect Webflow again.",
+  },
   token: {
     title: "Could not finish Webflow login",
-    body: "The authorization code is one-time and expires in 15 minutes. Click Install in Webflow again.",
+    body: "The first marketplace redirect sometimes sends a one-time code before our app is ready. Click Connect Webflow again — that second pass is the one that sticks.",
   },
 };
 

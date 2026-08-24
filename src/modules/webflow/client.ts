@@ -17,48 +17,55 @@ export async function exchangeWebflowCode(input: {
   code: string;
   redirectUri: string;
 }) {
-  const payload = {
-    client_id: input.clientId,
-    client_secret: input.clientSecret,
-    code: input.code,
-    grant_type: "authorization_code",
-    redirect_uri: input.redirectUri,
-  };
+  const payloads: Record<string, string>[] = [
+    {
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+      code: input.code,
+      grant_type: "authorization_code",
+      redirect_uri: input.redirectUri,
+    },
+    {
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+      code: input.code,
+      grant_type: "authorization_code",
+    },
+  ];
+  const urls = [TOKEN_URL, `${WEBFLOW_API}/oauth/token`];
 
-  let response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    response = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams(payload),
-    });
+  let lastMessage = "Webflow token exchange failed";
+  let lastStatus: number | undefined;
+  for (const url of urls) {
+    for (const payload of payloads) {
+      for (const asJson of [true, false]) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": asJson ? "application/json" : "application/x-www-form-urlencoded",
+          },
+          body: asJson ? JSON.stringify(payload) : new URLSearchParams(payload),
+        });
+        const body = (await response.json().catch(() => ({}))) as {
+          access_token?: string;
+          token?: string;
+          scope?: string;
+          error?: string;
+          error_description?: string;
+        };
+        const accessToken = body.access_token || body.token;
+        if (response.ok && accessToken) {
+          return { accessToken, scope: body.scope ?? "" };
+        }
+        lastStatus = response.status;
+        lastMessage =
+          body.error_description || body.error || `Webflow token exchange failed (${response.status})`;
+      }
+    }
   }
 
-  const body = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    token?: string;
-    scope?: string;
-    error?: string;
-    error_description?: string;
-  };
-
-  const accessToken = body.access_token || body.token;
-  if (!response.ok || !accessToken) {
-    throw new WebflowApiError(
-      body.error_description || body.error || `Webflow token exchange failed (${response.status})`,
-      response.status,
-    );
-  }
-
-  return { accessToken, scope: body.scope ?? "" };
+  throw new WebflowApiError(lastMessage, lastStatus);
 }
 
 export async function webflowGet<T>(accessToken: string, path: string): Promise<T> {

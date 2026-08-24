@@ -17,6 +17,7 @@ export type MarketplaceAdapterConfig = {
     apiSecretSet: boolean;
     redirectUri: string;
     installPath: string;
+    appHomeUrl: string;
   };
   widgetSrc: string;
 };
@@ -60,6 +61,7 @@ export async function getMarketplaceAdapterConfig(): Promise<MarketplaceAdapterC
       apiSecretSet: shopifySecretSet,
       redirectUri: `${origin}/api/shopify/oauth/callback`,
       installPath: `${origin}/shopify/install`,
+      appHomeUrl: `${origin}/shopify`,
     },
     widgetSrc: `${origin}/widget.js`,
   };
@@ -86,4 +88,18 @@ export async function getWebflowOAuthConfig() {
 export async function isShopifyAdapterEnabled() {
   const config = await getMarketplaceAdapterConfig();
   return config.shopify.enabled;
+}
+
+export async function getShopifyOAuthConfig() {
+  const config = await getMarketplaceAdapterConfig();
+  const apiSecret = await getSetting("shopify_api_secret");
+  return {
+    enabled: config.shopify.enabled,
+    apiKey: config.shopify.apiKey,
+    apiSecret,
+    redirectUri: config.shopify.redirectUri,
+    origin: config.origin,
+    widgetSrc: config.widgetSrc,
+    appHomeUrl: config.shopify.appHomeUrl,
+  };
 }

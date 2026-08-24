@@ -19,6 +19,7 @@ export function AgentTeam({
   hasEvents = false,
   contentTypes,
   voiceOnPlan = false,
+  platformLabel = "Wix",
 }: {
   agents: {
     id: string;
@@ -39,9 +40,11 @@ export function AgentTeam({
   hasEvents?: boolean;
   contentTypes: KnowledgeContentType[];
   voiceOnPlan?: boolean;
+  platformLabel?: string;
 }) {
   const limit = maxAgents;
   const site = { hasStores, hasBookings };
+  const wix = platformLabel === "Wix";
   const availableHandles = HANDLE_OPTIONS.filter((item) => specialtyAvailableOnSite(item, site));
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("John");
@@ -56,8 +59,8 @@ export function AgentTeam({
 
   const detected = [
     { label: "Pages & site", on: true },
-    { label: "Wix Stores", on: hasStores },
-    { label: "Wix Bookings", on: hasBookings },
+    { label: wix ? "Wix Stores" : "Store catalog", on: hasStores },
+    { label: wix ? "Wix Bookings" : "Bookings", on: hasBookings },
     { label: "Blog", on: hasBlog },
     { label: "Events", on: hasEvents },
   ];
@@ -87,7 +90,7 @@ export function AgentTeam({
       <h3 className="font-display text-lg text-white">Team of agents</h3>
       <p className="mt-2 text-sm text-navy-300">
         The general agent greets visitors. Specialists only see the data you assign. Handles come from apps we found on
-        this website — a store agent only appears if Wix Stores is installed. This plan allows {limit} agents (
+        this website — a store agent only appears if {wix ? "Wix Stores is" : "a store catalog is"} installed. This plan allows {limit} agents (
         {agents.length} in use).
       </p>
       <div className="mt-4 flex flex-wrap gap-2">

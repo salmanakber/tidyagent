@@ -12,6 +12,7 @@ import { OwnerNoteFields, composeOwnerNote, emptyNoteField, type NoteField } fro
 import { cn } from "@/lib/utils";
 import { publicSupportChannels } from "@/modules/support/channels";
 import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
+import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 
 const STEPS = ["Connected", "Scan", "Business", "Your team", "Owner notes", "Style", "Test", "Go live"];
 
@@ -40,6 +41,7 @@ export function OnboardingWizard({
   humanEmail,
   humanAvatarUrl,
   humanWhatsapp,
+  platform = "WIX",
 }: {
   siteName: string;
   siteUrl?: string | null;
@@ -56,6 +58,7 @@ export function OnboardingWizard({
   humanEmail?: string | null;
   humanAvatarUrl?: string | null;
   humanWhatsapp?: string | null;
+  platform?: string | null;
 }) {
   const [step, setStep] = useState(1);
   const [scan, setScan] = useState<ScanResult | null>(null);
@@ -80,6 +83,7 @@ export function OnboardingWizard({
 
   const understanding = scan?.understanding ?? existingUnderstanding ?? null;
   const teamReady = personName.trim().length >= 2 && aiName.trim().length >= 1;
+  const copy = wizardCopyForPlatform(platform);
 
   function next() {
     if (step === 2 && !scan?.ok && !existingUnderstanding) return;
@@ -149,7 +153,7 @@ export function OnboardingWizard({
         {step === 1 && (
           <Step
             title="Website connected"
-            body={`${siteName} is identified through Wix. The next step is a real read of the live site — scoped to ${planLabel} — so the employee learns this business, not a generic script.`}
+            body={copy.connected(siteName, planLabel)}
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <Info label="Site" value={siteName} />
@@ -165,7 +169,7 @@ export function OnboardingWizard({
             title="Read and understand the website"
             body="This pulls pages, policies, and (on Business/Pro) catalog data from the live site. Re-run it whenever the site changes."
           >
-            <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} />
+            <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />
           </Step>
         )}
 
@@ -313,14 +317,14 @@ export function OnboardingWizard({
                 <input type="radio" checked={embed === "AUTO"} onChange={() => setEmbed("AUTO")} />
                 <span>
                   <span className="block text-sm font-medium">Auto-install (recommended)</span>
-                  <span className="text-sm text-navy-300">Adds the widget to every published page.</span>
+                  <span className="text-sm text-navy-300">{copy.autoInstall}</span>
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 p-4">
                 <input type="radio" checked={embed === "MANUAL"} onChange={() => setEmbed("MANUAL")} />
                 <span>
                   <span className="block text-sm font-medium">Manual placement</span>
-                  <span className="text-sm text-navy-300">Place the widget only where you want it in the Wix Editor.</span>
+                  <span className="text-sm text-navy-300">{copy.manualInstall}</span>
                 </span>
               </label>
             </div>

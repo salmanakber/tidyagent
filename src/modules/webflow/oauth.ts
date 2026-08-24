@@ -41,7 +41,39 @@ export async function createWebflowOAuthState(input?: { embed?: boolean; siteId?
     .sign(new TextEncoder().encode(getEnv().SESSION_SECRET));
 }
 
+export async function readWebflowOAuthState(state?: string | null) {
+  if (!state) return { ours: false, embed: false, siteId: null as string | null };
+  try {
+    const { payload } = await jwtVerify(state, new TextEncoder().encode(getEnv().SESSION_SECRET));
+    return {
+      ours: true,
+      embed: Boolean(payload.embed),
+      siteId: typeof payload.siteId === "string" && payload.siteId ? payload.siteId : null,
+    };
+  } catch {
+    // Marketplace / Open app often send Webflow's own state. Do not consume the code
+    // by failing before the token exchange — Connect again would then be required.
+    return { ours: false, embed: false, siteId: null as string | null };
+  }
+}
+
+const inflightLogins = new Map<string, Promise<{ session: AppSession; destination: string }>>();
+
 export async function completeWebflowLogin(input: {
+  code: string;
+  state?: string | null;
+  preferredSiteId?: string | null;
+}): Promise<{ session: AppSession; destination: string }> {
+  const existing = inflightLogins.get(input.code);
+  if (existing) return existing;
+  const work = completeWebflowLoginOnce(input).finally(() => {
+    setTimeout(() => inflightLogins.delete(input.code), 60_000);
+  });
+  inflightLogins.set(input.code, work);
+  return work;
+}
+
+async function completeWebflowLoginOnce(input: {
   code: string;
   state?: string | null;
   preferredSiteId?: string | null;
@@ -54,34 +86,41 @@ export async function completeWebflowLogin(input: {
     );
   }
 
-  let preferredSiteId = input.preferredSiteId;
-  if (input.state) {
-    try {
-      const { payload } = await jwtVerify(input.state, new TextEncoder().encode(getEnv().SESSION_SECRET));
-      if (!preferredSiteId && typeof payload.siteId === "string" && payload.siteId) {
-        preferredSiteId = payload.siteId;
-      }
-    } catch {
-      throw new WebflowInstallError("invalid_state", "OAuth state did not match.");
-    }
-  }
+  const state = await readWebflowOAuthState(input.state);
+  const preferredSiteId = input.preferredSiteId || state.siteId;
 
-  const tokens = await exchangeWebflowCode({
-    clientId: config.clientId,
-    clientSecret: config.clientSecret,
-    code: input.code,
-    redirectUri: config.redirectUri,
-  });
+  let tokens;
+  try {
+    tokens = await exchangeWebflowCode({
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      code: input.code,
+      redirectUri: config.redirectUri,
+    });
+  } catch (error) {
+    throw new WebflowInstallError(
+      "token",
+      error instanceof Error ? error.message : "Webflow token exchange failed.",
+    );
+  }
 
   const user = await webflowGet<WebflowAuthorizedUser>(
     tokens.accessToken,
     "/v2/token/authorized_by",
   ).catch(() => null);
 
-  const listed = await webflowGet<{ sites?: WebflowSiteRecord[] } | WebflowSiteRecord[]>(
-    tokens.accessToken,
-    "/v2/sites",
-  );
+  let listed: { sites?: WebflowSiteRecord[] } | WebflowSiteRecord[];
+  try {
+    listed = await webflowGet<{ sites?: WebflowSiteRecord[] } | WebflowSiteRecord[]>(
+      tokens.accessToken,
+      "/v2/sites",
+    );
+  } catch (error) {
+    throw new WebflowInstallError(
+      "api",
+      error instanceof Error ? error.message : "Could not list Webflow sites.",
+    );
+  }
   const sites = Array.isArray(listed) ? listed : (listed.sites ?? []);
   const site = pickWebflowSite(sites, preferredSiteId);
   if (!site) {

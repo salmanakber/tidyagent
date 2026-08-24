@@ -1,8 +1,9 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
 import { isWixReviewMode } from "@/modules/auth/reviewer";
-import { platformLabel, isWebflowPlatform } from "@/modules/platforms";
+import { platformLabel, isWebflowPlatform, isShopifyPlatform } from "@/modules/platforms";
 import { webflowWidgetStatus } from "@/modules/webflow/embed";
+import { shopifyWidgetStatus } from "@/modules/shopify/embed";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -20,6 +21,11 @@ export default async function DashboardPage() {
   const webflowWidget = isWebflowPlatform(session.platform)
     ? await webflowWidgetStatus(session.siteId)
     : null;
+  const shopifyWidget = isShopifyPlatform(session.platform)
+    ? await shopifyWidgetStatus(session.siteId)
+    : null;
+  const widgetNotice = webflowWidget ?? shopifyWidget;
+  const widgetHost = isShopifyPlatform(session.platform) ? "Shopify" : "Webflow";
 
   return (
     <div className="space-y-8">
@@ -42,18 +48,20 @@ export default async function DashboardPage() {
         }
       />
 
-      {webflowWidget ? (
+      {widgetNotice ? (
         <div className="panel p-4 text-sm leading-6 text-navy-300">
-          {webflowWidget.error ? (
+          {widgetNotice.error ? (
             <>
-              Custom code was not applied ({webflowWidget.error}). Open the app again after confirming Custom
-              code permission in Webflow, then publish the site.
+              The chat widget was not applied on {widgetHost} ({widgetNotice.error}). Open the app again after
+              confirming script / custom-code permission.
             </>
           ) : (
             <>
-              The chat widget is attached as Webflow custom code
-              {webflowWidget.injectedAt ? ` (updated ${webflowWidget.injectedAt})` : ""}. Publish the Webflow
-              site if visitors do not see the bubble yet.
+              The chat widget is attached on this {widgetHost} site
+              {widgetNotice.injectedAt ? ` (updated ${widgetNotice.injectedAt})` : ""}.
+              {isWebflowPlatform(session.platform)
+                ? " Publish the Webflow site if visitors do not see the bubble yet."
+                : " Reload the storefront if visitors do not see the bubble yet."}
             </>
           )}
         </div>

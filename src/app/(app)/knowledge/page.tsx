@@ -9,7 +9,7 @@ import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { getPlanScope } from "@/modules/billing/plan-scope-store";
-import { knowledgeCardsForSite, siteFactsFromApps } from "@/modules/knowledge/site-facts";
+import { knowledgeCardsForSite, siteFactsForSite } from "@/modules/knowledge/site-facts";
 import { KnowledgeIntelligence } from "@/components/knowledge/KnowledgeIntelligence";
 import { prisma } from "@/lib/prisma";
 import type { CrawlItem } from "@/modules/knowledge/types";
@@ -25,7 +25,11 @@ export default async function KnowledgePage() {
   const planScope = await getPlanScope(entitlements.planKey);
   const scope = scanScopeFromConfig(entitlements.planKey, planScope);
 
-  const facts = siteFactsFromApps(data.site.installedWixApps);
+  const facts = siteFactsForSite({
+    platform: session.platform,
+    installedWixApps: data.site.installedWixApps,
+    capabilities: data.site.capabilities,
+  });
   const [storedFacts, conflicts, documents, scanSource, customNotes] = await Promise.all([
     prisma.knowledgeFact.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId },
@@ -64,6 +68,7 @@ export default async function KnowledgePage() {
     custom: data.knowledge.custom,
     facts: storedFacts.length,
     conflicts: conflicts.length,
+    platform: session.platform,
   });
 
   return (
@@ -96,6 +101,7 @@ export default async function KnowledgePage() {
             planLabel={planLabel(entitlements.planKey)}
             scopeNote={scope.depthNote}
             siteUrl={data.site.url}
+            platform={session.platform}
           />
         </div>
       </div>

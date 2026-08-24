@@ -50,6 +50,7 @@ export function AgentStudio({
   hasEvents = false,
   contentTypes = ["PAGE", "FAQ", "POLICY", "CUSTOM"],
   presentCapabilities,
+  platformLabel = "Wix",
   whatsappDigits,
 }: {
   agent: AgentView;
@@ -64,6 +65,7 @@ export function AgentStudio({
   hasEvents?: boolean;
   contentTypes?: KnowledgeContentType[];
   presentCapabilities?: string[];
+  platformLabel?: string;
   whatsappDigits?: string | null;
 }) {
   const [name, setName] = useState(agent.name);
@@ -263,7 +265,7 @@ export function AgentStudio({
         </div>
         <div className="panel p-6">
           <h3 className="font-display text-lg text-white">What this site can actually do</h3>
-          <p className="mt-2 text-sm text-navy-300">Only tools found on this Wix install are shown. Nothing generic is listed.</p>
+          <p className="mt-2 text-sm text-navy-300">Only tools found on this {platformLabel} install are shown. Nothing generic is listed.</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {agent.capabilities
               .filter((capability) => !presentCapabilities || presentCapabilities.includes(capability.key) || capability.enabled)
@@ -309,6 +311,7 @@ export function AgentStudio({
           hasBlog={hasBlog}
           hasEvents={hasEvents}
           contentTypes={contentTypes}
+          platformLabel={platformLabel}
         />
       </div>
       <div className="panel overflow-hidden p-4">

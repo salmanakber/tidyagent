@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { FRAME_ANCESTORS_CSP } from "./src/modules/platforms/frame-ancestors";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -47,8 +48,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value:
-              "frame-ancestors 'self' https://manage.wix.com https://www.wix.com https://*.wix.com https://*.editor.wix.com https://*.studio.wix.com https://*.harmony.wix.com https://webflow.com https://*.webflow.com https://*.design.webflow.com https://*.webflow.io https://cdn.webflow.com https://*.cdn.webflow.com",
+            value: FRAME_ANCESTORS_CSP,
           },
         ],
       },

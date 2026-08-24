@@ -4,59 +4,54 @@ import { encryptSecret } from "@/lib/security/settings";
 import type { AppSession } from "@/lib/security/session";
 import { seedDefaultAgent } from "@/modules/agents/defaults";
 import { syntheticInstanceId } from "@/modules/platforms/types";
-import { sitePublicUrl, type WebflowSiteRecord } from "@/modules/webflow/sites";
-
-export type WebflowAuthorizedUser = {
-  id?: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-};
+import type { ShopifyShopRecord } from "@/modules/shopify/client";
+import { shopPublicUrl } from "@/modules/shopify/shop";
 
 type TokenMetadata = Prisma.JsonObject & {
-  provider: "webflow";
+  provider: "shopify";
   accessToken: string;
   scope: string;
-  webflowUserId: string | null;
-  webflowSiteId: string;
+  shopifyShopDomain: string;
 };
 
-export async function provisionTenantFromWebflow(input: {
-  site: WebflowSiteRecord;
-  user?: WebflowAuthorizedUser | null;
+export async function provisionTenantFromShopify(input: {
+  shop: string;
+  shopRecord?: ShopifyShopRecord | null;
   accessToken: string;
   scope?: string;
 }): Promise<AppSession> {
-  const webflowSiteId = input.site.id;
-  const instanceId = syntheticInstanceId("WEBFLOW", webflowSiteId);
-  const url = sitePublicUrl(input.site);
-  const displayName = input.site.displayName || input.site.shortName || url || "Webflow site";
-  const ownerEmail = input.user?.email?.trim().toLowerCase() || undefined;
-  const ownerName =
-    [input.user?.firstName, input.user?.lastName].filter(Boolean).join(" ").trim() || displayName;
-  const webflowUserId = input.user?.id ? `wf:${input.user.id}` : `wf:site:${webflowSiteId}`;
+  const shopifyShopDomain = input.shop;
+  const instanceId = syntheticInstanceId("SHOPIFY", shopifyShopDomain);
+  const url = shopPublicUrl(
+    shopifyShopDomain,
+    input.shopRecord?.myshopify_domain,
+    input.shopRecord?.domain,
+  );
+  const displayName = input.shopRecord?.name || shopifyShopDomain.replace(".myshopify.com", "");
+  const ownerEmail = input.shopRecord?.email?.trim().toLowerCase() || undefined;
+  const ownerName = input.shopRecord?.shop_owner?.trim() || displayName;
+  const shopifyUserId = `shopify:shop:${shopifyShopDomain}`;
 
-  const user = await findOrCreateWebflowUser({
-    webflowUserId,
+  const user = await findOrCreateShopifyUser({
+    shopifyUserId,
     email: ownerEmail,
     name: ownerName,
   });
 
   const tokenMetadata = {
-    provider: "webflow",
+    provider: "shopify",
     accessToken: encryptSecret(input.accessToken),
     scope: input.scope ?? "",
-    webflowUserId: input.user?.id ?? null,
-    webflowSiteId,
+    shopifyShopDomain,
   } satisfies TokenMetadata;
 
   const existingSite = await prisma.wixSite.findUnique({
-    where: { webflowSiteId },
+    where: { shopifyShopDomain },
     include: { organization: true, credential: true },
   });
 
   if (existingSite) {
-    return connectExistingWebflowSite({
+    return connectExistingShopifySite({
       existingSite,
       displayName,
       url,
@@ -68,8 +63,8 @@ export async function provisionTenantFromWebflow(input: {
   }
 
   try {
-    return await createWebflowTenant({
-      webflowSiteId,
+    return await createShopifyTenant({
+      shopifyShopDomain,
       instanceId,
       displayName,
       url,
@@ -79,11 +74,11 @@ export async function provisionTenantFromWebflow(input: {
     });
   } catch (error) {
     const raced = await prisma.wixSite.findUnique({
-      where: { webflowSiteId },
+      where: { shopifyShopDomain },
       include: { organization: true, credential: true },
     });
     if (!raced) throw error;
-    return connectExistingWebflowSite({
+    return connectExistingShopifySite({
       existingSite: raced,
       displayName,
       url,
@@ -95,12 +90,8 @@ export async function provisionTenantFromWebflow(input: {
   }
 }
 
-async function connectExistingWebflowSite(input: {
-  existingSite: {
-    id: string;
-    organizationId: string;
-    wixInstanceId: string;
-  };
+async function connectExistingShopifySite(input: {
+  existingSite: { id: string; organizationId: string; wixInstanceId: string };
   displayName: string;
   url?: string;
   ownerEmail?: string;
@@ -117,7 +108,7 @@ async function connectExistingWebflowSite(input: {
       ownerEmail: input.ownerEmail,
       connectionStatus: "connected",
       lastSyncedAt: new Date(),
-      platform: "WEBFLOW",
+      platform: "SHOPIFY",
     },
   });
 
@@ -153,15 +144,15 @@ async function connectExistingWebflowSite(input: {
     siteId: existingSite.id,
     wixInstanceId: existingSite.wixInstanceId,
     wixUserId: input.user.wixUserId ?? undefined,
-    platform: "WEBFLOW",
+    platform: "SHOPIFY",
     role: "OWNER",
     email: input.ownerEmail,
     name: input.displayName,
   };
 }
 
-async function createWebflowTenant(input: {
-  webflowSiteId: string;
+async function createShopifyTenant(input: {
+  shopifyShopDomain: string;
   instanceId: string;
   displayName: string;
   url?: string;
@@ -180,15 +171,15 @@ async function createWebflowTenant(input: {
   const site = await prisma.wixSite.create({
     data: {
       organizationId: organization.id,
-      platform: "WEBFLOW",
+      platform: "SHOPIFY",
       wixInstanceId: input.instanceId,
-      webflowSiteId: input.webflowSiteId,
+      shopifyShopDomain: input.shopifyShopDomain,
       displayName: input.displayName,
       url: input.url,
       ownerEmail: input.ownerEmail,
       connectionStatus: "connected",
       lastSyncedAt: new Date(),
-      capabilities: { hasStores: false, source: "webflow" } as Prisma.InputJsonValue,
+      capabilities: { hasStores: true, source: "shopify" } as Prisma.InputJsonValue,
       credential: {
         create: {
           organizationId: organization.id,
@@ -230,7 +221,7 @@ async function createWebflowTenant(input: {
     organizationId: organization.id,
     siteId: site.id,
     name: "Sarah",
-    storesEnabled: false,
+    storesEnabled: true,
   });
 
   return {
@@ -239,19 +230,19 @@ async function createWebflowTenant(input: {
     siteId: site.id,
     wixInstanceId: input.instanceId,
     wixUserId: input.user.wixUserId ?? undefined,
-    platform: "WEBFLOW",
+    platform: "SHOPIFY",
     role: "OWNER",
     email: input.ownerEmail,
     name: input.displayName,
   };
 }
 
-async function findOrCreateWebflowUser(input: {
-  webflowUserId: string;
+async function findOrCreateShopifyUser(input: {
+  shopifyUserId: string;
   email?: string;
   name: string;
 }) {
-  const byUid = await prisma.user.findUnique({ where: { wixUserId: input.webflowUserId } });
+  const byUid = await prisma.user.findUnique({ where: { wixUserId: input.shopifyUserId } });
   if (byUid) {
     return prisma.user.update({
       where: { id: byUid.id },
@@ -274,7 +265,7 @@ async function findOrCreateWebflowUser(input: {
 
   return prisma.user.create({
     data: {
-      wixUserId: input.webflowUserId,
+      wixUserId: input.shopifyUserId,
       email: input.email,
       name: input.name,
     },

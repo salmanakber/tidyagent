@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { FRAME_ANCESTORS_CSP } from "@/modules/platforms/frame-ancestors";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,7 +27,10 @@ export function middleware(request: NextRequest) {
 
   const headers = new Headers(request.headers);
   headers.set("x-tidyagent-path", request.nextUrl.pathname);
-  return NextResponse.next({ request: { headers } });
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set("Content-Security-Policy", FRAME_ANCESTORS_CSP);
+  response.headers.delete("X-Frame-Options");
+  return response;
 }
 
 export const config = {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/security/session";
 import { getWorkspace } from "@/modules/organizations/workspace";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
-import { detectWixCapabilities } from "@/modules/wix/capabilities";
+import { capabilitiesForSite } from "@/modules/platforms/capabilities";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
@@ -18,10 +18,11 @@ export default async function OnboardingPage() {
   const entitlements = await entitlementsForOrganization(session.organizationId);
   const planScope = await getPlanScope(entitlements.planKey);
   const scope = scanScopeFromConfig(entitlements.planKey, planScope);
-  const apps = Array.isArray(workspace.site.installedWixApps)
-    ? (workspace.site.installedWixApps as string[])
-    : [];
-  const capabilities = detectWixCapabilities(apps).tools;
+  const capabilities = capabilitiesForSite({
+    platform: session.platform,
+    installedWixApps: workspace.site.installedWixApps,
+    capabilities: workspace.site.capabilities,
+  }).tools;
   const existingUnderstanding = asUnderstanding(workspace.profile?.structured);
 
   return (
@@ -41,6 +42,7 @@ export default async function OnboardingPage() {
       humanEmail={workspace.organization.humanAgentEmail}
       humanAvatarUrl={workspace.organization.humanAgentAvatarUrl}
       humanWhatsapp={workspace.organization.humanAgentWhatsapp}
+      platform={session.platform}
     />
   );
 }

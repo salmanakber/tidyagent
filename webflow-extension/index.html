@@ -6,40 +6,47 @@
     <title>tidyAgent</title>
     <style>
       html,
-      body,
-      iframe {
+      body {
         margin: 0;
         width: 100%;
         height: 100%;
-        border: 0;
         background: #0b1220;
+        color: #94a3b8;
+        font-family: system-ui, sans-serif;
+      }
+      p {
+        margin: 24px;
+        font-size: 14px;
       }
     </style>
   </head>
   <body>
-    <iframe
-      id="tidyagent"
-      title="tidyAgent dashboard"
-      src="https://agent.tidyflowapp.com/webflow?embed=1"
-      allow="clipboard-write"
-    ></iframe>
+    <p>Opening tidyAgent…</p>
     <script>
       (function () {
-        var frame = document.getElementById("tidyagent");
-        if (!frame) return;
+        var app = "https://agent.tidyflowapp.com/webflow";
         var params = new URLSearchParams();
         params.set("embed", "1");
+
+        function go() {
+          location.replace(app + "?" + params.toString());
+        }
+
         try {
-          if (window.webflow && typeof window.webflow.getSiteInfo === "function") {
-            window.webflow.setExtensionSize({ width: 480, height: 720 });
-            window.webflow.getSiteInfo().then(function (info) {
-              if (info && info.siteId) params.set("siteId", info.siteId);
-              frame.src = "https://agent.tidyflowapp.com/webflow?" + params.toString();
-            });
-            return;
+          if (window.webflow) {
+            if (typeof window.webflow.setExtensionSize === "function") {
+              window.webflow.setExtensionSize({ width: 480, height: 720 });
+            }
+            if (typeof window.webflow.getSiteInfo === "function") {
+              window.webflow.getSiteInfo().then(function (info) {
+                if (info && info.siteId) params.set("siteId", info.siteId);
+                go();
+              }).catch(go);
+              return;
+            }
           }
         } catch (error) {}
-        frame.src = "https://agent.tidyflowapp.com/webflow?" + params.toString();
+        go();
       })();
     </script>
   </body>

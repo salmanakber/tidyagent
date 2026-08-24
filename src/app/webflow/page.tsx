@@ -4,6 +4,7 @@ import { getSession } from "@/lib/security/session";
 import { isWebflowAdapterEnabled } from "@/modules/platforms/marketplace";
 import { workspacePathForOrganization } from "@/modules/auth/workspace-path";
 import { ensureWebflowWidgetForSite } from "@/modules/webflow/embed";
+import { isEmbeddedWebflowRequest, webflowCallbackQuery } from "@/modules/webflow/open";
 import { WebflowConnect } from "./WebflowConnect";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +12,27 @@ export const dynamic = "force-dynamic";
 export default async function WebflowAppHome({
   searchParams,
 }: {
-  searchParams: Promise<{ embed?: string; siteId?: string; site?: string }>;
+  searchParams: Promise<{
+    embed?: string;
+    siteId?: string;
+    site?: string;
+    code?: string;
+    state?: string;
+    error?: string;
+  }>;
 }) {
   const params = await searchParams;
+  if (params.code || params.error) {
+    redirect(
+      webflowCallbackQuery({
+        code: params.code,
+        state: params.state,
+        siteId: params.siteId,
+        site: params.site,
+        error: params.error,
+      }),
+    );
+  }
   const session = await getSession();
   if (session) {
     await ensureWebflowWidgetForSite(session.siteId).catch((error) => {
@@ -27,8 +46,13 @@ export default async function WebflowAppHome({
   }
 
   const siteId = params.siteId || params.site || "";
-  const embed = params.embed === "1" || params.embed === "true";
-  const framed = (await headers()).get("sec-fetch-dest") === "iframe" || embed;
+  const headerList = await headers();
+  const framed = isEmbeddedWebflowRequest({
+    embed: params.embed,
+    dest: headerList.get("sec-fetch-dest"),
+    site: headerList.get("sec-fetch-site"),
+    referer: headerList.get("referer"),
+  });
   const install = `/webflow/install${qs({ embed: framed ? "1" : "", siteId })}`;
 
   if (framed) {

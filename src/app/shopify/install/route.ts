@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createWebflowOAuthState, webflowAuthorizeUrl } from "@/modules/webflow/oauth";
-import { getWebflowOAuthConfig } from "@/modules/platforms/marketplace";
+import { createShopifyOAuthState, shopifyAuthorizeUrl } from "@/modules/shopify/oauth";
+import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import { getAppOrigin } from "@/lib/env";
-import { isEmbeddedWebflowRequest } from "@/modules/webflow/open";
+import { normalizeShopifyShop } from "@/modules/shopify/shop";
 
 export const dynamic = "force-dynamic";
 
@@ -11,36 +11,28 @@ export async function GET(request: Request) {
   const bounce = bounceOffBindAddress(request, origin);
   if (bounce) return NextResponse.redirect(bounce);
 
-  const config = await getWebflowOAuthConfig();
+  const config = await getShopifyOAuthConfig();
   if (!config.enabled) {
-    return NextResponse.redirect(new URL("/webflow/missing?error=disabled", origin));
+    return NextResponse.redirect(new URL("/shopify/missing?error=disabled", origin));
   }
-  if (!config.clientId) {
-    return NextResponse.redirect(new URL("/webflow/missing?error=not_configured", origin));
+  if (!config.apiKey) {
+    return NextResponse.redirect(new URL("/shopify/missing?error=not_configured", origin));
   }
 
   const url = new URL(request.url);
-  const siteId = url.searchParams.get("siteId") || url.searchParams.get("site") || "";
-  if (
-    isEmbeddedWebflowRequest({
-      dest: request.headers.get("sec-fetch-dest"),
-      site: request.headers.get("sec-fetch-site"),
-      referer: request.headers.get("referer"),
-    })
-  ) {
-    const home = new URL("/webflow", origin);
-    home.searchParams.set("embed", "1");
-    if (siteId) home.searchParams.set("siteId", siteId);
-    return NextResponse.redirect(home);
+  const shop = normalizeShopifyShop(url.searchParams.get("shop"));
+  if (!shop) {
+    return NextResponse.redirect(new URL("/shopify/missing?error=no_shop", origin));
   }
 
-  const state = await createWebflowOAuthState({
-    embed: url.searchParams.get("embed") === "1",
-    siteId: siteId || undefined,
+  const state = await createShopifyOAuthState({
+    shop,
+    embed: url.searchParams.get("embedded") === "1" || url.searchParams.get("embed") === "1",
   });
   return NextResponse.redirect(
-    webflowAuthorizeUrl({
-      clientId: config.clientId,
+    shopifyAuthorizeUrl({
+      shop,
+      apiKey: config.apiKey,
       redirectUri: config.redirectUri,
       state,
     }),

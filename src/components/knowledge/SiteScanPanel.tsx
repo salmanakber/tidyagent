@@ -5,13 +5,7 @@ import { AlertTriangle, Check, Loader2, Radar } from "lucide-react";
 import { runSiteScan } from "@/app/actions/workspace";
 import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
 import { cn } from "@/lib/utils";
-
-const LIVE_STAGES = [
-  "Confirming the Wix site",
-  "Reading every public page",
-  "Loading the Wix Stores catalog",
-  "Writing a business understanding",
-];
+import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 
 export function SiteScanPanel({
   planLabel,
@@ -19,13 +13,17 @@ export function SiteScanPanel({
   siteUrl,
   initial,
   onComplete,
+  platform,
 }: {
   planLabel: string;
   scopeNote: string;
   siteUrl?: string | null;
   initial?: ScanResult | null;
   onComplete?: (result: ScanResult) => void;
+  platform?: string | null;
 }) {
+  const copy = wizardCopyForPlatform(platform);
+  const stages = copy.scanStages;
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ScanResult | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +57,7 @@ export function SiteScanPanel({
         {siteUrl ? (
           <p className="mt-2 truncate text-xs text-navy-400">{siteUrl}</p>
         ) : (
-          <p className="mt-2 text-xs text-rose-200">No public URL yet — publish the Wix site, then scan.</p>
+          <p className="mt-2 text-xs text-rose-200">{copy.noUrl}</p>
         )}
         <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
           <input
@@ -72,7 +70,7 @@ export function SiteScanPanel({
           <span>
             Crawl every public page we can find
             <span className="mt-1 block text-xs text-navy-400">
-              Sitemap, on-site links, and Wix data. Uncheck to read only common pages like pricing, services, and FAQ.
+              {copy.crawlHint}
             </span>
           </span>
         </label>
@@ -80,10 +78,10 @@ export function SiteScanPanel({
 
       {pending ? (
         <div className="space-y-3">
-          {LIVE_STAGES.map((label, index) => (
+          {stages.map((label, index) => (
             <div key={label} className="flex items-center gap-3 text-sm">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-300">
-                {index <= tick % LIVE_STAGES.length ? (
+                {index <= tick % stages.length ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Radar className="h-3.5 w-3.5" />

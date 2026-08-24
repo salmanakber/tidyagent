@@ -89,6 +89,7 @@ export function PlatformSettingsForm({
       apiSecretSet: boolean;
       redirectUri: string;
       installPath: string;
+      appHomeUrl: string;
     };
   };
 }) {
@@ -287,23 +288,30 @@ export function PlatformSettingsForm({
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h3 className="text-sm font-medium text-white">Shopify setup (after Webflow)</h3>
+          <h3 className="text-sm font-medium text-white">Shopify setup</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
             <li>
-              In Shopify Partners → Apps → Create app. Use a public OAuth app if you want App Store listing later.
+              In Shopify Partners → Apps → Create app. App URL / home:
+              <code className="mt-1 block break-all text-amber-200">{marketplace.shopify.appHomeUrl}</code>
             </li>
             <li>
               Allowed redirection URL:
               <code className="mt-1 block break-all text-amber-200">{marketplace.shopify.redirectUri}</code>
             </li>
-            <li>Copy API key (Client ID) and API secret into the fields below, then save.</li>
             <li>
-              Keep <strong className="text-white">Enable Shopify</strong> off until that adapter is built. You can still
-              store keys now.
+              Privacy webhooks (required for App Store later):
+              <code className="mt-1 block break-all text-amber-200">{`${marketplace.origin}/api/shopify/webhooks`}</code>
             </li>
             <li>
-              Same widget script, via theme App Embed or Custom Liquid:
-              <code className="mt-1 block break-all text-amber-200">{`<script src="${marketplace.widgetSrc}" async></script>`}</code>
+              Access scopes: products, orders, customers, content, themes, script tags (read + write), locales. The
+              app injects <code className="text-amber-200">widget.js</code> as a ScriptTag. Publish is not needed;
+              the storefront picks it up after inject.
+            </li>
+            <li>Copy API key and API secret into the fields below, then save.</li>
+            <li>
+              Tick <strong className="text-white">Enable Shopify</strong> when you are ready to test OAuth. Test
+              installs start at{" "}
+              <code className="text-amber-200">{marketplace.shopify.installPath}?shop=your-store.myshopify.com</code>.
             </li>
           </ol>
         </div>
@@ -314,7 +322,7 @@ export function PlatformSettingsForm({
             <span>
               <span className="text-white">Enable Shopify</span>
               <span className="mt-1 block text-xs text-navy-400">
-                Placeholder for the third adapter. Leave off until that build starts.
+                Off by default. Does not change Wix or Webflow billing, embed, or installs.
               </span>
             </span>
           </label>

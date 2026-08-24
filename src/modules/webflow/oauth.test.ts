@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { webflowAuthorizeUrl } from "@/modules/webflow/oauth";
-import { isWebflowOpenRequest } from "@/modules/webflow/open";
+import { readWebflowOAuthState, webflowAuthorizeUrl } from "@/modules/webflow/oauth";
+import { isEmbeddedWebflowRequest, isWebflowOpenRequest } from "@/modules/webflow/open";
 import { pickWebflowSite, sitePublicUrl, widgetInlineSource } from "@/modules/webflow/sites";
 import { syntheticInstanceId } from "@/modules/platforms/types";
 
@@ -56,5 +56,22 @@ describe("webflow app home detection", () => {
     expect(isWebflowOpenRequest({ siteId: "site-1" })).toBe(true);
     expect(isWebflowOpenRequest({ referer: "https://agent.tidyflowapp.com/" })).toBe(false);
     expect(isWebflowOpenRequest({})).toBe(false);
+  });
+
+  it("detects Designer Launch iframes even without embed=1", () => {
+    expect(isEmbeddedWebflowRequest({ embed: "1" })).toBe(true);
+    expect(isEmbeddedWebflowRequest({ dest: "iframe" })).toBe(true);
+    expect(
+      isEmbeddedWebflowRequest({ referer: "https://d111111abcdef8.cloudfront.net/index.html" }),
+    ).toBe(true);
+    expect(isEmbeddedWebflowRequest({ dest: "document", site: "cross-site" })).toBe(false);
+  });
+});
+
+describe("webflow oauth state", () => {
+  it("does not reject marketplace state that we did not issue", async () => {
+    const parsed = await readWebflowOAuthState("webflow-marketplace-state");
+    expect(parsed.ours).toBe(false);
+    expect(parsed.siteId).toBeNull();
   });
 });

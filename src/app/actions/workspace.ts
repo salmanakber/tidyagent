@@ -77,18 +77,32 @@ export async function createSpecialistAgent(input: {
   const session = await requireSession();
   const entitlements = await requirePaidSeat(session);
   const { scopesForSpecialty } = await import("@/modules/agents/team");
-  const { siteFactsFromApps } = await import("@/modules/knowledge/site-facts");
+  const { siteFactsForSite } = await import("@/modules/knowledge/site-facts");
+  const { isWixPlatform, platformLabel } = await import("@/modules/platforms/types");
   const workspace = await getWorkspace(session);
   const limit = entitlements.maxAgents;
   if (workspace.agents.length >= limit) {
     throw new Error(`This plan allows ${limit} agent${limit === 1 ? "" : "s"}.`);
   }
-  const facts = siteFactsFromApps(workspace.site.installedWixApps);
+  const facts = siteFactsForSite({
+    platform: session.platform,
+    installedWixApps: workspace.site.installedWixApps,
+    capabilities: workspace.site.capabilities,
+  });
+  const marketplace = platformLabel(session.platform);
   if (input.specialty === "ECOMMERCE" && !facts.hasStores) {
-    throw new Error("This site does not have Wix Stores, so a store agent cannot be added.");
+    throw new Error(
+      isWixPlatform(session.platform)
+        ? "This site does not have Wix Stores, so a store agent cannot be added."
+        : `This site does not have a store catalog, so a store agent cannot be added.`,
+    );
   }
   if (input.specialty === "BOOKINGS" && !facts.hasBookings) {
-    throw new Error("This site does not have Wix Bookings, so a bookings agent cannot be added.");
+    throw new Error(
+      isWixPlatform(session.platform)
+        ? "This site does not have Wix Bookings, so a bookings agent cannot be added."
+        : `This ${marketplace} site does not have bookings, so a bookings agent cannot be added.`,
+    );
   }
   const name = z.string().min(1).max(60).parse(input.name);
   const scopes = input.knowledgeScopes?.length

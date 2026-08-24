@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/security/session";
 import { getWorkspace } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
-import { siteFactsFromApps } from "@/modules/knowledge/site-facts";
+import { siteFactsForSite } from "@/modules/knowledge/site-facts";
+import { platformLabel } from "@/modules/platforms";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AgentStudio } from "@/components/agent/AgentStudio";
 import { publicSupportChannels } from "@/modules/support/channels";
@@ -13,7 +14,11 @@ export default async function AgentPage() {
   const workspace = await getWorkspace(session);
   if (!workspace.agent) redirect("/onboarding");
   const entitlements = await entitlementsForOrganization(session.organizationId);
-  const facts = siteFactsFromApps(workspace.site.installedWixApps);
+  const facts = siteFactsForSite({
+    platform: session.platform,
+    installedWixApps: workspace.site.installedWixApps,
+    capabilities: workspace.site.capabilities,
+  });
 
   const agents = workspace.agents.map((agent) => ({
     id: agent.id,
@@ -60,6 +65,7 @@ export default async function AgentPage() {
         hasEvents={facts.hasEvents}
         contentTypes={facts.contentTypes}
         presentCapabilities={facts.toolsPresent.map((tool) => tool.key)}
+        platformLabel={platformLabel(session.platform)}
         whatsappDigits={publicSupportChannels(workspace.organization.humanAgentWhatsapp).whatsapp?.digits}
       />
     </div>
