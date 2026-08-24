@@ -9,11 +9,13 @@ export {
   type SitePlatform,
 } from "@/modules/platforms/types";
 
+export { isPlatformAdapterEnabled } from "@/modules/platforms/flags";
+
 export {
-  isWebflowEnabled,
-  isShopifyEnabled,
-  isPlatformAdapterEnabled,
-} from "@/modules/platforms/flags";
+  getMarketplaceAdapterConfig,
+  isWebflowAdapterEnabled,
+  isShopifyAdapterEnabled,
+} from "@/modules/platforms/marketplace";
 
 export {
   embedWidgetForSession,

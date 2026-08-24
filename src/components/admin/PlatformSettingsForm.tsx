@@ -26,6 +26,7 @@ export function PlatformSettingsForm({
   reviewerEmails,
   reviewerPasswordSet,
   resendFromEmail,
+  marketplace,
 }: {
   failoverEnabled: boolean;
   order: string;
@@ -65,6 +66,24 @@ export function PlatformSettingsForm({
   reviewerEmails: string;
   reviewerPasswordSet: boolean;
   resendFromEmail: string;
+  marketplace: {
+    origin: string;
+    widgetSrc: string;
+    webflow: {
+      enabled: boolean;
+      clientId: string;
+      clientSecretSet: boolean;
+      redirectUri: string;
+      installPath: string;
+    };
+    shopify: {
+      enabled: boolean;
+      apiKey: string;
+      apiSecretSet: boolean;
+      redirectUri: string;
+      installPath: string;
+    };
+  };
 }) {
   const [state, formAction, saving] = useActionState(savePlatformSettings, null);
   const [pending, startTransition] = useTransition();
@@ -174,6 +193,122 @@ export function PlatformSettingsForm({
           >
             Open reviewer dashboard
           </button>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">Webflow &amp; Shopify</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          Credentials live here, encrypted in the database — not in <code className="text-amber-200">.env</code>.
+          Wix installs are not affected. Leave an adapter off until you have finished the steps below.
+        </p>
+
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <h3 className="text-sm font-medium text-white">Webflow setup</h3>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
+            <li>
+              In Webflow: Workspace settings → Apps &amp; Integrations → Register app. Choose a{" "}
+              <strong className="text-white">Data Client</strong> (not only a Designer Extension).
+            </li>
+            <li>
+              Redirect URL (paste this exactly):
+              <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.redirectUri}</code>
+            </li>
+            <li>Copy Client ID and Client Secret into the fields below, then save.</li>
+            <li>
+              Tick <strong className="text-white">Enable Webflow</strong> only when you are ready to test OAuth.
+              Site owners will later install from{" "}
+              <code className="text-amber-200">{marketplace.webflow.installPath}</code>.
+            </li>
+            <li>
+              Widget script for Webflow Custom Code:
+              <code className="mt-1 block break-all text-amber-200">{`<script src="${marketplace.widgetSrc}" async></script>`}</code>
+            </li>
+          </ol>
+        </div>
+
+        <div className="mt-5 grid gap-4">
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="webflow_enabled" defaultChecked={marketplace.webflow.enabled} className="mt-1" />
+            <span>
+              <span className="text-white">Enable Webflow</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Off by default. Does not change Wix billing, embed, or App Market.
+              </span>
+            </span>
+          </label>
+          <label className="text-sm text-navy-300">
+            Webflow client ID {marketplace.webflow.clientId ? <span className="text-emerald-300">(saved)</span> : null}
+            <input
+              className="field mt-2"
+              name="webflow_client_id"
+              defaultValue={marketplace.webflow.clientId}
+              placeholder="Webflow client ID"
+              autoComplete="off"
+            />
+          </label>
+          <label className="text-sm text-navy-300">
+            Webflow client secret{" "}
+            {marketplace.webflow.clientSecretSet ? (
+              <span className="text-emerald-300">(saved)</span>
+            ) : (
+              <span className="text-amber-300">(not set yet)</span>
+            )}
+            <input className="field mt-2" name="webflow_client_secret" type="password" autoComplete="off" />
+          </label>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <h3 className="text-sm font-medium text-white">Shopify setup (after Webflow)</h3>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
+            <li>
+              In Shopify Partners → Apps → Create app. Use a public OAuth app if you want App Store listing later.
+            </li>
+            <li>
+              Allowed redirection URL:
+              <code className="mt-1 block break-all text-amber-200">{marketplace.shopify.redirectUri}</code>
+            </li>
+            <li>Copy API key (Client ID) and API secret into the fields below, then save.</li>
+            <li>
+              Keep <strong className="text-white">Enable Shopify</strong> off until that adapter is built. You can still
+              store keys now.
+            </li>
+            <li>
+              Same widget script, via theme App Embed or Custom Liquid:
+              <code className="mt-1 block break-all text-amber-200">{`<script src="${marketplace.widgetSrc}" async></script>`}</code>
+            </li>
+          </ol>
+        </div>
+
+        <div className="mt-5 grid gap-4">
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="shopify_enabled" defaultChecked={marketplace.shopify.enabled} className="mt-1" />
+            <span>
+              <span className="text-white">Enable Shopify</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Placeholder for the third adapter. Leave off until that build starts.
+              </span>
+            </span>
+          </label>
+          <label className="text-sm text-navy-300">
+            Shopify API key {marketplace.shopify.apiKey ? <span className="text-emerald-300">(saved)</span> : null}
+            <input
+              className="field mt-2"
+              name="shopify_api_key"
+              defaultValue={marketplace.shopify.apiKey}
+              placeholder="Shopify API key / client ID"
+              autoComplete="off"
+            />
+          </label>
+          <label className="text-sm text-navy-300">
+            Shopify API secret{" "}
+            {marketplace.shopify.apiSecretSet ? (
+              <span className="text-emerald-300">(saved)</span>
+            ) : (
+              <span className="text-amber-300">(not set yet)</span>
+            )}
+            <input className="field mt-2" name="shopify_api_secret" type="password" autoComplete="off" />
+          </label>
         </div>
       </div>
 

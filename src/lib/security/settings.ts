@@ -17,6 +17,8 @@ const SECRET_KEYS = new Set([
   "aws_secret_access_key",
   "wix_reviewer_password",
   "resend_api_key",
+  "webflow_client_secret",
+  "shopify_api_secret",
 ]);
 
 function keyMaterial() {

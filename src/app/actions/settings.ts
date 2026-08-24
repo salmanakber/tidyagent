@@ -12,6 +12,7 @@ import type { PlanKey } from "@prisma/client";
 import { saveAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 import { ensureReviewerWorkspace, getReviewerConfig, signInReviewer } from "@/modules/auth/reviewer";
+import { getMarketplaceAdapterConfig } from "@/modules/platforms/marketplace";
 
 export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
@@ -86,6 +87,7 @@ export async function getPlatformSettingsView() {
     reviewerEmails: reviewer.emails.slice(1).join(", "),
     reviewerPasswordSet: reviewerPasswordSet || Boolean(env.WIX_REVIEWER_PASSWORD),
     resendFromEmail: await getSetting("resend_from_email"),
+    marketplace: await getMarketplaceAdapterConfig(),
   };
 }
 
@@ -179,6 +181,32 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
         return { ok: false, error: message };
       }
     }
+
+    const webflowEnabled = formData.get("webflow_enabled") === "on" ? "true" : "false";
+    const webflowClientId = String(formData.get("webflow_client_id") ?? "").trim();
+    const webflowClientSecret = String(formData.get("webflow_client_secret") ?? "").trim();
+    const shopifyEnabled = formData.get("shopify_enabled") === "on" ? "true" : "false";
+    const shopifyApiKey = String(formData.get("shopify_api_key") ?? "").trim();
+    const shopifyApiSecret = String(formData.get("shopify_api_secret") ?? "").trim();
+    const marketplace = await getMarketplaceAdapterConfig();
+    if (webflowEnabled === "true" && !webflowClientId && !marketplace.webflow.clientId) {
+      return { ok: false, error: "Paste a Webflow client ID before enabling the Webflow adapter." };
+    }
+    if (webflowEnabled === "true" && !webflowClientSecret && !marketplace.webflow.clientSecretSet) {
+      return { ok: false, error: "Paste a Webflow client secret before enabling the Webflow adapter." };
+    }
+    if (shopifyEnabled === "true" && !shopifyApiKey && !marketplace.shopify.apiKey) {
+      return { ok: false, error: "Paste a Shopify API key before enabling the Shopify adapter." };
+    }
+    if (shopifyEnabled === "true" && !shopifyApiSecret && !marketplace.shopify.apiSecretSet) {
+      return { ok: false, error: "Paste a Shopify API secret before enabling the Shopify adapter." };
+    }
+    await setSetting("webflow_enabled", webflowEnabled);
+    if (webflowClientId) await setSetting("webflow_client_id", webflowClientId);
+    if (webflowClientSecret) await setSetting("webflow_client_secret", webflowClientSecret);
+    await setSetting("shopify_enabled", shopifyEnabled);
+    if (shopifyApiKey) await setSetting("shopify_api_key", shopifyApiKey);
+    if (shopifyApiSecret) await setSetting("shopify_api_secret", shopifyApiSecret);
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/access");
