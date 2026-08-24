@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
+import { platformLabel } from "@/modules/platforms";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { formatNumber } from "@/lib/utils";
@@ -19,7 +20,7 @@ export default async function AnalyticsPage() {
       <PageHeader
         eyebrow="Quality"
         title="Analytics"
-        description="Numbers come from live chats, knowledge, and leads on this Wix site. Empty charts mean visitors have not talked yet."
+        description={`Numbers come from live chats, knowledge, and leads on this ${platformLabel(session.platform)} site. Empty charts mean visitors have not talked yet.`}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

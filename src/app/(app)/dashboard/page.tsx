@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
 import { isWixReviewMode } from "@/modules/auth/reviewer";
+import { platformLabel } from "@/modules/platforms";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -14,13 +15,14 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/");
   const [data, testingMode] = await Promise.all([getDashboardOverview(session), isWixReviewMode()]);
+  const siteName = data.site.displayName ?? `Your ${platformLabel(session.platform)} site`;
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="AI employee"
         title={data.agent?.name ?? "Your AI employee"}
-        description={`${data.site.displayName ?? "Your Wix site"} is connected. Answers stay evidence-based. Sensitive actions stay behind confirmation.`}
+        description={`${siteName} is connected. Answers stay evidence-based. Sensitive actions stay behind confirmation.`}
         actions={
           <>
             <StatusPill status={data.agent?.status ?? "DRAFT"} />

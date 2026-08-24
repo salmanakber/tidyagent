@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
+import { platformLabel } from "@/modules/platforms";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AddKnowledgeForm } from "@/components/knowledge/AddKnowledgeForm";
 import { SiteScanPanel } from "@/components/knowledge/SiteScanPanel";
@@ -70,7 +71,7 @@ export default async function KnowledgePage() {
       <PageHeader
         eyebrow="Business knowledge"
         title="What your AI employee knows"
-        description="The scanner reads every public page it can find, plus the Wix Stores catalog on Business and Pro. Custom notes you add sit above that and are never overwritten."
+        description={`The scanner reads every public page it can find on this ${platformLabel(session.platform)} site, plus the catalog on Business and Pro. Custom notes you add sit above that and are never overwritten.`}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (

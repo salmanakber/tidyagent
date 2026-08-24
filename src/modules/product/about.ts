@@ -28,13 +28,13 @@ export async function answerTidyAgentQuestion(question: string) {
   const wantPrice = /price|pricing|plan|cost|how much|fee|rate/i.test(q);
   const wantWhy = /why|good|benefit|feature|different/i.test(q);
 
-  const intro = `tidyAgent is an AI employee for Wix websites. It learns from the live site, answers in the business’s own brand, and hands off to a person when it should not guess.`;
+  const intro = `tidyAgent is an AI employee for websites. It learns from the live site, answers in the business’s own brand, and hands off to a person when it should not guess.`;
   const founderLine = `It was founded by ${who}.`;
   const why = [
-    "Answers only from the connected Wix site, FAQ, and owner notes — it does not invent prices or pages.",
+    "Answers only from the connected site, FAQ, and owner notes — it does not invent prices or pages.",
     "Wears the business’s colors in the chat widget, not tidyAgent branding.",
     "Can route to a real teammate with the full chat history when a human is needed.",
-    "Plans are billed through Wix, so site owners stay in the App Market they already use.",
+    "Plans are billed on the platform where the app is installed.",
   ];
 
   const priceBlock = formatPlanList(pricing, scopes);
@@ -45,7 +45,7 @@ export async function answerTidyAgentQuestion(question: string) {
     parts.push("**Why it’s a good fit**", why.map((line) => `- ${line}`).join("\n"));
     parts.push("**Plans**", priceBlock);
   } else if (wantPrice && !wantFounder && !wantWhy) {
-    parts.push(`Here are the current tidyAgent plans (${pricing.source === "wix" ? "from Wix App Plans" : "from platform price settings"}). Starter includes a ${pricing.trialDays}-day trial.`);
+    parts.push(`Here are the current tidyAgent plans. Starter includes a ${pricing.trialDays}-day trial.`);
     parts.push(priceBlock);
     parts.push(`You can compare them on [this link](${plansUrl}).`);
   } else if (wantWhy && !wantFounder && !wantPrice) {

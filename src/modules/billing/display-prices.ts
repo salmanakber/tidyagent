@@ -4,6 +4,8 @@ import type { PlanKey } from "@prisma/client";
 import { getEnv } from "@/lib/env";
 import { getSetting } from "@/lib/security/settings";
 import { mapWixPackageToPlan, planLabel, wixProductIdForPlan } from "@/modules/billing/catalog";
+import { loadPlatformPrices } from "@/modules/billing/platform-prices";
+import { isWixPlatform, resolveSitePlatform, type SitePlatform } from "@/modules/platforms/types";
 
 export type DisplayPlanPrice = {
   key: PlanKey;
@@ -33,32 +35,30 @@ function emptyPlan(key: PlanKey): DisplayPlanPrice {
   return { key, name: planLabel(key), monthly: null, yearly: null };
 }
 
-export async function getDisplayPricing(): Promise<DisplayPricing> {
+export async function getDisplayPricing(platform?: string | null): Promise<DisplayPricing> {
   const trialDays = Number(await getSetting("plan_trial_days", "7")) || 7;
-  const fromWix = await fetchWixPlanPrices();
-  if (fromWix) {
-    return { ...fromWix, trialDays: fromWix.trialDays || trialDays };
+  const resolved = resolveSitePlatform(platform);
+  if (isWixPlatform(resolved)) {
+    const fromWix = await fetchWixPlanPrices();
+    if (fromWix) {
+      return { ...fromWix, trialDays: fromWix.trialDays || trialDays };
+    }
   }
-  return loadManualPrices(trialDays);
+  return loadManualPrices(resolved, trialDays);
 }
 
-async function loadManualPrices(trialDays: number): Promise<DisplayPricing> {
-  const [starter, business, pro, currency] = await Promise.all([
-    getSetting("plan_price_starter"),
-    getSetting("plan_price_business"),
-    getSetting("plan_price_pro"),
-    getSetting("plan_price_currency", "USD"),
-  ]);
-  const code = currency.toUpperCase() || "USD";
+async function loadManualPrices(platform: SitePlatform, trialDays: number): Promise<DisplayPricing> {
+  const prices = await loadPlatformPrices(platform);
+  const code = prices.currency.toUpperCase() || "USD";
   return {
     source: "manual",
     currency: code,
     symbol: SYMBOLS[code] ?? "$",
     trialDays,
     plans: {
-      STARTER: { key: "STARTER", name: "Starter", monthly: starter || null, yearly: null },
-      GROWTH: { key: "GROWTH", name: "Business", monthly: business || null, yearly: null },
-      PRO: { key: "PRO", name: "Pro", monthly: pro || null, yearly: null },
+      STARTER: { key: "STARTER", name: "Starter", monthly: prices.starter || null, yearly: null },
+      GROWTH: { key: "GROWTH", name: "Business", monthly: prices.business || null, yearly: null },
+      PRO: { key: "PRO", name: "Pro", monthly: prices.pro || null, yearly: null },
     },
   };
 }

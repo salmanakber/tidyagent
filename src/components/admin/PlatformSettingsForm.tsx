@@ -19,6 +19,7 @@ export function PlatformSettingsForm({
   planPricePro,
   planPriceCurrency,
   planTrialDays,
+  platformPrices,
   productFounder,
   googleTtsVoice,
   reviewMode,
@@ -59,6 +60,11 @@ export function PlatformSettingsForm({
   planPricePro: string;
   planPriceCurrency: string;
   planTrialDays: string;
+  platformPrices: {
+    wix: { starter: string; business: string; pro: string; currency: string };
+    webflow: { starter: string; business: string; pro: string; currency: string };
+    shopify: { starter: string; business: string; pro: string; currency: string };
+  };
   productFounder: string;
   googleTtsVoice: string;
   reviewMode: boolean;
@@ -494,33 +500,36 @@ export function PlatformSettingsForm({
       </div>
 
       <div className="panel p-6">
-        <h2 className="font-display text-xl text-white">Displayed plan prices</h2>
+        <h2 className="font-display text-xl text-white">Plan prices by platform</h2>
         <p className="mt-2 text-sm text-navy-300">
-          The public pricing page first loads live Wix App Plans prices. These fields are the fallback if Wix does not
-          return amounts.
+          Each marketplace can show its own Starter / Business / Pro price. Wix still prefers live App Plans amounts
+          when those exist. Webflow and Shopify tenants only see the prices in their column — never another
+          marketplace.
         </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <label className="text-sm text-navy-300">
-            Starter / month
-            <input className="field mt-2" name="plan_price_starter" defaultValue={planPriceStarter} placeholder="19" />
-          </label>
-          <label className="text-sm text-navy-300">
-            Business / month
-            <input className="field mt-2" name="plan_price_business" defaultValue={planPriceBusiness} placeholder="49" />
-          </label>
-          <label className="text-sm text-navy-300">
-            Pro / month
-            <input className="field mt-2" name="plan_price_pro" defaultValue={planPricePro} placeholder="99" />
-          </label>
-          <label className="text-sm text-navy-300">
-            Currency
-            <input className="field mt-2" name="plan_price_currency" defaultValue={planPriceCurrency} placeholder="USD" />
-          </label>
-          <label className="text-sm text-navy-300">
-            Trial days
-            <input className="field mt-2" name="plan_trial_days" defaultValue={planTrialDays} placeholder="7" />
-          </label>
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <PriceColumn
+            title="Wix"
+            prefix="wix"
+            hint="Fallback if live Wix App Plans do not return amounts"
+            values={platformPrices.wix}
+          />
+          <PriceColumn
+            title="Webflow"
+            prefix="webflow"
+            hint="Shown only on Webflow billing"
+            values={platformPrices.webflow}
+          />
+          <PriceColumn
+            title="Shopify"
+            prefix="shopify"
+            hint="Shown only on Shopify billing"
+            values={platformPrices.shopify}
+          />
         </div>
+        <label className="mt-5 block text-sm text-navy-300">
+          Trial days
+          <input className="field mt-2 max-w-xs" name="plan_trial_days" defaultValue={planTrialDays} placeholder="7" />
+        </label>
         <label className="mt-5 block text-sm text-navy-300">
           Founder / who built tidyAgent
           <input
@@ -530,8 +539,7 @@ export function PlatformSettingsForm({
             placeholder="The tidyFlow team"
           />
           <span className="mt-1 block text-xs text-navy-400">
-            Used when a visitor asks who founded tidyAgent, what the plans cost, or why it is a good fit. Prices above
-            (or live Wix App Plans) are what the chat reads.
+            Used when a visitor asks who founded tidyAgent. Chat quotes the price list for that visitor’s platform.
           </span>
         </label>
       </div>
@@ -564,5 +572,40 @@ export function PlatformSettingsForm({
       </div>
       {testResult ? <p className="text-sm text-navy-200">{testResult}</p> : null}
     </form>
+  );
+}
+
+function PriceColumn({
+  title,
+  prefix,
+  hint,
+  values,
+}: {
+  title: string;
+  prefix: "wix" | "webflow" | "shopify";
+  hint: string;
+  values: { starter: string; business: string; pro: string; currency: string };
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <h3 className="text-sm font-medium text-white">{title}</h3>
+      <p className="mt-1 text-xs leading-5 text-navy-400">{hint}</p>
+      <label className="mt-4 block text-sm text-navy-300">
+        Starter / month
+        <input className="field mt-2" name={`plan_price_${prefix}_starter`} defaultValue={values.starter} placeholder="19" />
+      </label>
+      <label className="mt-3 block text-sm text-navy-300">
+        Business / month
+        <input className="field mt-2" name={`plan_price_${prefix}_business`} defaultValue={values.business} placeholder="49" />
+      </label>
+      <label className="mt-3 block text-sm text-navy-300">
+        Pro / month
+        <input className="field mt-2" name={`plan_price_${prefix}_pro`} defaultValue={values.pro} placeholder="99" />
+      </label>
+      <label className="mt-3 block text-sm text-navy-300">
+        Currency
+        <input className="field mt-2" name={`plan_price_${prefix}_currency`} defaultValue={values.currency} placeholder="USD" />
+      </label>
+    </div>
   );
 }

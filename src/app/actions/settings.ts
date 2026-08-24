@@ -13,6 +13,8 @@ import { saveAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 import { ensureReviewerWorkspace, getReviewerConfig, signInReviewer } from "@/modules/auth/reviewer";
 import { getMarketplaceAdapterConfig } from "@/modules/platforms/marketplace";
+import { loadAllPlatformPrices, platformPriceKeys } from "@/modules/billing/platform-prices";
+import type { SitePlatform } from "@/modules/platforms/types";
 
 export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
@@ -43,6 +45,7 @@ export async function getPlatformSettingsView() {
   const planPricePro = await getSetting("plan_price_pro");
   const planPriceCurrency = await getSetting("plan_price_currency", "USD");
   const planTrialDays = await getSetting("plan_trial_days", "7");
+  const platformPrices = await loadAllPlatformPrices();
   const productFounder = await getSetting("product_founder");
   const googleTtsVoice = await getSetting("google_tts_voice", env.GOOGLE_TTS_VOICE);
   const reviewer = await getReviewerConfig();
@@ -80,6 +83,7 @@ export async function getPlatformSettingsView() {
     planPricePro,
     planPriceCurrency,
     planTrialDays,
+    platformPrices,
     productFounder,
     googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
     reviewMode: reviewer.reviewMode,
@@ -137,10 +141,9 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     if (geminiModel) await setSetting("gemini_model", geminiModel);
     if (groqModel) await setSetting("groq_model", groqModel);
     if (openaiModel) await setSetting("openai_model", openaiModel);
-    await setSetting("plan_price_starter", String(formData.get("plan_price_starter") ?? "").trim());
-    await setSetting("plan_price_business", String(formData.get("plan_price_business") ?? "").trim());
-    await setSetting("plan_price_pro", String(formData.get("plan_price_pro") ?? "").trim());
-    await setSetting("plan_price_currency", String(formData.get("plan_price_currency") ?? "USD").trim() || "USD");
+    await savePlatformPriceGroup("WIX", formData);
+    await savePlatformPriceGroup("WEBFLOW", formData);
+    await savePlatformPriceGroup("SHOPIFY", formData);
     await setSetting("plan_trial_days", String(formData.get("plan_trial_days") ?? "7").trim() || "7");
     await setSetting("product_founder", String(formData.get("product_founder") ?? "").trim());
     const googleTts = String(formData.get("google_tts_api_key") ?? "").trim();
@@ -258,6 +261,25 @@ export async function testPlatformTts(voiceId?: string, text?: string) {
     contentType: result.contentType,
     audio: result.bytes.toString("base64"),
   };
+}
+
+async function savePlatformPriceGroup(platform: SitePlatform, formData: FormData) {
+  const keys = platformPriceKeys(platform);
+  const slug = platform.toLowerCase();
+  const starter = String(formData.get(`plan_price_${slug}_starter`) ?? "").trim();
+  const business = String(formData.get(`plan_price_${slug}_business`) ?? "").trim();
+  const pro = String(formData.get(`plan_price_${slug}_pro`) ?? "").trim();
+  const currency = String(formData.get(`plan_price_${slug}_currency`) ?? "USD").trim() || "USD";
+  await setSetting(keys.starter, starter);
+  await setSetting(keys.business, business);
+  await setSetting(keys.pro, pro);
+  await setSetting(keys.currency, currency);
+  if (platform === "WIX") {
+    await setSetting("plan_price_starter", starter);
+    await setSetting("plan_price_business", business);
+    await setSetting("plan_price_pro", pro);
+    await setSetting("plan_price_currency", currency);
+  }
 }
 
 export async function savePlanScopesAction(input: Record<PlanKey, PlanScopeConfig>) {

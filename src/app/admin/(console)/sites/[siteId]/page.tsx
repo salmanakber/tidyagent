@@ -7,6 +7,7 @@ import { SiteAdminActions } from "@/components/admin/SiteAdminActions";
 import { CompPlanForm } from "@/components/admin/CompPlanForm";
 import { relativeTime } from "@/lib/utils";
 import { planLabel } from "@/modules/billing/catalog";
+import { isWixPlatform, platformLabel, resolveSitePlatform } from "@/modules/platforms";
 
 export default async function AdminSiteDetailPage({
   params,
@@ -19,26 +20,29 @@ export default async function AdminSiteDetailPage({
   const { site, events } = data;
   const subscription = site.organization.subscriptions[0];
   const org = site.organization;
+  const platform = resolveSitePlatform(site.platform);
+  const wix = isWixPlatform(platform);
+  const name = platformLabel(platform);
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Website"
         title={site.displayName || site.organization.name}
-        description="Platform control for this Wix install. Wix billing stays the source of truth unless you grant a complimentary paid seat below."
+        description={`Platform control for this ${name} install.${wix ? " Wix billing stays the source of truth unless you grant a complimentary paid seat below." : " Complimentary paid seats still work while native checkout is being connected."}`}
         actions={<SiteAdminActions siteId={site.id} suspended={site.organization.accessStatus === "suspended"} />}
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-6">
           <h2 className="font-display text-xl text-white">Connection</h2>
           <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Platform" value={site.platform === "WEBFLOW" ? "Webflow" : site.platform === "SHOPIFY" ? "Shopify" : "Wix"} />
-            <Row label="Instance" value={site.wixInstanceId} />
+            <Row label="Platform" value={name} />
+            <Row label={wix ? "Instance" : "Site id"} value={site.wixInstanceId} />
             <Row label="Owner" value={site.ownerEmail || "—"} />
             <Row label="URL" value={site.url || "Unpublished"} />
             <Row label="Onboarding" value={site.organization.onboardingStatus} />
             <div className="flex justify-between">
-              <dt className="text-navy-300">Wix status</dt>
+              <dt className="text-navy-300">Connection</dt>
               <dd>
                 <StatusPill status={site.connectionStatus} />
               </dd>
@@ -52,7 +56,7 @@ export default async function AdminSiteDetailPage({
           </dl>
         </div>
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">Wix subscription</h2>
+          <h2 className="font-display text-xl text-white">{name} subscription</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <Row label="Plan" value={subscription ? planLabel(subscription.planKey) : "Free"} />
             <Row label="Status" value={subscription?.status ?? "NONE"} />
@@ -88,10 +92,10 @@ export default async function AdminSiteDetailPage({
           </dl>
         </div>
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">Billing webhooks</h2>
+          <h2 className="font-display text-xl text-white">Billing events</h2>
           <ul className="mt-4 space-y-3 text-sm">
             {events.length === 0 ? (
-              <li className="text-navy-300">No Wix billing events stored yet.</li>
+              <li className="text-navy-300">No billing events stored yet.</li>
             ) : (
               events.map((event) => (
                 <li key={event.id}>
