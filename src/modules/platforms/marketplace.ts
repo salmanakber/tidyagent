@@ -68,6 +68,19 @@ export async function isWebflowAdapterEnabled() {
   return config.webflow.enabled;
 }
 
+export async function getWebflowOAuthConfig() {
+  const config = await getMarketplaceAdapterConfig();
+  const clientSecret = await getSetting("webflow_client_secret");
+  return {
+    enabled: config.webflow.enabled,
+    clientId: config.webflow.clientId,
+    clientSecret,
+    redirectUri: config.webflow.redirectUri,
+    origin: config.origin,
+    widgetSrc: config.widgetSrc,
+  };
+}
+
 export async function isShopifyAdapterEnabled() {
   const config = await getMarketplaceAdapterConfig();
   return config.shopify.enabled;

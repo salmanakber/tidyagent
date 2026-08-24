@@ -15,6 +15,7 @@ export {
   getMarketplaceAdapterConfig,
   isWebflowAdapterEnabled,
   isShopifyAdapterEnabled,
+  getWebflowOAuthConfig,
 } from "@/modules/platforms/marketplace";
 
 export {
