@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, History, Maximize2, Mic, Minimize2, Plus, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
-import { LeadCaptureCard, SupportChoiceCard, WhatsAppOpenedCard } from "@/components/widget/HumanSupportCard";
+import { LeadCaptureCard, SupportChoiceCard, WhatsAppOpenedCard, WhatsAppStrip } from "@/components/widget/HumanSupportCard";
 import { widgetGradientCss } from "@/modules/widget/gradient";
 import { realtimeSocketUrl } from "@/modules/realtime/publish";
 
@@ -94,6 +94,7 @@ export function ChatWidget({
   const seenLive = useRef(new Set<string>());
   const liveSocket = useRef<WebSocket | null>(null);
   const liveClosed = useRef(false);
+  const composerRef = useRef<HTMLInputElement | null>(null);
   const agentRef = useRef(agent);
   agentRef.current = agent;
   const typingHideRef = useRef<number>(0);
@@ -260,7 +261,14 @@ export function ChatWidget({
   }
 
   async function openWhatsApp() {
-    if (!conversationId || supportBusy) return;
+    if (supportBusy) return;
+    const fallback = whatsappDigits
+      ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent("Hi, I was on the website and would like to chat.")}`
+      : "";
+    if (!conversationId) {
+      if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
+      return;
+    }
     setSupportBusy(true);
     setSupportError(null);
     try {
@@ -270,14 +278,16 @@ export function ChatWidget({
         body: JSON.stringify({ conversationId, preview }),
       });
       const data = (await response.json()) as { url?: string; error?: string };
-      if (!response.ok || !data.url) {
+      const url = data.url || fallback;
+      if (!url) {
         setSupportError(data.error || "Could not open WhatsApp just then.");
         return;
       }
-      window.open(data.url, "_blank", "noopener,noreferrer");
+      window.open(url, "_blank", "noopener,noreferrer");
       setLines((current) => [...current.filter((item) => item.kind !== "support" && item.kind !== "lead"), { kind: "whatsapp" }]);
     } catch {
-      setSupportError("Could not open WhatsApp just then.");
+      if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
+      else setSupportError("Could not open WhatsApp just then.");
     } finally {
       setSupportBusy(false);
     }
@@ -313,6 +323,26 @@ export function ChatWidget({
     setThinking(false);
     setAgent({ name, avatarUrl, role: "Online", voiceId });
     setLines([{ kind: "msg", role: "agent", text: greeting, at: new Date().toISOString(), agent: { name, avatarUrl } }]);
+  }
+
+  function resumeAgentChat() {
+    liveClosed.current = true;
+    liveSocket.current?.close();
+    setHumanTyping(null);
+    setSupportError(null);
+    const ai = { name, avatarUrl, role: "Online" as const, voiceId };
+    setAgent(ai);
+    setLines((current) => [
+      ...current.filter((item) => item.kind !== "lead" && item.kind !== "support" && item.kind !== "whatsapp" && item.kind !== "wait"),
+      {
+        kind: "msg",
+        role: "agent",
+        text: "Thanks — I’m here if you have another question.",
+        at: new Date().toISOString(),
+        agent: ai,
+      },
+    ]);
+    window.setTimeout(() => composerRef.current?.focus(), 50);
   }
 
   function finishListen(sendIt: boolean) {
@@ -550,8 +580,11 @@ export function ChatWidget({
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {whatsappDigits ? (
+              <WhatsAppStrip busy={supportBusy} onClick={() => void openWhatsApp()} />
+            ) : null}
             {inboxOpen ? (
-              <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-white p-4 text-sm text-slate-600">
+              <div className={cn("absolute inset-x-0 bottom-0 z-10 bg-white p-4 text-sm text-slate-600", whatsappDigits ? "top-[5.75rem]" : "top-12")}>
                 <div className="mb-3 flex items-center justify-between">
                   <p className="font-semibold text-slate-900">Your chats</p>
                   <button
@@ -599,7 +632,7 @@ export function ChatWidget({
                   <WhatsAppOpenedCard
                     key="whatsapp"
                     brandStyle={visitorStyle}
-                    onDismiss={() => setLines((current) => current.filter((item) => item.kind !== "whatsapp"))}
+                    onDismiss={() => resumeAgentChat()}
                   />
                 ) : line.kind === "lead" ? (
                   <LeadCaptureCard
@@ -608,7 +641,7 @@ export function ChatWidget({
                     preview={preview}
                     brandStyle={visitorStyle}
                     onBack={whatsappDigits ? () => setLines((current) => [...current.filter((item) => item.kind !== "lead"), { kind: "support" }]) : undefined}
-                    onDismiss={() => setLines((current) => current.filter((item) => item.kind !== "lead"))}
+                    onDismiss={() => resumeAgentChat()}
                   />
                 ) : line.kind === "joined" ? (
                   <div key={index} className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-slate-400">
@@ -683,6 +716,7 @@ export function ChatWidget({
                       if (event.key === "Enter") void send();
                     }}
                     placeholder="Write a message"
+                    ref={composerRef}
                     className={cn(
                       "min-w-0 flex-1 rounded-full px-3 py-2 text-base outline-none sm:px-4 sm:text-sm",
                       template === "MINIMAL" ? "bg-[#1a2436] text-[#e8edf5]" : "bg-slate-100 text-slate-800",

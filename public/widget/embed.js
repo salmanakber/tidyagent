@@ -65,6 +65,11 @@
             <button type="button" class="icon-btn voice-stop" hidden title="Stop listening">${iconStop()}</button>` : ""}
             <button type="button" class="icon-btn x" aria-label="Close chat">${iconClose()}</button>
           </div>
+          <button type="button" class="wa-strip"${whatsappDigits ? "" : " hidden"} aria-label="Chat on WhatsApp">
+            <span class="wa-mark">${iconWhatsApp()}</span>
+            <span class="wa-copy"><strong>Chat on WhatsApp</strong><em>Message the team directly</em></span>
+            <span class="wa-go">Open</span>
+          </button>
           <div class="inbox" hidden>
             <div class="inbox-bar">
               <p>Your chats</p>
@@ -126,6 +131,8 @@
     const nameEl = shadow.querySelector(".nm");
     const statusEl = shadow.querySelector(".st-label");
     const headAva = shadow.querySelector(".head-ava");
+    const waStrip = shadow.querySelector(".wa-strip");
+    const waStripGo = shadow.querySelector(".wa-strip .wa-go");
 
     let typed = false;
     let teaserDismissed = false;
@@ -200,6 +207,7 @@
       growBtn.innerHTML = maximized ? iconShrink() : iconGrow();
       placeRoot();
     });
+    waStrip?.addEventListener("click", () => void openWhatsApp(waStrip));
     let typingTimer = 0;
     box.addEventListener("input", () => {
       emitTyping(true);
@@ -369,7 +377,10 @@
           writeStore("lastAt", String(Date.now()));
           watchLive();
         }
-        if (data.support?.whatsapp?.digits) whatsappDigits = data.support.whatsapp.digits;
+        if (data.support?.whatsapp?.digits) {
+          whatsappDigits = data.support.whatsapp.digits;
+          showWhatsAppStrip(true);
+        }
         if (data.wait && !data.wait.expired) {
           const to = data.wait.human ? personFrom(data.wait.human) : data.handoff?.to ? personFrom(data.handoff.to) : currentAgent;
           await playHandoff(data.handoff || { from: currentAgent, to });
@@ -535,6 +546,22 @@
       stopSpeech();
       setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant", voiceId });
       seedGreeting();
+    }
+
+    function resumeAgentChat() {
+      liveClosed = true;
+      try {
+        liveSocket?.close();
+      } catch {
+        /* ignore */
+      }
+      thread.querySelectorAll(".wait-card, .lead-form, .support-choice, .lead-success, .wa-ready").forEach((el) => el.remove());
+      setHeader({ id: config.id, name: startName, avatarUrl: startAvatar, role: "Assistant", voiceId });
+      addMsg("agent", "Thanks — I’m here if you have another question.", { agent: currentAgent });
+      if (box) {
+        box.disabled = false;
+        window.setTimeout(() => box.focus(), 50);
+      }
     }
 
     function showResumeBanner(id) {
@@ -881,10 +908,21 @@
       const digits = (support && support.whatsapp && support.whatsapp.digits) || whatsappDigits;
       if (digits) {
         whatsappDigits = digits;
+        showWhatsAppStrip(true);
         renderSupportChoice();
         return;
       }
       renderLeadForm();
+    }
+
+    function showWhatsAppStrip(on) {
+      if (!waStrip) return;
+      if (on && whatsappDigits) waStrip.removeAttribute("hidden");
+      else waStrip.setAttribute("hidden", "");
+    }
+
+    function directWhatsAppUrl() {
+      return `https://wa.me/${whatsappDigits}?text=${encodeURIComponent("Hi, I was on the website and would like to chat.")}`;
     }
 
     function supportCardOpen() {
@@ -900,12 +938,18 @@
         <p class="lead-heading">How would you like to get help from our team?</p>
         <p class="lead-copy">Choose how a teammate should pick this up. Your chat here stays saved.</p>
         <button type="button" class="support-opt" data-opt="form">
-          <strong>Submit a support request</strong>
-          <span>Leave your details. The team will follow up by email.</span>
+          <span class="opt-mark mail">✉</span>
+          <span class="opt-copy">
+            <strong>Submit a support request</strong>
+            <span>Leave your details. The team will follow up by email.</span>
+          </span>
         </button>
-        <button type="button" class="support-opt primary" data-opt="whatsapp">
-          <strong>Continue on WhatsApp</strong>
-          <span>Opens WhatsApp with a short summary of this chat. You review and send it.</span>
+        <button type="button" class="support-opt wa" data-opt="whatsapp">
+          <span class="opt-mark wa-mark">${iconWhatsApp()}</span>
+          <span class="opt-copy">
+            <strong>Continue on WhatsApp</strong>
+            <span>Opens WhatsApp with a short summary. You review and send it.</span>
+          </span>
         </button>
         <p class="lead-error" hidden></p>`;
       wrap.querySelectorAll("[data-opt]").forEach((btn) => {
@@ -923,14 +967,22 @@
       thread.scrollTop = thread.scrollHeight;
     }
 
-    async function openWhatsApp(wrap) {
-      if (!conversationId || wrap.dataset.busy === "1") return;
-      wrap.dataset.busy = "1";
-      const errorEl = wrap.querySelector(".lead-error");
-      const waBtn = wrap.querySelector('[data-opt="whatsapp"]');
+    async function openWhatsApp(host) {
+      const fromStrip = host && host.classList.contains("wa-strip");
+      if (host && host.dataset.busy === "1") return;
+      if (!whatsappDigits) return;
+      if (host) host.dataset.busy = "1";
+      if (fromStrip && waStripGo) waStripGo.textContent = "Opening…";
+      const errorEl = host && !fromStrip ? host.querySelector(".lead-error") : null;
+      const waBtn = host && !fromStrip ? host.querySelector('[data-opt="whatsapp"]') : null;
       if (waBtn) waBtn.disabled = true;
       if (errorEl) errorEl.hidden = true;
+      const fallback = directWhatsAppUrl();
       try {
+        if (!conversationId) {
+          window.open(fallback, "_blank", "noopener,noreferrer");
+          return;
+        }
         const response = await fetch(`${origin}/api/widget/whatsapp-handoff`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -942,29 +994,30 @@
           }),
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.url) {
-          if (errorEl) {
-            errorEl.hidden = false;
-            errorEl.textContent = data.error || "Could not open WhatsApp just then.";
-          }
-          wrap.dataset.busy = "";
-          if (waBtn) waBtn.disabled = false;
-          return;
+        const url = data.url || fallback;
+        window.open(url, "_blank", "noopener,noreferrer");
+        if (fromStrip) return;
+        if (host) {
+          host.className = "wa-ready";
+          host.innerHTML = `
+            <div class="lead-check wa">✓</div>
+            <p class="lead-heading">WhatsApp is ready</p>
+            <p class="lead-copy">A short summary of this chat is pre-filled. Review it, then send it yourself. This website conversation stays here.</p>
+            <button type="button" class="lead-submit">Back to chat</button>`;
+          host.querySelector("button").addEventListener("click", () => {
+            host.remove();
+            resumeAgentChat();
+          });
         }
-        window.open(data.url, "_blank", "noopener,noreferrer");
-        wrap.className = "wa-ready";
-        wrap.innerHTML = `
-          <div class="lead-check">✓</div>
-          <p class="lead-heading">WhatsApp is ready</p>
-          <p class="lead-copy">A short summary of this chat is pre-filled. Review it, then send it yourself. This website conversation stays here.</p>
-          <button type="button" class="lead-submit">Back to chat</button>`;
-        wrap.querySelector("button").addEventListener("click", () => wrap.remove());
       } catch {
+        window.open(fallback, "_blank", "noopener,noreferrer");
         if (errorEl) {
           errorEl.hidden = false;
-          errorEl.textContent = "Could not open WhatsApp just then.";
+          errorEl.textContent = "Opened WhatsApp. You can send the message from there.";
         }
-        wrap.dataset.busy = "";
+      } finally {
+        if (host) host.dataset.busy = "";
+        if (fromStrip && waStripGo) waStripGo.textContent = "Open";
         if (waBtn) waBtn.disabled = false;
       }
     }
@@ -1055,7 +1108,10 @@
               <p class="lead-copy">Your support request was submitted. The team has your details and will follow up by email.</p>
               <p class="lead-copy muted">You can keep chatting here if you have more to add.</p>
               <button type="button" class="lead-submit">Continue chatting</button>`;
-            wrap.querySelector("button").addEventListener("click", () => wrap.remove());
+            wrap.querySelector("button").addEventListener("click", () => {
+              wrap.remove();
+              resumeAgentChat();
+            });
             return;
           }
           if (formError) {
@@ -1296,6 +1352,9 @@
   function iconStop() {
     return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
   }
+  function iconWhatsApp() {
+    return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.5 2 2.01 6.48 2.01 12.02c0 1.77.46 3.45 1.28 4.91L2 22l5.2-1.26A9.96 9.96 0 0 0 12.04 22C17.57 22 22 17.52 22 11.98 22 6.48 17.57 2 12.04 2zm5.46 14.56c-.23.64-1.33 1.18-1.84 1.26-.47.07-1.06.1-1.71-.11-.4-.12-.9-.3-1.55-.58-2.73-1.18-4.5-3.94-4.64-4.12-.13-.18-1.1-1.46-1.1-2.79 0-1.32.69-1.97.94-2.24.24-.26.53-.33.7-.33h.51c.16 0 .38-.06.6.46.23.54.78 1.87.85 2 .07.13.11.28.02.46-.09.18-.13.28-.26.44-.13.15-.27.34-.39.46-.13.13-.26.26-.11.51.15.26.67 1.1 1.44 1.78 1 .88 1.83 1.16 2.09 1.29.26.13.41.11.56-.07.16-.18.66-.77.84-1.03.18-.26.35-.22.6-.13.24.09 1.54.73 1.8.86.27.13.44.2.51.31.07.13.07.73-.16 1.37z"/></svg>`;
+  }
 
   function widgetCss({ color, left, template, useGradient, gradientTo, gradientAngle, textColor, messageColor }) {
     const noir = template === "MINIMAL";
@@ -1356,6 +1415,16 @@
       .tpl-bar .panel { align-self: stretch; }
       .head { display:flex; align-items:center; gap:8px; padding:10px; background:${headBg}; color:${textColor}; backdrop-filter: blur(16px); flex:none; }
       .tpl-soft .head { padding:14px 12px 16px; }
+      .wa-strip { display:flex; align-items:center; gap:10px; width:100%; border:0; flex:none; padding:8px 12px; background:linear-gradient(135deg,#25D366,#1EBE57); color:#fff; cursor:pointer; text-align:left; box-shadow:inset 0 1px 0 rgba(255,255,255,.2); }
+      .wa-strip[hidden] { display:none !important; }
+      .wa-strip:hover { filter:brightness(1.04); }
+      .wa-strip:disabled { opacity:.75; }
+      .wa-mark { height:32px; width:32px; border-radius:999px; display:grid; place-items:center; background:#fff; color:#25D366; flex:none; box-shadow:0 4px 10px rgba(16,24,40,.08); }
+      .wa-mark svg { width:18px; height:18px; display:block; }
+      .wa-copy { min-width:0; flex:1; }
+      .wa-copy strong { display:block; font:700 12px/1.2 ui-sans-serif,system-ui; }
+      .wa-copy em { display:block; margin-top:2px; font:500 10px/1.2 ui-sans-serif,system-ui; font-style:normal; opacity:.92; }
+      .wa-go { flex:none; border-radius:999px; background:rgba(255,255,255,.2); padding:6px 10px; font:700 10px/1 ui-sans-serif,system-ui; letter-spacing:.04em; }
       .head-ava, .ava { height:36px; width:36px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.18); flex:none; }
       .head-ava.has-photo, .ava.has-photo, .face:has(img), .teaser-ava:has(img) { background: transparent; }
       .ava.sm { height:26px; width:26px; }
@@ -1440,10 +1509,16 @@
       .lead-submit { border:0; border-radius:999px; padding:11px 12px; background:${fill}; color:${textColor}; font:650 13px/1 ui-sans-serif,system-ui; cursor:pointer; }
       .lead-submit:disabled { opacity:.6; cursor:wait; }
       .lead-back { border:0; background:transparent; color:${noir ? "#8b9bb4" : "#64748b"}; font:600 12px/1 ui-sans-serif,system-ui; cursor:pointer; padding:2px; }
-      .support-opt { border:1px solid ${noir ? "rgba(255,255,255,.08)" : "#e2e8f0"}; background:${noir ? "#1a2436" : "#f8fafc"}; border-radius:16px; padding:12px; text-align:left; cursor:pointer; color:inherit; }
+      .support-opt { display:flex; align-items:center; gap:12px; border:1px solid ${noir ? "rgba(255,255,255,.08)" : "#e2e8f0"}; background:${noir ? "#1a2436" : "#f8fafc"}; border-radius:16px; padding:11px; text-align:left; cursor:pointer; color:inherit; }
+      .support-opt .opt-copy { min-width:0; flex:1; }
       .support-opt strong { display:block; font:700 13px/1.3 ui-sans-serif,system-ui; }
-      .support-opt span { display:block; margin-top:4px; font:500 11px/1.4 ui-sans-serif,system-ui; opacity:.72; }
-      .support-opt.primary { background:${fill}; color:${textColor}; border-color:transparent; }
+      .support-opt .opt-copy span { display:block; margin-top:3px; font:500 11px/1.4 ui-sans-serif,system-ui; opacity:.72; }
+      .opt-mark { height:40px; width:40px; border-radius:14px; display:grid; place-items:center; flex:none; background:${noir ? "#0b1220" : "#fff"}; color:${noir ? "#cbd5e1" : "#475569"}; box-shadow:0 4px 12px rgba(16,24,40,.06); font-size:16px; }
+      .opt-mark.wa-mark { background:#fff; color:#25D366; }
+      .opt-mark.wa-mark svg { width:20px; height:20px; display:block; }
+      .support-opt.wa { background:linear-gradient(135deg,#25D366,#128C7E); color:#fff; border-color:transparent; box-shadow:0 8px 20px rgba(37,211,102,.28); }
+      .support-opt.wa .opt-copy span { opacity:.88; }
+      .lead-check.wa { background:linear-gradient(135deg,#25D366,#128C7E); }
       .lead-success, .wa-ready { text-align:center; padding:18px 14px; }
       .joined { display:flex; align-items:center; gap:8px; color:#64748b; font:650 11px/1 ui-sans-serif,system-ui; letter-spacing:.04em; text-transform:uppercase; margin:4px 0 2px; }
       .joined .line { flex:1; height:1px; background:currentColor; opacity:.25; }
@@ -1471,6 +1546,7 @@
       .listen-x svg, .listen-go svg { width:15px; height:15px; }
       .go svg, .mic svg { width:16px; height:16px; }
       .inbox { position:absolute; inset:52px 0 0; background:${paper}; z-index:3; display:flex; flex-direction:column; }
+      .panel:has(.wa-strip:not([hidden])) .inbox { top: 96px; }
       .inbox-bar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font:650 13px/1 ui-sans-serif,system-ui; }
       .new-chat { border:0; background:${fill}; color:${textColor}; border-radius:999px; padding:8px 12px; font:650 11px/1 ui-sans-serif,system-ui; cursor:pointer; }
       .inbox-list { list-style:none; margin:0; padding:0 10px 16px; overflow:auto; }

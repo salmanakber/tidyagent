@@ -1,17 +1,53 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Loader2, MessageSquareText } from "lucide-react";
+import { Check, ChevronRight, Loader2, Mail, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export function WhatsAppMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M12.04 2C6.5 2 2.01 6.48 2.01 12.02c0 1.77.46 3.45 1.28 4.91L2 22l5.2-1.26A9.96 9.96 0 0 0 12.04 22C17.57 22 22 17.52 22 11.98 22 6.48 17.57 2 12.04 2zm5.46 14.56c-.23.64-1.33 1.18-1.84 1.26-.47.07-1.06.1-1.71-.11-.4-.12-.9-.3-1.55-.58-2.73-1.18-4.5-3.94-4.64-4.12-.13-.18-1.1-1.46-1.1-2.79 0-1.32.69-1.97.94-2.24.24-.26.53-.33.7-.33h.51c.16 0 .38-.06.6.46.23.54.78 1.87.85 2 .07.13.11.28.02.46-.09.18-.13.28-.26.44-.13.15-.27.34-.39.46-.13.13-.26.26-.11.51.15.26.67 1.1 1.44 1.78 1 .88 1.83 1.16 2.09 1.29.26.13.41.11.56-.07.16-.18.66-.77.84-1.03.18-.26.35-.22.6-.13.24.09 1.54.73 1.8.86.27.13.44.2.51.31.07.13.07.73-.16 1.37z" />
+    </svg>
+  );
+}
+
+export function WhatsAppStrip({
+  busy,
+  onClick,
+}: {
+  busy?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className="flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-[#25D366] to-[#1EBE57] px-3 py-2 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,.2)] transition hover:from-[#22c55e] hover:to-[#16a34a] disabled:opacity-70"
+      aria-label="Chat on WhatsApp"
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#25D366] shadow-sm">
+        <WhatsAppMark className="h-[18px] w-[18px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] font-semibold leading-4">Chat on WhatsApp</span>
+        <span className="mt-0.5 block text-[10px] leading-3 text-white/90">Message the team directly</span>
+      </span>
+      <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-semibold tracking-wide">
+        {busy ? "Opening…" : "Open"}
+      </span>
+    </button>
+  );
+}
+
 export function SupportChoiceCard({
-  brandStyle,
   onChooseForm,
   onChooseWhatsApp,
   busy,
   error,
 }: {
-  brandStyle: React.CSSProperties;
+  brandStyle?: React.CSSProperties;
   onChooseForm: () => void;
   onChooseWhatsApp: () => void;
   busy?: boolean;
@@ -19,41 +55,47 @@ export function SupportChoiceCard({
 }) {
   return (
     <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
-      <div className="px-4 pb-4 pt-4">
+      <div className="px-3.5 pb-3.5 pt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Human support</p>
         <h3 className="mt-1 text-[15px] font-semibold leading-5 text-slate-900">How would you like to get help from our team?</h3>
         <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
           Choose how you’d like a teammate to pick this up. Your chat here stays saved.
         </p>
-        <div className="mt-3 grid gap-2">
+        <div className="mt-3 grid gap-2.5">
           <button
             type="button"
             disabled={busy}
             onClick={onChooseForm}
-            className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-white disabled:opacity-60"
+            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-white disabled:opacity-60"
           >
-            <p className="text-[13px] font-semibold text-slate-900">Submit a support request</p>
-            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Leave your details. The team will follow up by email.</p>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-slate-600 shadow-sm ring-1 ring-slate-200">
+              <Mail className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-slate-900">Submit a support request</span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">Leave your details. The team will follow up by email.</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={onChooseWhatsApp}
-            className="rounded-2xl px-3 py-3 text-left text-white shadow-sm transition disabled:opacity-60"
-            style={brandStyle}
+            className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] px-3 py-3 text-left text-white shadow-[0_8px_20px_rgba(37,211,102,.28)] transition hover:brightness-105 disabled:opacity-60"
           >
-            <p className="text-[13px] font-semibold">Continue on WhatsApp</p>
-            <p className="mt-0.5 text-[11px] leading-4 opacity-85">
-              Opens WhatsApp with a short summary of this chat. You review and send it.
-            </p>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#25D366] shadow-sm">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <WhatsAppMark className="h-5 w-5" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold">Continue on WhatsApp</span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-white/85">
+                Opens WhatsApp with a short summary. You review and send it.
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-white/80" />
           </button>
         </div>
         {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
-        {busy ? (
-          <p className="mt-2 flex items-center gap-2 text-[12px] text-slate-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing WhatsApp…
-          </p>
-        ) : null}
       </div>
     </div>
   );
@@ -218,17 +260,17 @@ export function LeadCaptureCard({
   );
 }
 
-export function WhatsAppOpenedCard({ brandStyle, onDismiss }: { brandStyle: React.CSSProperties; onDismiss: () => void }) {
+export function WhatsAppOpenedCard({ onDismiss }: { brandStyle?: React.CSSProperties; onDismiss: () => void }) {
   return (
     <div className="overflow-hidden rounded-3xl bg-white px-4 py-5 text-center shadow-sm ring-1 ring-black/5">
-      <span className="mx-auto grid h-12 w-12 place-items-center rounded-full text-white" style={brandStyle}>
-        <Check className="h-6 w-6" strokeWidth={2.5} />
+      <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white shadow-[0_8px_20px_rgba(37,211,102,.28)]">
+        <WhatsAppMark className="h-6 w-6" />
       </span>
       <h3 className="mt-3 text-[15px] font-semibold text-slate-900">WhatsApp is ready</h3>
       <p className="mt-1.5 text-[13px] leading-5 text-slate-600">
         A short summary of this chat is pre-filled. Review it, then send it yourself. This website conversation stays here.
       </p>
-      <button type="button" className="mt-4 w-full rounded-full py-2.5 text-[13px] font-semibold text-white" style={brandStyle} onClick={onDismiss}>
+      <button type="button" className="mt-4 w-full rounded-full bg-gradient-to-r from-[#25D366] to-[#1EBE57] py-2.5 text-[13px] font-semibold text-white" onClick={onDismiss}>
         Back to chat
       </button>
     </div>

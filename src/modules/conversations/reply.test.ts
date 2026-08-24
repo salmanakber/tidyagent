@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isFollowUp, isPriceQuestion, searchQueryFromThread, subjectTerms } from "@/modules/conversations/reply";
+import { formatEvidenceAnswer, formatFactsAnswer, isCasualOpener, isFollowUp, isPriceQuestion, isSensitiveQuestion, searchQueryFromThread, subjectTerms } from "@/modules/conversations/reply";
 
 describe("visitor openers", () => {
   it("treats hi/hello as greetings, not missing knowledge", () => {
@@ -14,6 +14,12 @@ describe("visitor openers", () => {
     expect(isPriceQuestion("what is the price of deep clean?")).toBe(true);
     expect(isPriceQuestion("How much does it cost")).toBe(true);
     expect(isPriceQuestion("Do you deliver on Friday?")).toBe(false);
+  });
+
+  it("treats subscription and plan questions as sensitive commercial facts", () => {
+    expect(isSensitiveQuestion("what is the subscription price")).toBe(true);
+    expect(isSensitiveQuestion("how much is the business plan")).toBe(true);
+    expect(isSensitiveQuestion("Do you deliver on Friday?")).toBe(false);
   });
 
   it("keeps the asked item and does not dump page titles", () => {

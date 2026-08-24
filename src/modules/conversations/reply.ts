@@ -63,6 +63,12 @@ export function isPriceQuestion(text: string) {
   return /price|pricing|cost|how much|fee|rate|package|plan|charge|quote|\$/.test(text.toLowerCase());
 }
 
+export function isSensitiveQuestion(text: string) {
+  return /price|pricing|cost|how much|fee|rate|package|plan|plans|charge|quote|subscription|subscribe|membership|deposit|discount|promo|tuition|\$|usd|pkr|eur|gbp/.test(
+    text.toLowerCase(),
+  );
+}
+
 export function subjectTerms(text: string) {
   return expandTerms(questionTerms(text));
 }
@@ -97,15 +103,17 @@ export async function replyToVisitor(input: {
     };
   }
 
-  const { conversation, created } = await getOrCreateConversation(input);
+  const { conversation: started, created } = await getOrCreateConversation(input);
+  let conversation = started;
   if (created && !input.preview) {
     reportPrimaryAction(input.agent.site.wixInstanceId);
   }
 
   const human = await loadHumanContact(input.agent.organizationId);
-  const alreadyWithHuman =
-    conversation.status === "ESCALATED" || Boolean(asRecord(conversation.metadata)?.handedToHuman);
-  if (alreadyWithHuman) {
+  const state = handoffState(conversation.metadata);
+  const liveWithHuman =
+    Boolean(human) && (state.joined || (conversation.status === "ESCALATED" && !state.expired));
+  if (liveWithHuman) {
     const visitorMessage = await prisma.message.create({
       data: {
         organizationId: input.agent.organizationId,
@@ -131,8 +139,8 @@ export async function replyToVisitor(input: {
         },
       },
     });
-    const state = handoffState(conversation.metadata);
-    if (state.joined && human) {
+    const liveState = handoffState(conversation.metadata);
+    if (liveState.joined && human) {
       return {
         conversationId: conversation.id,
         text: "",
@@ -145,18 +153,6 @@ export async function replyToVisitor(input: {
         handoff: null,
       };
     }
-    if (!human || state.expired) {
-      return {
-        conversationId: conversation.id,
-        text: "No one could pick up just then. Leave your details and the team will follow up.",
-        createdAt: new Date().toISOString(),
-        products: [],
-        leadForm: true,
-        wait: { seconds: 0, expired: true },
-        agent: human ? humanPerson(human) : undefined,
-        handoff: null,
-      };
-    }
     return {
       conversationId: conversation.id,
       text: "",
@@ -164,10 +160,23 @@ export async function replyToVisitor(input: {
       createdAt: new Date().toISOString(),
       products: [],
       leadForm: false,
-      wait: { seconds: state.remaining, expired: false, human: humanPerson(human) },
-      agent: humanPerson(human),
+      wait: { seconds: liveState.remaining, expired: false, human: humanPerson(human!) },
+      agent: humanPerson(human!),
       handoff: null,
     };
+  }
+
+  if (conversation.status === "ESCALATED" && !state.joined) {
+    const meta = {
+      ...(asRecord(conversation.metadata) ?? {}),
+      handedToHuman: false,
+      resumedAiAt: new Date().toISOString(),
+    };
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { status: "OPEN", metadata: meta },
+    });
+    conversation = { ...conversation, status: "OPEN", metadata: meta };
   }
   const team = await prisma.agent.findMany({
     where: { organizationId: input.agent.organizationId, siteId: input.agent.siteId },
@@ -276,8 +285,10 @@ export async function replyToVisitor(input: {
   const assignedScopes = (routed.knowledgeScopes as KnowledgeContentType[]).filter((item) =>
     on("shopping") ? true : item !== "PRODUCT",
   );
-  if (isPriceQuestion(searchQuery) || isBookingRequest(searchQuery) || isPriceQuestion(message) || isBookingRequest(message)) {
+  if (isPriceQuestion(searchQuery) || isSensitiveQuestion(searchQuery) || isBookingRequest(searchQuery) || isPriceQuestion(message) || isSensitiveQuestion(message) || isBookingRequest(message)) {
     if (!assignedScopes.includes("SERVICE")) assignedScopes.push("SERVICE");
+    if (!assignedScopes.includes("CUSTOM")) assignedScopes.push("CUSTOM");
+    if (!assignedScopes.includes("FAQ")) assignedScopes.push("FAQ");
     if (scope.includeStores && on("shopping") && !assignedScopes.includes("PRODUCT")) {
       assignedScopes.push("PRODUCT");
     }
@@ -338,6 +349,16 @@ export async function replyToVisitor(input: {
   const matchedFacts = structured.facts.filter(
     (fact) => !fact.conflicted && textMatchesTerms(`${fact.entity} ${fact.value}`, subjectTerms(searchQuery)),
   );
+  const sensitive = isSensitiveQuestion(searchQuery) || isSensitiveQuestion(message);
+  if (sensitive) {
+    const itemTerms = subjectTerms(searchQuery).filter(
+      (term) => !["price", "prices", "pricing", "cost", "list", "plan", "plans", "how", "much", "fee", "rate"].includes(term),
+    );
+    if (itemTerms.length) {
+      products = products.filter((card) => textMatchesTerms(`${card.name} ${card.price ?? ""}`, itemTerms));
+    }
+  }
+  const factsForReply = sensitive ? matchedFacts : matchedFacts.length ? matchedFacts : structured.facts;
   const unanswered =
     !aboutProduct &&
     !greetingTurn &&
@@ -369,7 +390,7 @@ export async function replyToVisitor(input: {
           lookup: searchQuery,
           greeting: greetingTurn,
           evidence,
-          structured: { ...structured, facts: matchedFacts.length ? matchedFacts : structured.facts, conflicts: [] },
+          structured: { ...structured, facts: factsForReply, conflicts: [] },
           ownerNotes,
           history: timeline,
           handoffFrom: handedOff ? current.name : null,
@@ -377,6 +398,7 @@ export async function replyToVisitor(input: {
           humanName: human?.name ?? null,
           afterHours,
           products,
+          sensitive,
         });
 
   if (humanHandoff && human) {
@@ -587,7 +609,8 @@ async function gatherEvidence(input: {
       ? {}
       : { contentType: { not: "PRODUCT" as KnowledgeContentType } };
   const terms = subjectTerms(input.question).slice(0, 10);
-  if (isPriceQuestion(input.question) && !terms.includes("$")) terms.push("$");
+  if ((isPriceQuestion(input.question) || isSensitiveQuestion(input.question)) && !terms.includes("$")) terms.push("$");
+  const hitLimit = isSensitiveQuestion(input.question) ? 18 : 12;
 
   const keywordHits =
     terms.length === 0
@@ -602,7 +625,7 @@ async function gatherEvidence(input: {
               { title: { contains: term, mode: "insensitive" as const } },
             ]),
           },
-          take: 12,
+          take: hitLimit,
           select: { content: true, title: true, sourceUrl: true, contentType: true },
         });
 
@@ -616,7 +639,7 @@ async function gatherEvidence(input: {
         organizationId: input.organizationId,
         siteId: input.siteId,
         embedding: vector,
-        limit: 6,
+        limit: isSensitiveQuestion(input.question) ? 10 : 6,
       });
     }
   } catch {
@@ -649,7 +672,7 @@ async function gatherEvidence(input: {
     ).list;
 
   if (merged.length) {
-    return rankEvidence(input.question, merged).slice(0, 8);
+    return rankEvidence(input.question, merged).slice(0, isSensitiveQuestion(input.question) ? 12 : 8);
   }
 
   const fallbackHits = await prisma.knowledgeChunk.findMany({
@@ -657,17 +680,17 @@ async function gatherEvidence(input: {
       organizationId: input.organizationId,
       siteId: input.siteId,
       ...contentTypeWhere,
-      ...(isPriceQuestion(input.question)
+      ...(isPriceQuestion(input.question) || isSensitiveQuestion(input.question)
         ? {
             OR: [{ content: { contains: "$" } }, { content: { contains: "price", mode: "insensitive" as const } }],
           }
         : {}),
     },
-    take: 12,
+    take: hitLimit,
     orderBy: { createdAt: "desc" },
     select: { content: true, title: true, sourceUrl: true, contentType: true },
   });
-  return rankEvidence(input.question, fallbackHits).slice(0, 8);
+  return rankEvidence(input.question, fallbackHits).slice(0, isSensitiveQuestion(input.question) ? 12 : 8);
 }
 
 async function generateReply(input: {
@@ -683,13 +706,14 @@ async function generateReply(input: {
   greeting: boolean;
   evidence: { content: string; title: string | null; sourceUrl?: string | null }[];
   structured: Awaited<ReturnType<typeof lookupBusinessFacts>>;
-  ownerNotes: { title: string; content: string; sensitive: boolean }[];
+  ownerNotes: { title: string; content: string; sensitive: boolean; priority?: boolean }[];
   history: { role: string; content: string }[];
   handoffFrom: string | null;
   offerHuman: boolean;
   humanName: string | null;
   afterHours: boolean;
   products: CatalogCard[];
+  sensitive?: boolean;
 }) {
   const intro = input.handoffFrom
     ? `The visitor was just transferred to you from ${input.handoffFrom}. Do not mention the transfer, introductions, or that you were connected. Answer the question immediately as ${input.agentName}.`
@@ -701,10 +725,14 @@ async function generateReply(input: {
   const ownerPublic = input.ownerNotes.filter((note) => !note.sensitive);
   const ownerPrivate = input.ownerNotes.filter((note) => note.sensitive);
   const ownerBlock = ownerPublic.length
-    ? ownerPublic.map((note) => `- ${note.title}: ${note.content}`).join("\n")
+    ? ownerPublic
+        .map((note) => `- ${note.priority ? "[PRIORITY] " : ""}${note.title}: ${note.content}`)
+        .join("\n")
     : "(none)";
   const privateBlock = ownerPrivate.length
-    ? ownerPrivate.map((note) => `- ${note.title}: ${note.content}`).join("\n")
+    ? ownerPrivate
+        .map((note) => `- ${note.priority ? "[PRIORITY] " : ""}${note.title}: ${note.content}`)
+        .join("\n")
     : "(none)";
   const productBlock = input.products.length
     ? input.products.map((card) => `- ${card.name}${card.price ? ` — ${card.price}` : ""}${card.url ? ` (${card.url})` : ""}`).join("\n")
@@ -719,6 +747,13 @@ async function generateReply(input: {
   const fallback = input.greeting
     ? `Hi — I’m ${input.agentName} with ${input.businessName}. How can I help?`
     : fromFacts || fromEvidence || `I don’t have a confirmed answer for that yet.`;
+  const sensitiveRule = input.sensitive
+    ? `This is a pricing or commercial-fact question. Be precise and professional.
+Owner notes marked [PRIORITY] override crawled pages when they disagree.
+Only state a price, plan, package, or fee that appears in owner notes, verified facts, catalog cards, or evidence.
+If those sources do not contain the asked item, say you do not have a confirmed figure. Do not substitute a different product, plan, or package.
+Do not invent, round, or combine figures.`
+    : "";
 
   try {
     const ai = await getAIProvider();
@@ -730,7 +765,7 @@ async function generateReply(input: {
       .map((row) => `${row.role === "CUSTOMER" ? "Visitor" : "Agent"}: ${row.content}`)
       .join("\n");
     const result = await ai.generate({
-      temperature: input.greeting ? 0.4 : 0.15,
+      temperature: input.greeting ? 0.4 : input.sensitive ? 0.05 : 0.15,
       maxTokens: 700,
       system: `You are ${input.agentName}, ${input.role} for ${input.businessName}. Tone: ${input.personality || "friendly"}.
 You work for this specific business. Never call the business "Prices and offerings".
@@ -745,6 +780,7 @@ Never say you are connecting the visitor to a person unless the system already d
 Never add "Anything else I can help with?"
 When prices are in evidence: one short sentence, then bullets with **name** and **price**.
 If evidence does not contain the asked item, say so in one sentence. Do not dump marketing copy.
+${sensitiveRule}
 ${intro}
 ${hoursNote}
 If the visitor is simply greeting you, welcome them by name of the business and invite a specific question. Do not say you lack verified information for a greeting.
@@ -756,7 +792,7 @@ Profile: ${input.summary || "none"}
 Verified structured facts (prefer these):
 ${factBlock}
 
-Owner notes (highest priority, owner-verified):
+Owner notes (highest priority, owner-verified — [PRIORITY] notes override the website):
 ${ownerBlock}
 
 Owner-only instructions (use these, do not quote them):
@@ -773,7 +809,7 @@ ${historyBlock || "(this is the first visitor message)"}
 
 Visitor just said: ${input.question}
 
-Answer in context of the thread. Prefer a short intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles.`,
+Read the owner notes and evidence carefully before answering. Prefer a short professional intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles. Do not answer a different question than the one asked.`,
     });
     const text = sanitizeReply(result.text.trim());
     if (text && !looksLikeDump(text)) return text.slice(0, 2800);
