@@ -6,7 +6,7 @@
 # HTTPS URL in Partner Dashboard → App setup → GDPR / privacy webhooks. For CLI-managed
 # apps, TOML + deploy is the source of truth — pasting the URL alone is not enough.
 
-client_id = "YOUR_SHOPIFY_API_KEY"
+client_id = "cf0756196113f78ef60ca45598d8b344"
 name = "tidyAgent"
 application_url = "https://agent.tidyflowapp.com/shopify"
 embedded = true
