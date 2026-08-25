@@ -31,6 +31,8 @@ export default async function AdminSettingsPage() {
         productFounder={settings.productFounder}
         googleTtsVoice={settings.googleTtsVoice}
         reviewMode={settings.reviewMode}
+        webflowReviewMode={settings.webflowReviewMode}
+        shopifyReviewMode={settings.shopifyReviewMode}
         reviewerEmail={settings.reviewerEmail}
         reviewerEmails={settings.reviewerEmails}
         reviewerPasswordSet={settings.reviewerPasswordSet}

@@ -1,0 +1,2 @@
+"use strict";(()=>{(function(){var i="https://agent.tidyflowapp.com/webflow",t=new URLSearchParams;t.set("embed","1");function o(){location.replace(i+"?"+t.toString())}try{if(window.webflow&&(typeof window.webflow.setExtensionSize=="function"&&window.webflow.setExtensionSize({width:480,height:720}),typeof window.webflow.getSiteInfo=="function")){window.webflow.getSiteInfo().then(function(e){e&&e.siteId&&t.set("siteId",e.siteId),o()}).catch(o);return}}catch{}o()})();})();
+//# sourceMappingURL=bundle.js.map

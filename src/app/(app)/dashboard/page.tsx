@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
-import { isWixReviewMode } from "@/modules/auth/reviewer";
+import { isPlatformReviewMode } from "@/modules/auth/reviewer";
 import { platformLabel, isWebflowPlatform, isShopifyPlatform } from "@/modules/platforms";
 import { webflowWidgetStatus } from "@/modules/webflow/embed";
 import { shopifyWidgetStatus } from "@/modules/shopify/embed";
@@ -16,7 +16,10 @@ import { redirect } from "next/navigation";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/");
-  const [data, testingMode] = await Promise.all([getDashboardOverview(session), isWixReviewMode()]);
+  const [data, testingMode] = await Promise.all([
+    getDashboardOverview(session),
+    isPlatformReviewMode(session.platform),
+  ]);
   const siteName = data.site.displayName ?? `Your ${platformLabel(session.platform)} site`;
   const webflowWidget = isWebflowPlatform(session.platform)
     ? await webflowWidgetStatus(session.siteId)

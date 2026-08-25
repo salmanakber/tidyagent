@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseReviewerEmails, pickHigherPlan, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
 
-describe("Wix App Market reviewer access", () => {
+describe("marketplace reviewer access", () => {
   it("parses reviewer emails from primary + extras", () => {
     expect(parseReviewerEmails("wix-reviewer@tidyflowapp.com", "qa@example.com, Review@Wix.com ")).toEqual([
       "wix-reviewer@tidyflowapp.com",

@@ -90,7 +90,9 @@ export async function getPlatformSettingsView() {
     platformPrices,
     productFounder,
     googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
-    reviewMode: reviewer.reviewMode,
+    reviewMode: reviewer.modes.WIX,
+    webflowReviewMode: reviewer.modes.WEBFLOW,
+    shopifyReviewMode: reviewer.modes.SHOPIFY,
     reviewerEmail: reviewer.emails[0] ?? env.WIX_REVIEWER_EMAIL,
     reviewerEmails: reviewer.emails.slice(1).join(", "),
     reviewerPasswordSet: reviewerPasswordSet || Boolean(env.WIX_REVIEWER_PASSWORD),
@@ -170,6 +172,8 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     if (resendFrom) await setSetting("resend_from_email", resendFrom);
 
     const reviewMode = formData.get("wix_review_mode") === "on" ? "true" : "false";
+    const webflowReviewMode = formData.get("webflow_review_mode") === "on" ? "true" : "false";
+    const shopifyReviewMode = formData.get("shopify_review_mode") === "on" ? "true" : "false";
     const reviewerEmail = String(formData.get("wix_reviewer_email") ?? "").trim().toLowerCase();
     const reviewerEmails = String(formData.get("wix_reviewer_emails") ?? "").trim().toLowerCase();
     const reviewerPassword = String(formData.get("wix_reviewer_password") ?? "");
@@ -182,6 +186,8 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
       await setSetting("wix_reviewer_password", reviewerPassword);
     }
     await setSetting("wix_review_mode", reviewMode);
+    await setSetting("webflow_review_mode", webflowReviewMode);
+    await setSetting("shopify_review_mode", shopifyReviewMode);
     if (reviewMode === "true") {
       try {
         await ensureReviewerWorkspace();

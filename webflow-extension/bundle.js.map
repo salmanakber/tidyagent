@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/main.js"],
+  "sourcesContent": ["/**\n * tidyAgent Designer Extension bootstrap.\n * Opens the hosted Webflow app home inside the Designer (with optional siteId).\n */\n(function () {\n  var app = \"https://agent.tidyflowapp.com/webflow\";\n  var params = new URLSearchParams();\n  params.set(\"embed\", \"1\");\n\n  function go() {\n    location.replace(app + \"?\" + params.toString());\n  }\n\n  try {\n    if (window.webflow) {\n      if (typeof window.webflow.setExtensionSize === \"function\") {\n        window.webflow.setExtensionSize({ width: 480, height: 720 });\n      }\n      if (typeof window.webflow.getSiteInfo === \"function\") {\n        window.webflow\n          .getSiteInfo()\n          .then(function (info) {\n            if (info && info.siteId) params.set(\"siteId\", info.siteId);\n            go();\n          })\n          .catch(go);\n        return;\n      }\n    }\n  } catch (error) {\n    /* fall through */\n  }\n  go();\n})();\n"],
+  "mappings": "oBAIC,UAAY,CACX,IAAIA,EAAM,wCACNC,EAAS,IAAI,gBACjBA,EAAO,IAAI,QAAS,GAAG,EAEvB,SAASC,GAAK,CACZ,SAAS,QAAQF,EAAM,IAAMC,EAAO,SAAS,CAAC,CAChD,CAEA,GAAI,CACF,GAAI,OAAO,UACL,OAAO,OAAO,QAAQ,kBAAqB,YAC7C,OAAO,QAAQ,iBAAiB,CAAE,MAAO,IAAK,OAAQ,GAAI,CAAC,EAEzD,OAAO,OAAO,QAAQ,aAAgB,YAAY,CACpD,OAAO,QACJ,YAAY,EACZ,KAAK,SAAUE,EAAM,CAChBA,GAAQA,EAAK,QAAQF,EAAO,IAAI,SAAUE,EAAK,MAAM,EACzDD,EAAG,CACL,CAAC,EACA,MAAMA,CAAE,EACX,MACF,CAEJ,MAAgB,CAEhB,CACAA,EAAG,CACL,GAAG",
+  "names": ["app", "params", "go", "info"]
+}

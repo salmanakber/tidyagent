@@ -23,6 +23,8 @@ export function PlatformSettingsForm({
   productFounder,
   googleTtsVoice,
   reviewMode,
+  webflowReviewMode,
+  shopifyReviewMode,
   reviewerEmail,
   reviewerEmails,
   reviewerPasswordSet,
@@ -72,6 +74,8 @@ export function PlatformSettingsForm({
   productFounder: string;
   googleTtsVoice: string;
   reviewMode: boolean;
+  webflowReviewMode: boolean;
+  shopifyReviewMode: boolean;
   reviewerEmail: string;
   reviewerEmails: string;
   reviewerPasswordSet: boolean;
@@ -153,24 +157,42 @@ export function PlatformSettingsForm({
       </div>
 
       <div className="panel p-6">
-        <h2 className="font-display text-xl text-white">App Market testing</h2>
+        <h2 className="font-display text-xl text-white">Marketplace testing</h2>
         <p className="mt-2 text-sm text-navy-300">
-          Turn this on while Wix reviews the app. Unpaid installs get a complimentary Pro seat, and the owner
-          dashboard shows a Test AI button so reviewers can talk to the employee without buying a plan. Turn it
-          off after approval.
+          Each marketplace has its own testing toggle. When a toggle is on, unpaid installs on that platform get a
+          complimentary Pro seat and the owner dashboard shows Test AI. Turn a toggle off after that marketplace
+          approves the app. Wix reviewer login credentials below only apply to Wix App Market review.
         </p>
         <div className="mt-5 grid gap-4">
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="wix_review_mode" defaultChecked={reviewMode} className="mt-1" />
             <span>
-              <span className="text-white">Enable testing mode</span>
+              <span className="text-white">Enable Wix testing mode</span>
               <span className="mt-1 block text-xs text-navy-400">
-                Dashboard Test AI + complimentary Pro for Wix installs. Does not require a .env restart.
+                Test AI + complimentary Pro for Wix installs only. Does not require a .env restart.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="webflow_review_mode" defaultChecked={webflowReviewMode} className="mt-1" />
+            <span>
+              <span className="text-white">Enable Webflow testing mode</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Test AI + complimentary Pro for Webflow installs only. Does not affect Wix or Shopify.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="shopify_review_mode" defaultChecked={shopifyReviewMode} className="mt-1" />
+            <span>
+              <span className="text-white">Enable Shopify testing mode</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Test AI + complimentary Pro for Shopify installs only. Does not affect Wix or Webflow.
               </span>
             </span>
           </label>
           <label className="text-sm text-navy-300">
-            Reviewer email
+            Wix reviewer email
             <input
               className="field mt-2"
               name="wix_reviewer_email"
@@ -187,13 +209,17 @@ export function PlatformSettingsForm({
               defaultValue={reviewerEmails}
               placeholder="qa@wix.com"
             />
-            <span className="mt-1 block text-xs text-navy-400">Comma-separated. These emails also get a Pro seat.</span>
+            <span className="mt-1 block text-xs text-navy-400">
+              Comma-separated. These emails also get a Pro seat (any marketplace).
+            </span>
           </label>
           <label className="text-sm text-navy-300">
-            Reviewer password{" "}
+            Wix reviewer password{" "}
             {reviewerPasswordSet ? <span className="text-emerald-300">(saved)</span> : <span className="text-amber-300">(not set yet)</span>}
             <input className="field mt-2" name="wix_reviewer_password" type="password" autoComplete="new-password" />
-            <span className="mt-1 block text-xs text-navy-400">Leave blank to keep the current password. Required the first time you enable testing mode.</span>
+            <span className="mt-1 block text-xs text-navy-400">
+              Leave blank to keep the current password. Required the first time you enable Wix testing mode.
+            </span>
           </label>
           <button
             type="button"
@@ -205,7 +231,7 @@ export function PlatformSettingsForm({
               })
             }
           >
-            Open reviewer dashboard
+            Open Wix reviewer dashboard
           </button>
         </div>
       </div>
@@ -237,8 +263,12 @@ export function PlatformSettingsForm({
             <li>
               Designer Extension development URL (Launch in Designer):
               <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.appHomeUrl}</code>
-              Upload <code className="text-amber-200">webflow-extension/</code> when you publish the marketplace
-              listing. The extension iframes the same dashboard.
+              Upload the zip from <code className="text-amber-200">npm run webflow:extension</code> (
+              <code className="text-amber-200">tidyagent-webflow-extension.zip</code>). For Marketplace
+              submission also upload{" "}
+              <code className="text-amber-200">tidyagent-webflow-extension-sourcemaps.zip</code> and the
+              App Review Preflight <code className="text-amber-200">wfpre_</code> receipt — see{" "}
+              <code className="text-amber-200">webflow-extension/SUBMISSION.md</code>.
             </li>
             <li>
               Data Client permissions — turn <strong className="text-white">on</strong>: Sites (read + write), Pages

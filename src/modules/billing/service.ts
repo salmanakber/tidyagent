@@ -15,7 +15,7 @@ import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes"
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
 import { getReviewerConfig, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
-import { isWixPlatform } from "@/modules/platforms/types";
+import { isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -224,7 +224,7 @@ export async function entitlementsForOrganization(organizationId: string): Promi
     getAllPlanScopes(),
     prisma.wixSite.findFirst({
       where: { organizationId },
-      select: { ownerEmail: true },
+      select: { ownerEmail: true, platform: true },
       orderBy: { createdAt: "asc" },
     }),
   ]);
@@ -234,7 +234,7 @@ export async function entitlementsForOrganization(organizationId: string): Promi
   const grant = reviewComplimentaryPlan({
     storedGrant: organization?.compPlanKey,
     ownerEmail: site?.ownerEmail,
-    reviewMode: reviewer.reviewMode,
+    reviewMode: reviewer.modes[resolveSitePlatform(site?.platform)],
     reviewerEmails: reviewer.emails,
   });
 

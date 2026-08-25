@@ -6,11 +6,20 @@ import { getSetting } from "@/lib/security/settings";
 import { setSessionCookie } from "@/lib/security/session";
 import { seedDefaultAgent } from "@/modules/agents/defaults";
 import { PLAN_RANK } from "@/modules/billing/entitlements";
+import {
+  isShopifyPlatform,
+  isWebflowPlatform,
+  isWixPlatform,
+  resolveSitePlatform,
+  type SitePlatform,
+} from "@/modules/platforms/types";
 
 const REVIEW_INSTANCE = "reviewer:wix-app-market";
 
 export type ReviewerConfig = {
+  /** @deprecated Prefer modes.WIX — kept for older call sites. */
   reviewMode: boolean;
+  modes: Record<SitePlatform, boolean>;
   emails: string[];
   password: string;
 };
@@ -24,23 +33,41 @@ export function parseReviewerEmails(primary?: string | null, extras?: string | n
   return [...(first ? [first] : []), ...extra.filter((email) => email !== first)];
 }
 
+function truthyFlag(value: string) {
+  return value === "true" || value === "1" || value === "on";
+}
+
 export async function getReviewerConfig(): Promise<ReviewerConfig> {
   const env = getEnv();
-  const [mode, email, password, extras] = await Promise.all([
+  const [wixMode, webflowMode, shopifyMode, email, password, extras] = await Promise.all([
     getSetting("wix_review_mode", env.WIX_REVIEW_MODE),
+    getSetting("webflow_review_mode", "false"),
+    getSetting("shopify_review_mode", "false"),
     getSetting("wix_reviewer_email", env.WIX_REVIEWER_EMAIL),
     getSetting("wix_reviewer_password", env.WIX_REVIEWER_PASSWORD),
     getSetting("wix_reviewer_emails", env.WIX_REVIEWER_EMAILS),
   ]);
+  const modes: Record<SitePlatform, boolean> = {
+    WIX: truthyFlag(wixMode),
+    WEBFLOW: truthyFlag(webflowMode),
+    SHOPIFY: truthyFlag(shopifyMode),
+  };
   return {
-    reviewMode: mode === "true",
+    reviewMode: modes.WIX,
+    modes,
     emails: parseReviewerEmails(email, extras),
     password,
   };
 }
 
 export async function isWixReviewMode() {
-  return (await getReviewerConfig()).reviewMode;
+  return (await getReviewerConfig()).modes.WIX;
+}
+
+/** Test AI + complimentary Pro unlock for the given marketplace only. */
+export async function isPlatformReviewMode(platform?: string | null) {
+  const config = await getReviewerConfig();
+  return config.modes[resolveSitePlatform(platform)];
 }
 
 export async function isReviewerEmail(email?: string | null) {
@@ -115,6 +142,7 @@ export async function ensureReviewerWorkspace() {
     site = await prisma.wixSite.create({
       data: {
         organizationId: organization.id,
+        platform: "WIX",
         wixInstanceId: REVIEW_INSTANCE,
         displayName: "Wix App Review",
         url: "https://agent.tidyflowapp.com",
@@ -146,6 +174,7 @@ export async function ensureReviewerWorkspace() {
         planKey: "PRO",
         status: "ACTIVE",
         isFree: false,
+        billingProvider: "WIX",
       },
     });
     await prisma.businessProfile.create({
@@ -209,4 +238,11 @@ export async function signInReviewer(user: User) {
     email: user.email ?? undefined,
     name: user.name ?? undefined,
   });
+}
+
+export function reviewModeLabel(platform?: string | null) {
+  if (isWebflowPlatform(platform)) return "Webflow";
+  if (isShopifyPlatform(platform)) return "Shopify";
+  if (isWixPlatform(platform)) return "Wix";
+  return "Wix";
 }
