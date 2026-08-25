@@ -5,7 +5,8 @@ import { logout } from "@/app/actions/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { planLabel } from "@/modules/billing/catalog";
-import { isWixPlatform, isShopifyPlatform, isWebflowPlatform, platformLabel } from "@/modules/platforms";
+import { legalHref } from "@/modules/legal/platform";
+import { isWixPlatform, isShopifyPlatform, isWebflowPlatform, platformLabel, resolveSitePlatform } from "@/modules/platforms";
 
 export default async function SettingsPage() {
   const session = await getSession();
@@ -13,6 +14,7 @@ export default async function SettingsPage() {
   const data = await getDashboardOverview(session);
   const wix = isWixPlatform(session.platform);
   const name = platformLabel(session.platform);
+  const platform = resolveSitePlatform(session.platform);
 
   return (
     <div className="space-y-8">
@@ -69,6 +71,15 @@ export default async function SettingsPage() {
             <Row label="Agents" value={String(data.entitlements.maxAgents)} />
             <Row label="Voice" value={data.entitlements.voiceEnabled ? "On" : "Off"} />
           </dl>
+          <p className="mt-6 text-xs leading-5 text-navy-400">
+            <a href={legalHref("/terms", platform)} className="text-amber-300 hover:underline">
+              Terms of Use
+            </a>
+            {" · "}
+            <a href={legalHref("/privacy", platform)} className="text-amber-300 hover:underline">
+              Privacy Policy
+            </a>
+          </p>
         </div>
       </div>
       {data.agent ? (

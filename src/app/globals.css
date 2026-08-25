@@ -148,6 +148,64 @@ html.theme-light .text-amber-300 {
   color: #b45309 !important;
 }
 
+/*
+ * Marketing / legal / auth use AuroraScene (always dark). Light-theme remaps
+ * text-* to dark ink for the app shell — without this lock, Terms/Privacy links
+ * and body copy become dark-on-dark and unreadable.
+ */
+html.theme-light .aurora-scene {
+  color: #e8edf5;
+}
+
+html.theme-light .aurora-scene .text-white {
+  color: #ffffff !important;
+}
+
+html.theme-light .aurora-scene .text-navy-100 {
+  color: #e8edf5 !important;
+}
+
+html.theme-light .aurora-scene .text-navy-200 {
+  color: #c5d0e3 !important;
+}
+
+html.theme-light .aurora-scene .text-navy-300 {
+  color: #9aabc8 !important;
+}
+
+html.theme-light .aurora-scene .text-navy-400,
+html.theme-light .aurora-scene .text-navy-500,
+html.theme-light .aurora-scene .text-navy-600 {
+  color: #6b7fa3 !important;
+}
+
+html.theme-light .aurora-scene .text-amber-200,
+html.theme-light .aurora-scene .text-amber-300 {
+  color: #f5c14a !important;
+}
+
+html.theme-light .aurora-scene .hover\:text-white:hover {
+  color: #ffffff !important;
+}
+
+html.theme-light .aurora-scene header.sticky,
+html.theme-light .aurora-scene .sticky {
+  background-color: rgba(7, 11, 20, 0.55) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+}
+
+html.theme-light .aurora-scene .bg-navy-900,
+html.theme-light .aurora-scene .bg-navy-900\/55 {
+  background-color: rgba(11, 18, 32, 0.55) !important;
+}
+
+html.theme-light .aurora-scene .field {
+  background: rgba(7, 11, 20, 0.55);
+  color: #e8edf5;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 html.theme-light .border-white\/5,
 html.theme-light .border-white\/10 {
   border-color: rgba(18, 32, 51, 0.08) !important;

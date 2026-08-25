@@ -23,13 +23,26 @@ Outputs:
 
 Readable source lives in `webflow-extension/src/main.js`.
 
-## App Review Preflight
+## App Review Preflight receipt (optional)
 
-1. Install **App Review Preflight** from the Webflow Marketplace / Designer.
-2. In Designer, open Preflight.
-3. Select the **exact** extension zip and source-map zip from the build above.
-4. Run preflight and copy the receipt (`wfpre_…`).
-5. Paste that receipt into the submission form.
+Webflow marks this field as **optional**. You can submit with only the extension zip + source maps if you prefer.
+
+### How to install Preflight (this is the missing step)
+
+It is **not** listed like a normal Marketplace search result. Install it with Webflow’s official OAuth link:
+
+1. Open this link while logged into the **same Webflow Workspace** that owns tidyAgent:  
+   https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread
+2. Approve / install **App Review Preflight** into that Workspace.
+3. Open any site in the **Designer**.
+4. Open apps / extensions in Designer and launch **App Review Preflight**.
+5. In Preflight, choose:
+   - Bundle: `tidyagent-webflow-extension.zip`
+   - Source maps: `tidyagent-webflow-extension-sourcemaps.zip`
+6. Run Preflight → copy the receipt (`wfpre_` + 32 hex characters).
+7. Paste that receipt into the submission form.
+
+Official note: [Submitting your app → Submission artifacts](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app#submission-artifacts).
 
 Do not rebuild between Preflight and submission — the receipt must match the attached artifacts.
 
