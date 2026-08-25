@@ -8,6 +8,7 @@ import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import type { SiteUnderstanding } from "@/modules/knowledge/types";
+import { copyForPlatform } from "@/modules/platforms/copy";
 
 export const maxDuration = 120;
 
@@ -30,7 +31,7 @@ export default async function OnboardingPage() {
       siteName={workspace.site.displayName || workspace.organization.name}
       siteUrl={workspace.site.url}
       planLabel={planLabel(entitlements.planKey)}
-      scopeNote={scope.depthNote}
+      scopeNote={copyForPlatform(session.platform, scope.depthNote)}
       capabilities={capabilities.filter((item) => item.available)}
       agentName={workspace.agent?.name ?? "Sarah"}
       greeting={workspace.agent?.widgetGreeting ?? "Hi! How can I help you today?"}

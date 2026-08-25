@@ -225,7 +225,7 @@ export default async function BillingPage() {
             <li>1. Merchant picks Starter, Business, or Pro on this page.</li>
             <li>2. Shopify shows its native app charge approval screen (Admin listed prices).</li>
             <li>3. After approval, Shopify notifies this app and the matching plan unlocks.</li>
-            <li>4. Wix and Webflow checkout paths are never used for Shopify stores.</li>
+            <li>4. Charges and invoices stay inside Shopify Admin.</li>
           </ol>
         </div>
       ) : (
@@ -235,7 +235,7 @@ export default async function BillingPage() {
             <li>1. Customer picks Starter, Business, or Pro on this page.</li>
             <li>2. Secure checkout opens with the Admin-listed {name} price (and trial days when set).</li>
             <li>3. After payment succeeds, this workspace unlocks the matching plan.</li>
-            <li>4. Wix App Market checkout is unchanged and is never used for {name} sites.</li>
+            <li>4. You can manage the card and renewals from Manage billing.</li>
           </ol>
         </div>
       )}

@@ -14,6 +14,8 @@ import { KnowledgeIntelligence } from "@/components/knowledge/KnowledgeIntellige
 import { prisma } from "@/lib/prisma";
 import type { CrawlItem } from "@/modules/knowledge/types";
 import type { Prisma } from "@prisma/client";
+import { copyForPlatform, wizardCopyForPlatform } from "@/modules/platforms/copy";
+import { resolveSitePlatform } from "@/modules/platforms";
 
 export const maxDuration = 120;
 
@@ -30,6 +32,8 @@ export default async function KnowledgePage() {
     installedWixApps: data.site.installedWixApps,
     capabilities: data.site.capabilities,
   });
+  const copy = wizardCopyForPlatform(session.platform);
+  const platform = resolveSitePlatform(session.platform);
   const [storedFacts, conflicts, documents, scanSource, customNotes] = await Promise.all([
     prisma.knowledgeFact.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId },
@@ -76,7 +80,7 @@ export default async function KnowledgePage() {
       <PageHeader
         eyebrow="Business knowledge"
         title="What your AI employee knows"
-        description={`The scanner reads every public page it can find on this ${platformLabel(session.platform)} site, plus the catalog on Business and Pro. Custom notes you add sit above that and are never overwritten.`}
+        description={copy.knowledgeDescription(platformLabel(session.platform))}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
@@ -99,7 +103,7 @@ export default async function KnowledgePage() {
         <div className="mt-6">
           <SiteScanPanel
             planLabel={planLabel(entitlements.planKey)}
-            scopeNote={scope.depthNote}
+            scopeNote={copyForPlatform(platform, scope.depthNote)}
             siteUrl={data.site.url}
             platform={session.platform}
           />
@@ -121,6 +125,7 @@ export default async function KnowledgePage() {
         })}
       />
       <KnowledgeIntelligence
+        platform={session.platform}
         facts={storedFacts.map((row) => ({
           id: row.id,
           kind: row.kind,

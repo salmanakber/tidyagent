@@ -5,13 +5,14 @@ import { logout } from "@/app/actions/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { planLabel } from "@/modules/billing/catalog";
-import { isWixPlatform } from "@/modules/platforms";
+import { isWixPlatform, isShopifyPlatform, isWebflowPlatform, platformLabel } from "@/modules/platforms";
 
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/");
   const data = await getDashboardOverview(session);
   const wix = isWixPlatform(session.platform);
+  const name = platformLabel(session.platform);
 
   return (
     <div className="space-y-8">
@@ -21,12 +22,16 @@ export default async function SettingsPage() {
         description={
           wix
             ? "Wix is the source of truth for install and billing. Widget look is your brand, not tidyAgent’s."
-            : "Workspace settings and widget branding for this site."
+            : isShopifyPlatform(session.platform)
+              ? "Shopify is the source of truth for install and billing. Widget look is your brand, not tidyAgent’s."
+              : "Webflow is the source of truth for this install. Widget look is your brand, not tidyAgent’s."
         }
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">{wix ? "Wix connection" : "Site connection"}</h2>
+          <h2 className="font-display text-xl text-white">
+            {wix ? "Wix connection" : isShopifyPlatform(session.platform) ? "Shopify connection" : "Webflow connection"}
+          </h2>
           <dl className="mt-5 space-y-3 text-sm">
             <Row label="Site" value={data.site.displayName || "Unnamed site"} />
             <Row label="URL" value={data.site.url || "Unpublished"} />
@@ -45,7 +50,11 @@ export default async function SettingsPage() {
           <p className="mt-3 text-xs leading-5 text-navy-400">
             {wix
               ? "Clears this browser session. Reopen tidyAgent from Wix, or use Reconnect with Wix on the sign-in page, to authenticate again."
-              : "Clears this browser session."}
+              : isShopifyPlatform(session.platform)
+                ? "Clears this browser session. Reopen tidyAgent from Shopify Admin to authenticate again."
+                : isWebflowPlatform(session.platform)
+                  ? "Clears this browser session. Reopen tidyAgent from Webflow to authenticate again."
+                  : `Clears this browser session for this ${name} site.`}
           </p>
         </div>
         <div className="panel p-6">

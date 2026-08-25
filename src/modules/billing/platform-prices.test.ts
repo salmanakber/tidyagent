@@ -16,6 +16,7 @@ describe("platform prices", () => {
     expect(copyForPlatform("WEBFLOW", "Wix Stores catalog")).toBe("store catalog");
     expect(bulletsForPlatform("SHOPIFY", ["Wix site profile and pages"])[0]).toBe("Shopify site profile and pages");
     expect(copyForPlatform("WEBFLOW", "Checkout stays on Wix")).not.toMatch(/Wix/);
-    expect(copyForPlatform("WEBFLOW", "Checkout stays on Wix")).not.toMatch(/Shopify/);
+    expect(copyForPlatform("WEBFLOW", "Checkout stays on Wix")).not.toMatch(/Shopify/i);
+    expect(copyForPlatform("SHOPIFY", "Published on Webflow")).not.toMatch(/Webflow/i);
   });
 });

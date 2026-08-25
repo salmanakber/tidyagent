@@ -16,13 +16,17 @@ import {
   type ExtractedPage,
 } from "@/modules/knowledge/extract";
 import { harvestWixApis } from "@/modules/knowledge/wix-sources";
+import { harvestWebflowApis } from "@/modules/knowledge/webflow-sources";
+import { harvestShopifyApis } from "@/modules/knowledge/shopify-sources";
 import { understandSite, type SiteUnderstanding } from "@/modules/knowledge/understand";
 import { contentHash, factsFromPage, factsFromProduct } from "@/modules/knowledge/structured";
 import { persistSiteFacts } from "@/modules/knowledge/fact-store";
 import { getAIProvider } from "@/modules/ai/factory";
 import { detectWixCapabilities } from "@/modules/wix/capabilities";
-import { isWixPlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWebflowPlatform, isWixPlatform, platformLabel } from "@/modules/platforms/types";
+import { copyForPlatform } from "@/modules/platforms/copy";
 import type { CrawlItem, ScanResult, ScanStage } from "@/modules/knowledge/types";
+import type { PlatformApiHarvest } from "@/modules/knowledge/webflow-sources";
 
 const FETCH_TIMEOUT_MS = 9000;
 const MAX_BYTES = 900_000;
@@ -56,6 +60,9 @@ export async function scanOrganizationSite(input: {
   }
 
   const wixSite = isWixPlatform(site.platform);
+  const webflowSite = isWebflowPlatform(site.platform);
+  const shopifySite = isShopifyPlatform(site.platform);
+  const marketplace = platformLabel(site.platform);
   let siteUrl = site.url;
   if (wixSite) {
     try {
@@ -91,7 +98,7 @@ export async function scanOrganizationSite(input: {
   } else {
     stages.push({
       key: "identity",
-      label: "Confirmed site identity",
+      label: `Confirmed ${marketplace} site identity`,
       status: siteUrl ? "done" : "skipped",
       detail: site.displayName || site.url || site.wixInstanceId,
     });
@@ -107,12 +114,12 @@ export async function scanOrganizationSite(input: {
         detail: "No public URL — using Wix APIs only",
       });
     } else {
-      warnings.push("This site does not have a public URL yet.");
+      warnings.push(`This ${marketplace} site does not have a public URL yet. Native APIs will still be read when available.`);
       stages.push({
         key: "homepage",
         label: "Read the live website",
         status: "skipped",
-        detail: "No public URL",
+        detail: "No public URL — using platform APIs when available",
       });
     }
   }
@@ -120,7 +127,7 @@ export async function scanOrganizationSite(input: {
   const origin = siteUrl && isSafeHttpUrl(siteUrl)
     ? new URL(siteUrl.includes("://") ? siteUrl : `https://${siteUrl}`)
     : null;
-  const homeUrl = origin ? origin.toString().replace(/\/$/, "") : siteUrl || "wix://site";
+  const homeUrl = origin ? origin.toString().replace(/\/$/, "") : siteUrl || `${marketplace.toLowerCase()}://site`;
   const host = origin?.hostname ?? "";
   const pages: ExtractedPage[] = [];
   const crawl: CrawlItem[] = [];
@@ -135,51 +142,110 @@ export async function scanOrganizationSite(input: {
     skipped.push("Domain crawl is included after a paid plan is purchased.");
   }
 
-  const apiHarvest = wixSite
-    ? await harvestWixApis({
-        wixInstanceId: input.wixInstanceId,
-        siteUrl: homeUrl,
-        scope,
-      })
-    : { pages: [], products: [], stages: [], skipped: [], warnings: [] };
+  let apiHarvest: PlatformApiHarvest;
+  if (wixSite) {
+    const wixHarvest = await harvestWixApis({
+      wixInstanceId: input.wixInstanceId,
+      siteUrl: homeUrl,
+      scope,
+    });
+    apiHarvest = { ...wixHarvest, siteUrl: homeUrl };
+  } else if (webflowSite) {
+    apiHarvest = await harvestWebflowApis({
+      siteId: site.id,
+      siteUrl: homeUrl,
+      scope,
+    });
+  } else if (shopifySite) {
+    apiHarvest = await harvestShopifyApis({
+      siteId: site.id,
+      siteUrl: homeUrl,
+      scope,
+    });
+  } else {
+    apiHarvest = { pages: [], products: [], stages: [], skipped: [], warnings: [] };
+  }
+
+  if (apiHarvest.siteUrl || apiHarvest.displayName || apiHarvest.currency || apiHarvest.locale) {
+    await prisma.wixSite.update({
+      where: { id: site.id },
+      data: {
+        ...(apiHarvest.siteUrl ? { url: apiHarvest.siteUrl } : {}),
+        ...(apiHarvest.displayName ? { displayName: apiHarvest.displayName } : {}),
+        ...(apiHarvest.currency ? { currency: apiHarvest.currency } : {}),
+        ...(apiHarvest.locale ? { locale: apiHarvest.locale } : {}),
+        ...(apiHarvest.products.length
+          ? {
+              capabilities: {
+                hasStores: true,
+                hasBookings: false,
+                source: webflowSite ? "webflow" : shopifySite ? "shopify" : "scan",
+              } as Prisma.InputJsonValue,
+            }
+          : {}),
+        lastSyncedAt: new Date(),
+      },
+    });
+  }
+
   pages.push(...apiHarvest.pages);
   const products = apiHarvest.products;
   stages.push(...apiHarvest.stages);
   skipped.push(...apiHarvest.skipped);
   warnings.push(...apiHarvest.warnings);
+
+  const apiOrigin = (pageUrl: string): CrawlItem["origin"] => {
+    if (wixSite) return pageUrl.includes("/cms/") ? "wix-cms" : "wix-site";
+    if (webflowSite) return pageUrl.includes("/cms/") || pageUrl.includes("#site-profile") ? "webflow-cms" : "webflow-site";
+    if (shopifySite) return pageUrl.includes("/blogs/") || pageUrl.includes("/pages/") || pageUrl.includes("#shop-profile")
+      ? "shopify-cms"
+      : "shopify-site";
+    return "website";
+  };
+  const storeOrigin: CrawlItem["origin"] = wixSite
+    ? "wix-store"
+    : webflowSite
+      ? "webflow-store"
+      : shopifySite
+        ? "shopify-store"
+        : "website";
+
   crawl.push(
     ...apiHarvest.pages.map((page) => ({
       url: page.url,
       title: page.title,
       contentType: page.contentType,
       status: "crawled" as const,
-      origin: page.url.includes("/cms/") ? ("wix-cms" as const) : ("wix-site" as const),
+      origin: apiOrigin(page.url),
     })),
     ...products.map((product) => ({
       url: product.url || `${homeUrl}/product/${product.id || product.name}`,
       title: product.price ? `${product.name} — ${product.price}` : product.name,
       contentType: "PRODUCT",
       status: "crawled" as const,
-      origin: "wix-store" as const,
+      origin: storeOrigin,
     })),
   );
 
   const pricesDoc = pricesCatalogPage(pages, products, homeUrl);
+  const resolvedHome = apiHarvest.siteUrl && isSafeHttpUrl(apiHarvest.siteUrl)
+    ? apiHarvest.siteUrl.replace(/\/$/, "")
+    : homeUrl;
 
   if (!pages.length && !products.length) {
     warnings.push(
       wixSite
         ? "No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions."
-        : "No public pages could be read yet. Publish the site and try again.",
+        : `No public pages or catalog data could be read yet. Publish the ${marketplace} site and try again.`,
     );
-    return emptyResult(scope, homeUrl === "wix://site" ? null : homeUrl, stages, skipped, warnings);
+    return emptyResult(scope, resolvedHome.includes("://site") ? null : resolvedHome, stages, skipped, warnings);
   }
 
   const understanding = await understandSite({
-    displayName: site.displayName || host || (wixSite ? "Wix site" : "Site"),
-    siteUrl: homeUrl,
-    locale: site.locale,
-    currency: site.currency,
+    displayName: apiHarvest.displayName || site.displayName || host || `${marketplace} site`,
+    siteUrl: resolvedHome,
+    locale: apiHarvest.locale || site.locale,
+    currency: apiHarvest.currency || site.currency,
     pages,
     products,
   });
@@ -203,6 +269,8 @@ export async function scanOrganizationSite(input: {
     pagesDiscovered: crawl.filter((item) => item.origin === "website").length,
     pagesCrawled: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
     pagesFailed: crawl.filter((item) => item.status === "failed").length,
+    storeOrigin,
+    catalogExtractionMethod: wixSite ? "wix-api" : webflowSite ? "webflow-api" : shopifySite ? "shopify-api" : "http",
   });
   stages.push({
     key: "knowledge",
@@ -223,8 +291,8 @@ export async function scanOrganizationSite(input: {
     ok: true,
     planKey: scope.planKey,
     planLabel: scope.planLabel,
-    scopeNote: scope.depthNote,
-    siteUrl: homeUrl,
+    scopeNote: copyForPlatform(site.platform, scope.depthNote),
+    siteUrl: resolvedHome,
     understanding,
     counts: {
       pages: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
@@ -239,7 +307,7 @@ export async function scanOrganizationSite(input: {
       ...pages.map((page) => ({ title: page.title, url: page.url, type: page.contentType })),
       ...products.map((product) => ({
         title: product.name,
-        url: product.url || homeUrl,
+        url: product.url || resolvedHome,
         type: "PRODUCT" as const,
       })),
     ],
@@ -262,6 +330,8 @@ async function persistScan(input: {
   pagesDiscovered?: number;
   pagesCrawled?: number;
   pagesFailed?: number;
+  storeOrigin?: CrawlItem["origin"];
+  catalogExtractionMethod?: string;
 }) {
   await prisma.businessProfile.upsert({
     where: { organizationId: input.organizationId },
@@ -326,9 +396,9 @@ async function persistScan(input: {
     cleanedContent: [product.name, product.price ? `Price: ${product.price}` : "", product.url, product.description]
       .filter(Boolean)
       .join("\n"),
-    extractionMethod: "wix-api",
+    extractionMethod: input.catalogExtractionMethod || "wix-api",
     metadata: {
-      origin: "wix-store",
+      origin: input.storeOrigin || "wix-store",
       name: product.name,
       price: product.price || null,
       imageUrl: product.imageUrl || null,
@@ -385,7 +455,7 @@ async function persistScan(input: {
         cleanedContent: doc.cleanedContent.slice(0, 20000),
         metadata: ("metadata" in doc && doc.metadata
           ? doc.metadata
-          : { origin: doc.extractionMethod === "wix-api" ? "wix-store" : "site-scan" }) as Prisma.InputJsonValue,
+          : { origin: input.storeOrigin || (doc.extractionMethod?.includes("api") ? "wix-store" : "site-scan") }) as Prisma.InputJsonValue,
         contentHash: contentHash(doc.cleanedContent),
         extractionMethod: doc.extractionMethod,
       },
@@ -603,7 +673,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
   const homepage = await fetchText(homeUrl, host);
   if (!homepage.ok) {
     failed.set(homeUrl, homepage.reason);
-    warnings.push(`Homepage could not be crawled (${homepage.reason}). Continuing with Wix APIs and other pages.`);
+    warnings.push(`Homepage could not be crawled (${homepage.reason}). Continuing with catalog APIs and other pages.`);
     stages.push({ key: "homepage", label: "Read homepage and metadata", status: "failed", detail: homepage.reason });
   } else {
     const page = extractPage(homepage.text, homeUrl, scope.maxCharsPerPage);

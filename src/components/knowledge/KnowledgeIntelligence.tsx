@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { resolveKnowledgeConflict } from "@/app/actions/workspace";
+import { wizardCopyForPlatform } from "@/modules/platforms/copy";
+import { isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 type IndexedPage = {
   id: string;
@@ -16,13 +18,16 @@ export function KnowledgeIntelligence({
   facts,
   conflicts,
   pages,
+  platform,
 }: {
   facts: { id: string; kind: string; entity: string; value: string; sourceUrl: string | null; confidence: string; extractionMethod: string }[];
   conflicts: { id: string; entity: string; kind: string; values: { value?: string; sourceUrl?: string }[] }[];
   pages: IndexedPage[];
+  platform?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "pages" | "products" | "pending">("all");
+  const copy = wizardCopyForPlatform(platform);
 
   const counts = useMemo(() => {
     return {
@@ -75,7 +80,7 @@ export function KnowledgeIntelligence({
 
       <section className="panel p-6">
         <h2 className="font-display text-xl text-white">Verified facts</h2>
-        <p className="mt-2 text-sm text-navy-300">Structured prices, contact details, hours, and services extracted from the live site and Wix APIs.</p>
+        <p className="mt-2 text-sm text-navy-300">{copy.factsHint}</p>
         <div className="mt-4 max-h-[420px] space-y-2 overflow-y-auto">
           {facts.length ? (
             facts.map((fact) => (
@@ -121,7 +126,7 @@ export function KnowledgeIntelligence({
                   <p className="truncate text-[11px] text-navy-500">{page.sourceUrl}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-navy-400">{originLabel(page.origin, page.contentType)}</p>
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-navy-400">{originLabel(page.origin, page.contentType, platform)}</p>
                   <p className={page.status === "crawled" ? "text-[11px] text-emerald-300" : page.status === "failed" ? "text-[11px] text-rose-300" : "text-[11px] text-amber-200"}>
                     {statusLabel(page.status)}
                   </p>
@@ -165,9 +170,24 @@ function statusLabel(status: IndexedPage["status"]) {
   return "Found, not crawled yet";
 }
 
-function originLabel(origin: string, contentType: string) {
-  if (origin === "wix-store" || contentType === "PRODUCT") return "Wix Stores";
-  if (origin === "wix-cms") return "Wix CMS";
-  if (origin === "wix-site") return "Wix site";
+function originLabel(origin: string, contentType: string, platform?: string | null) {
+  const resolved = resolveSitePlatform(platform);
+  if (isWixPlatform(resolved)) {
+    if (origin === "wix-store" || contentType === "PRODUCT") return "Wix Stores";
+    if (origin === "wix-cms") return "Wix CMS";
+    if (origin === "wix-site") return "Wix site";
+    return contentType;
+  }
+  if (resolved === "SHOPIFY") {
+    if (origin === "shopify-store" || contentType === "PRODUCT") return "Product catalog";
+    if (origin === "shopify-cms") return "Store content";
+    if (origin === "shopify-site") return "Store profile";
+    if (origin === "website") return "Storefront";
+    return contentType;
+  }
+  if (origin === "webflow-store" || contentType === "PRODUCT") return "Ecommerce";
+  if (origin === "webflow-cms") return "CMS";
+  if (origin === "webflow-site") return "Site profile";
+  if (origin === "website") return "Website";
   return contentType;
 }

@@ -28,7 +28,7 @@ export type CrawlItem = {
   title: string;
   contentType: string;
   status: "crawled" | "discovered" | "failed";
-  origin: "website" | "wix-store" | "wix-cms" | "wix-site";
+  origin: "website" | "wix-store" | "wix-cms" | "wix-site" | "webflow-cms" | "webflow-site" | "webflow-store" | "shopify-store" | "shopify-site" | "shopify-cms";
 };
 
 export type ScanResult = {
