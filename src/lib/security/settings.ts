@@ -19,6 +19,8 @@ const SECRET_KEYS = new Set([
   "resend_api_key",
   "webflow_client_secret",
   "shopify_api_secret",
+  "stripe_secret_key",
+  "stripe_webhook_secret",
 ]);
 
 function keyMaterial() {

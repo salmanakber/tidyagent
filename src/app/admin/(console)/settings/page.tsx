@@ -10,7 +10,7 @@ export default async function AdminSettingsPage() {
       <PageHeader
         eyebrow="Platform"
         title="API & login settings"
-        description="Operator login, App Market testing, Webflow/Shopify adapters, AI keys, Google OAuth, Cloudinary, and voice. Adapter credentials live here — not in .env. Package limits live under Plans."
+        description="Operator login, App Market testing, Webflow/Shopify adapters, Stripe (Webflow billing), AI keys, Google OAuth, Cloudinary, and voice. Adapter credentials live here — not in .env. Package limits live under Plans."
       />
       <PlatformSettingsForm
         failoverEnabled={settings.failoverEnabled}
@@ -35,6 +35,8 @@ export default async function AdminSettingsPage() {
         reviewerEmails={settings.reviewerEmails}
         reviewerPasswordSet={settings.reviewerPasswordSet}
         resendFromEmail={settings.resendFromEmail}
+        stripePublishableKey={settings.stripePublishableKey}
+        stripeWebhookUrl={settings.stripeWebhookUrl}
         marketplace={settings.marketplace}
       />
     </div>

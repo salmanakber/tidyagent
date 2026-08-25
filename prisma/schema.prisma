@@ -304,6 +304,10 @@ model Subscription {
   previousVendorProductId String?
   billingIssue       Boolean            @default(false)
   billingProvider    BillingProvider    @default(WIX)
+  /// Stripe customer id for Webflow/Shopify seats. Unused for Wix.
+  stripeCustomerId   String?
+  /// Stripe subscription id for Webflow/Shopify seats. Unused for Wix.
+  stripeSubscriptionId String?
   rawBilling         Json?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -313,6 +317,8 @@ model Subscription {
 
   @@index([organizationId])
   @@index([wixSubscriptionId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model UsageRecord {

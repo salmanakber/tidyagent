@@ -20,7 +20,7 @@ export async function getPlatformSettingsView() {
   await requireAdminSession("SUPER");
   const config = await getAIRuntimeConfig();
   const cloudinary = await getCloudinaryConfig();
-  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet, googleTtsSet, awsKeySet, awsSecretSet, resendSet] = await Promise.all([
+  const [geminiSet, groqSet, openaiSet, googleIdSet, googleSecretSet, cloudNameSet, cloudKeySet, cloudSecretSet, googleTtsSet, awsKeySet, awsSecretSet, resendSet, stripeSecretSet, stripeWebhookSet] = await Promise.all([
     settingExists("gemini_api_key"),
     settingExists("groq_api_key"),
     settingExists("openai_api_key"),
@@ -33,6 +33,8 @@ export async function getPlatformSettingsView() {
     settingExists("aws_access_key_id"),
     settingExists("aws_secret_access_key"),
     settingExists("resend_api_key"),
+    settingExists("stripe_secret_key"),
+    settingExists("stripe_webhook_secret"),
   ]);
   const env = getEnv();
   const googleClientId = await getSetting("google_client_id");
@@ -67,6 +69,8 @@ export async function getPlatformSettingsView() {
       googleTts: googleTtsSet || Boolean(env.GOOGLE_TTS_API_KEY),
       awsPolly: (awsKeySet && awsSecretSet) || Boolean(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY),
       resend: resendSet,
+      stripeSecret: stripeSecretSet,
+      stripeWebhook: stripeWebhookSet,
     },
     googleClientId,
     cloudinaryCloudName,
@@ -91,6 +95,8 @@ export async function getPlatformSettingsView() {
     reviewerEmails: reviewer.emails.slice(1).join(", "),
     reviewerPasswordSet: reviewerPasswordSet || Boolean(env.WIX_REVIEWER_PASSWORD),
     resendFromEmail: await getSetting("resend_from_email"),
+    stripePublishableKey: await getSetting("stripe_publishable_key"),
+    stripeWebhookUrl: `${env.APP_URL.replace(/\/$/, "")}/api/billing/stripe/webhook`,
     marketplace: await getMarketplaceAdapterConfig(),
   };
 }
@@ -210,6 +216,13 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     await setSetting("shopify_enabled", shopifyEnabled);
     if (shopifyApiKey) await setSetting("shopify_api_key", shopifyApiKey);
     if (shopifyApiSecret) await setSetting("shopify_api_secret", shopifyApiSecret);
+
+    const stripeSecret = String(formData.get("stripe_secret_key") ?? "").trim();
+    const stripeWebhook = String(formData.get("stripe_webhook_secret") ?? "").trim();
+    const stripePublishable = String(formData.get("stripe_publishable_key") ?? "").trim();
+    if (stripeSecret) await setSetting("stripe_secret_key", stripeSecret);
+    if (stripeWebhook) await setSetting("stripe_webhook_secret", stripeWebhook);
+    if (stripePublishable) await setSetting("stripe_publishable_key", stripePublishable);
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/access");

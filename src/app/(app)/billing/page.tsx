@@ -6,10 +6,12 @@ import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { getDisplayPricing } from "@/modules/billing/display-prices";
 import { formatListedPrice } from "@/modules/billing/platform-prices";
+import { isStripeCheckoutConfigured } from "@/modules/billing/stripe/config";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { refreshWixBilling } from "@/app/actions/billing";
 import { isWixPlatform, platformLabel, resolveSitePlatform } from "@/modules/platforms";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
+import { prisma } from "@/lib/prisma";
 
 const PAID_PLANS = ["STARTER", "GROWTH", "PRO"] as const;
 
@@ -19,13 +21,22 @@ export default async function BillingPage() {
   const platform = resolveSitePlatform(session.platform);
   const wix = isWixPlatform(platform);
   const name = platformLabel(platform);
-  const [data, scopes, pricing] = await Promise.all([
+  const [data, scopes, pricing, stripeReady, subscription] = await Promise.all([
     getDashboardOverview(session),
     getAllPlanScopes(),
     getDisplayPricing(platform),
+    wix ? Promise.resolve(false) : isStripeCheckoutConfigured(),
+    wix
+      ? Promise.resolve(null)
+      : prisma.subscription.findFirst({
+          where: { organizationId: session.organizationId },
+          orderBy: { createdAt: "desc" },
+          select: { stripeCustomerId: true, stripeSubscriptionId: true, status: true },
+        }),
   ]);
   const e = data.entitlements;
   const upgradeUrl = wix ? wixUpgradeUrl(session.wixInstanceId) : null;
+  const hasStripeCustomer = Boolean(subscription?.stripeCustomerId);
 
   return (
     <div className="space-y-8">
@@ -38,8 +49,10 @@ export default async function BillingPage() {
               ? "Checkout stays on Wix. Paid plans include a 7-day free trial."
               : "The dashboard and live chat stay off until a plan is purchased. Start a 7-day trial — Starter, Business, or Pro."
             : e.isPaidSeat
-              ? `Current plan and limits for this ${name} site.`
-              : `The dashboard and live chat stay off until a plan is active on this ${name} site.`
+              ? `Current plan and limits for this ${name} site. Manage billing in Stripe.`
+              : stripeReady
+                ? `Pick a plan below. Checkout runs on Stripe with a ${pricing.trialDays}-day trial when configured.`
+                : `The dashboard and live chat stay off until a plan is active on this ${name} site.`
         }
         actions={
           wix ? (
@@ -55,6 +68,10 @@ export default async function BillingPage() {
                 <button className="btn-secondary">Refresh from Wix</button>
               </form>
             </>
+          ) : hasStripeCustomer ? (
+            <a href="/api/billing/stripe/portal" className="btn-secondary">
+              Manage billing in Stripe
+            </a>
           ) : null
         }
       />
@@ -82,10 +99,26 @@ export default async function BillingPage() {
         </div>
       ) : null}
 
-      {!wix && !e.isPaidSeat ? (
+      {!wix && e.status === "TRIALING" && !e.grantedByAdmin ? (
+        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          Your Stripe trial is active. Stripe charges when the trial ends unless you cancel in the billing portal.
+        </div>
+      ) : null}
+      {!wix && e.cancelAtPeriodEnd ? (
+        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          Cancellation is scheduled. You keep paid features until the current Stripe period ends.
+        </div>
+      ) : null}
+      {!wix && e.billingIssue ? (
+        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          Stripe reported a payment issue. Update the card in Manage billing, or contact support.
+        </div>
+      ) : null}
+
+      {!wix && !e.isPaidSeat && !stripeReady ? (
         <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-navy-200">
-          Checkout for {name} is being connected. Complimentary access from the platform owner still applies. Prices
-          below are the current {name} packages.
+          Stripe checkout is not configured yet. An operator must add the Stripe secret key in Admin → Settings.
+          Complimentary access from the platform owner still applies. Prices below are the current {name} packages.
         </div>
       ) : null}
 
@@ -96,6 +129,13 @@ export default async function BillingPage() {
           const monthly = formatListedPrice(price.monthly, pricing.symbol);
           const yearly = formatListedPrice(price.yearly, pricing.symbol);
           const bullets = bulletsForPlatform(platform, bulletsForPlanScope(key, scopes[key]));
+          const checkoutHref = wix
+            ? upgradeUrl
+              ? `/api/billing/checkout?plan=${key === "GROWTH" ? "BUSINESS" : key}`
+              : null
+            : stripeReady
+              ? `/api/billing/stripe/checkout?plan=${key === "GROWTH" ? "BUSINESS" : key}`
+              : null;
           return (
             <div key={key} className={`panel p-6 ${current ? "amber-ring" : ""}`}>
               <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">
@@ -121,12 +161,15 @@ export default async function BillingPage() {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              {wix && upgradeUrl ? (
-                <a
-                  href={`/api/billing/checkout?plan=${key === "GROWTH" ? "BUSINESS" : key}`}
-                  className="btn-secondary mt-6 inline-flex"
-                >
-                  {current ? "Manage in Wix" : `Start ${planLabel(key)} trial`}
+              {checkoutHref ? (
+                <a href={checkoutHref} className="btn-secondary mt-6 inline-flex">
+                  {wix
+                    ? current
+                      ? "Manage in Wix"
+                      : `Start ${planLabel(key)} trial`
+                    : current
+                      ? "Change plan"
+                      : `Start ${planLabel(key)}`}
                 </a>
               ) : null}
             </div>
@@ -144,7 +187,17 @@ export default async function BillingPage() {
             <li>4. Plan Changed and Auto Renewal Cancelled use the same URL. Cancelled seats stay paid until period end.</li>
           </ol>
         </div>
-      ) : null}
+      ) : (
+        <div className="panel p-6">
+          <h2 className="font-display text-xl text-white">How Stripe billing works for {name}</h2>
+          <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
+            <li>1. Customer picks Starter, Business, or Pro on this page.</li>
+            <li>2. Stripe Checkout opens with the Admin-listed {name} price (and trial days when set).</li>
+            <li>3. Stripe POSTs to /api/billing/stripe/webhook and we unlock the matching plan.</li>
+            <li>4. Wix App Market checkout is unchanged and is never used for {name} sites.</li>
+          </ol>
+        </div>
+      )}
     </div>
   );
 }

@@ -27,6 +27,8 @@ export function PlatformSettingsForm({
   reviewerEmails,
   reviewerPasswordSet,
   resendFromEmail,
+  stripePublishableKey,
+  stripeWebhookUrl,
   marketplace,
 }: {
   failoverEnabled: boolean;
@@ -44,6 +46,8 @@ export function PlatformSettingsForm({
     googleTts: boolean;
     awsPolly: boolean;
     resend: boolean;
+    stripeSecret: boolean;
+    stripeWebhook: boolean;
   };
   googleClientId: string;
   cloudinaryCloudName: string;
@@ -72,6 +76,8 @@ export function PlatformSettingsForm({
   reviewerEmails: string;
   reviewerPasswordSet: boolean;
   resendFromEmail: string;
+  stripePublishableKey: string;
+  stripeWebhookUrl: string;
   marketplace: {
     origin: string;
     widgetSrc: string;
@@ -299,8 +305,16 @@ export function PlatformSettingsForm({
               <code className="mt-1 block break-all text-amber-200">{marketplace.shopify.redirectUri}</code>
             </li>
             <li>
-              Privacy webhooks (required for App Store later):
+              Privacy webhooks (required for App Store). Use the same URL in both places when applicable:
               <code className="mt-1 block break-all text-amber-200">{`${marketplace.origin}/api/shopify/webhooks`}</code>
+              <span className="mt-2 block text-xs text-navy-400">
+                Partner Dashboard: paste that HTTPS URL under GDPR / privacy webhooks. CLI / Dev Dashboard apps:
+                also declare <code className="text-amber-200">compliance_topics</code> in{" "}
+                <code className="text-amber-200">shopify.app.toml</code> at the repo root and run{" "}
+                <code className="text-amber-200">shopify app deploy</code> — for those apps, TOML + deploy is
+                required; pasting the URL alone is not enough. Topics: customers/data_request, customers/redact,
+                shop/redact. Endpoint must return 401 on bad HMAC (already implemented).
+              </span>
             </li>
             <li>
               Access scopes: products, orders, customers, content, themes, script tags (read + write), locales. The
@@ -344,6 +358,72 @@ export function PlatformSettingsForm({
               <span className="text-amber-300">(not set yet)</span>
             )}
             <input className="field mt-2" name="shopify_api_secret" type="password" autoComplete="off" />
+          </label>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <h2 className="font-display text-xl text-white">Stripe (Webflow billing)</h2>
+        <p className="mt-2 text-sm text-navy-300">
+          Used for Webflow (and other non-Wix) checkout. Wix App Market billing is unchanged. Keys are stored
+          encrypted in the database — leave blank to keep the current value. Set Webflow package prices in the
+          pricing section below; Checkout builds Stripe prices from those amounts.
+        </p>
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
+          <li>
+            In Stripe Dashboard → Developers → API keys, copy the secret key (and optionally the publishable key).
+          </li>
+          <li>
+            Add a webhook endpoint pointing at:
+            <code className="mt-1 block break-all text-amber-200">{stripeWebhookUrl}</code>
+            Events: <code className="text-amber-200">checkout.session.completed</code>,{" "}
+            <code className="text-amber-200">customer.subscription.*</code>,{" "}
+            <code className="text-amber-200">invoice.paid</code>,{" "}
+            <code className="text-amber-200">invoice.payment_failed</code>.
+          </li>
+          <li>Paste the webhook signing secret (<code className="text-amber-200">whsec_…</code>) below and save.</li>
+          <li>Enable Customer Portal in Stripe for plan changes and cancellations.</li>
+        </ol>
+        <div className="mt-5 grid gap-4">
+          <label className="text-sm text-navy-300">
+            Stripe secret key{" "}
+            {configured.stripeSecret ? (
+              <span className="text-emerald-300">(saved)</span>
+            ) : (
+              <span className="text-amber-300">(not set yet)</span>
+            )}
+            <input
+              className="field mt-2"
+              name="stripe_secret_key"
+              type="password"
+              placeholder="sk_live_… or sk_test_…"
+              autoComplete="off"
+            />
+          </label>
+          <label className="text-sm text-navy-300">
+            Stripe webhook secret{" "}
+            {configured.stripeWebhook ? (
+              <span className="text-emerald-300">(saved)</span>
+            ) : (
+              <span className="text-amber-300">(not set yet)</span>
+            )}
+            <input
+              className="field mt-2"
+              name="stripe_webhook_secret"
+              type="password"
+              placeholder="whsec_…"
+              autoComplete="off"
+            />
+          </label>
+          <label className="text-sm text-navy-300">
+            Stripe publishable key (optional)
+            <input
+              className="field mt-2"
+              name="stripe_publishable_key"
+              defaultValue={stripePublishableKey}
+              placeholder="pk_live_… or pk_test_…"
+              autoComplete="off"
+            />
           </label>
         </div>
       </div>
