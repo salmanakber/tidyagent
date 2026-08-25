@@ -60,5 +60,8 @@ Use these (or shorten as needed):
 
 - App home: `https://agent.tidyflowapp.com/webflow`
 - OAuth callback: `https://agent.tidyflowapp.com/api/webflow/oauth/callback`
+- Install & permissions guide: `https://agent.tidyflowapp.com/install?platform=webflow`
+- Terms: `https://agent.tidyflowapp.com/terms?platform=webflow`
+- Privacy: `https://agent.tidyflowapp.com/privacy?platform=webflow`
 
 See also: [Publishing your app](https://developers.webflow.com/apps/docs/publishing-your-app).

@@ -245,6 +245,9 @@ export function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row">
           <Logo compact href="/" />
           <div className="flex items-center gap-6 text-[12px] text-navy-400">
+            <Link href="/install" className="transition hover:text-white">
+              Install
+            </Link>
             <Link href="/terms" className="transition hover:text-white">
               Terms
             </Link>

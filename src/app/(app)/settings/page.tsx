@@ -72,6 +72,19 @@ export default async function SettingsPage() {
             <Row label="Voice" value={data.entitlements.voiceEnabled ? "On" : "Off"} />
           </dl>
           <p className="mt-6 text-xs leading-5 text-navy-400">
+            <a
+              href={
+                platform === "WEBFLOW"
+                  ? "/install?platform=webflow"
+                  : platform === "SHOPIFY"
+                    ? "/install?platform=shopify"
+                    : "/install"
+              }
+              className="text-amber-300 hover:underline"
+            >
+              Install guide
+            </a>
+            {" · "}
             <a href={legalHref("/terms", platform)} className="text-amber-300 hover:underline">
               Terms of Use
             </a>

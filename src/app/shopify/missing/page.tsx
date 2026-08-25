@@ -54,7 +54,10 @@ export default async function ShopifyMissingPage({
         <h1 className="mt-6 font-display text-2xl text-white">{copy.title}</h1>
         <p className="mt-3 text-sm leading-6 text-navy-300">{copy.body}</p>
         <div className="mt-6 grid gap-3">
-          <Link href="/login" className="btn-primary">
+          <Link href="/install?platform=shopify" className="btn-primary">
+            Install &amp; permissions guide
+          </Link>
+          <Link href="/login" className="btn-secondary">
             Sign in with email
           </Link>
           <Link href="/" className="btn-secondary">
