@@ -56,6 +56,7 @@ enum SitePlatform {
 enum BillingProvider {
   WIX
   STRIPE
+  SHOPIFY
 }
 
 enum WidgetPosition {
@@ -304,10 +305,12 @@ model Subscription {
   previousVendorProductId String?
   billingIssue       Boolean            @default(false)
   billingProvider    BillingProvider    @default(WIX)
-  /// Stripe customer id for Webflow/Shopify seats. Unused for Wix.
+  /// Card-billing customer id for Webflow seats. Unused for Wix/Shopify.
   stripeCustomerId   String?
-  /// Stripe subscription id for Webflow/Shopify seats. Unused for Wix.
+  /// Card-billing subscription id for Webflow seats. Unused for Wix/Shopify.
   stripeSubscriptionId String?
+  /// Shopify AppSubscription GID for Shopify seats. Unused for Wix/Webflow.
+  shopifySubscriptionId String?
   rawBilling         Json?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -319,6 +322,7 @@ model Subscription {
   @@index([wixSubscriptionId])
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([shopifySubscriptionId])
 }
 
 model UsageRecord {

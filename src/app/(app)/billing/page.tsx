@@ -9,7 +9,13 @@ import { formatListedPrice } from "@/modules/billing/platform-prices";
 import { isStripeCheckoutConfigured } from "@/modules/billing/stripe/config";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { refreshWixBilling } from "@/app/actions/billing";
-import { isWixPlatform, platformLabel, resolveSitePlatform } from "@/modules/platforms";
+import {
+  isShopifyPlatform,
+  isWebflowPlatform,
+  isWixPlatform,
+  platformLabel,
+  resolveSitePlatform,
+} from "@/modules/platforms";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
 import { prisma } from "@/lib/prisma";
 
@@ -20,23 +26,26 @@ export default async function BillingPage() {
   if (!session) redirect("/");
   const platform = resolveSitePlatform(session.platform);
   const wix = isWixPlatform(platform);
+  const webflow = isWebflowPlatform(platform);
+  const shopify = isShopifyPlatform(platform);
   const name = platformLabel(platform);
-  const [data, scopes, pricing, stripeReady, subscription] = await Promise.all([
+  const [data, scopes, pricing, cardReady, subscription] = await Promise.all([
     getDashboardOverview(session),
     getAllPlanScopes(),
     getDisplayPricing(platform),
-    wix ? Promise.resolve(false) : isStripeCheckoutConfigured(),
-    wix
-      ? Promise.resolve(null)
-      : prisma.subscription.findFirst({
+    webflow ? isStripeCheckoutConfigured() : Promise.resolve(false),
+    webflow
+      ? prisma.subscription.findFirst({
           where: { organizationId: session.organizationId },
           orderBy: { createdAt: "desc" },
-          select: { stripeCustomerId: true, stripeSubscriptionId: true, status: true },
-        }),
+          select: { stripeCustomerId: true, status: true },
+        })
+      : Promise.resolve(null),
   ]);
   const e = data.entitlements;
   const upgradeUrl = wix ? wixUpgradeUrl(session.wixInstanceId) : null;
-  const hasStripeCustomer = Boolean(subscription?.stripeCustomerId);
+  const hasCardCustomer = Boolean(subscription?.stripeCustomerId);
+  const checkoutReady = wix ? Boolean(upgradeUrl) : webflow ? cardReady : shopify;
 
   return (
     <div className="space-y-8">
@@ -48,11 +57,15 @@ export default async function BillingPage() {
             ? e.isPaidSeat
               ? "Checkout stays on Wix. Paid plans include a 7-day free trial."
               : "The dashboard and live chat stay off until a plan is purchased. Start a 7-day trial — Starter, Business, or Pro."
-            : e.isPaidSeat
-              ? `Current plan and limits for this ${name} site. Manage billing in Stripe.`
-              : stripeReady
-                ? `Pick a plan below. Checkout runs on Stripe with a ${pricing.trialDays}-day trial when configured.`
-                : `The dashboard and live chat stay off until a plan is active on this ${name} site.`
+            : shopify
+              ? e.isPaidSeat
+                ? `Current plan and limits for this ${name} store. Billing is managed in Shopify.`
+                : `Pick a plan below. Checkout and charges stay inside Shopify Admin.`
+              : e.isPaidSeat
+                ? `Current plan and limits for this ${name} site.`
+                : cardReady
+                  ? `Pick a plan below. Paid plans include a ${pricing.trialDays}-day trial when configured.`
+                  : `The dashboard and live chat stay off until a plan is active on this ${name} site.`
         }
         actions={
           wix ? (
@@ -68,9 +81,18 @@ export default async function BillingPage() {
                 <button className="btn-secondary">Refresh from Wix</button>
               </form>
             </>
-          ) : hasStripeCustomer ? (
+          ) : webflow && hasCardCustomer ? (
             <a href="/api/billing/stripe/portal" className="btn-secondary">
-              Manage billing in Stripe
+              Manage billing
+            </a>
+          ) : shopify && e.isPaidSeat ? (
+            <a
+              href={`https://${session.wixInstanceId.replace(/^shopify:/, "")}/admin/settings/billing`}
+              className="btn-secondary"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Manage in Shopify
             </a>
           ) : null
         }
@@ -101,23 +123,27 @@ export default async function BillingPage() {
 
       {!wix && e.status === "TRIALING" && !e.grantedByAdmin ? (
         <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Your Stripe trial is active. Stripe charges when the trial ends unless you cancel in the billing portal.
+          {shopify
+            ? "Your Shopify trial is active. Shopify charges when the trial ends unless you cancel the app subscription."
+            : "Your free trial is active. You will be charged when the trial ends unless you cancel from Manage billing."}
         </div>
       ) : null}
       {!wix && e.cancelAtPeriodEnd ? (
         <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Cancellation is scheduled. You keep paid features until the current Stripe period ends.
+          Cancellation is scheduled. You keep paid features until the current billing period ends.
         </div>
       ) : null}
       {!wix && e.billingIssue ? (
         <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Stripe reported a payment issue. Update the card in Manage billing, or contact support.
+          {shopify
+            ? "There is a payment issue on this Shopify subscription. Update billing in Shopify Admin."
+            : "There is a payment issue on this plan. Update your card in Manage billing, or contact support."}
         </div>
       ) : null}
 
-      {!wix && !e.isPaidSeat && !stripeReady ? (
+      {webflow && !e.isPaidSeat && !cardReady ? (
         <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-navy-200">
-          Stripe checkout is not configured yet. An operator must add the Stripe secret key in Admin → Settings.
+          Card checkout is not configured yet. An operator must add payment keys in Admin → Settings.
           Complimentary access from the platform owner still applies. Prices below are the current {name} packages.
         </div>
       ) : null}
@@ -129,13 +155,14 @@ export default async function BillingPage() {
           const monthly = formatListedPrice(price.monthly, pricing.symbol);
           const yearly = formatListedPrice(price.yearly, pricing.symbol);
           const bullets = bulletsForPlatform(platform, bulletsForPlanScope(key, scopes[key]));
-          const checkoutHref = wix
-            ? upgradeUrl
-              ? `/api/billing/checkout?plan=${key === "GROWTH" ? "BUSINESS" : key}`
-              : null
-            : stripeReady
-              ? `/api/billing/stripe/checkout?plan=${key === "GROWTH" ? "BUSINESS" : key}`
-              : null;
+          const planParam = key === "GROWTH" ? "BUSINESS" : key;
+          const checkoutHref = !checkoutReady
+            ? null
+            : wix
+              ? `/api/billing/checkout?plan=${planParam}`
+              : shopify
+                ? `/api/billing/shopify/checkout?plan=${planParam}`
+                : `/api/billing/stripe/checkout?plan=${planParam}`;
           return (
             <div key={key} className={`panel p-6 ${current ? "amber-ring" : ""}`}>
               <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">
@@ -167,9 +194,13 @@ export default async function BillingPage() {
                     ? current
                       ? "Manage in Wix"
                       : `Start ${planLabel(key)} trial`
-                    : current
-                      ? "Change plan"
-                      : `Start ${planLabel(key)}`}
+                    : shopify
+                      ? current
+                        ? "Change plan in Shopify"
+                        : `Start ${planLabel(key)} in Shopify`
+                      : current
+                        ? "Change plan"
+                        : `Start ${planLabel(key)}`}
                 </a>
               ) : null}
             </div>
@@ -187,13 +218,23 @@ export default async function BillingPage() {
             <li>4. Plan Changed and Auto Renewal Cancelled use the same URL. Cancelled seats stay paid until period end.</li>
           </ol>
         </div>
+      ) : shopify ? (
+        <div className="panel p-6">
+          <h2 className="font-display text-xl text-white">How billing works for Shopify</h2>
+          <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
+            <li>1. Merchant picks Starter, Business, or Pro on this page.</li>
+            <li>2. Shopify shows its native app charge approval screen (Admin listed prices).</li>
+            <li>3. After approval, Shopify notifies this app and the matching plan unlocks.</li>
+            <li>4. Wix and Webflow checkout paths are never used for Shopify stores.</li>
+          </ol>
+        </div>
       ) : (
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">How Stripe billing works for {name}</h2>
+          <h2 className="font-display text-xl text-white">How billing works for {name}</h2>
           <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
             <li>1. Customer picks Starter, Business, or Pro on this page.</li>
-            <li>2. Stripe Checkout opens with the Admin-listed {name} price (and trial days when set).</li>
-            <li>3. Stripe POSTs to /api/billing/stripe/webhook and we unlock the matching plan.</li>
+            <li>2. Secure checkout opens with the Admin-listed {name} price (and trial days when set).</li>
+            <li>3. After payment succeeds, this workspace unlocks the matching plan.</li>
             <li>4. Wix App Market checkout is unchanged and is never used for {name} sites.</li>
           </ol>
         </div>

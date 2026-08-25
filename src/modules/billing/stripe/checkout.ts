@@ -7,7 +7,7 @@ import { getSetting } from "@/lib/security/settings";
 import { listedAmountToCents, normalizeStripeCurrency } from "@/modules/billing/stripe/amounts";
 import { getStripeClient } from "@/modules/billing/stripe/client";
 import { assertPaidPlanKey } from "@/modules/billing/stripe/apply";
-import { isWixPlatform, platformLabel, resolveSitePlatform, type SitePlatform } from "@/modules/platforms/types";
+import { isWebflowPlatform, isWixPlatform, platformLabel, resolveSitePlatform, type SitePlatform } from "@/modules/platforms/types";
 
 export type StripeCheckoutInput = {
   organizationId: string;
@@ -19,19 +19,22 @@ export type StripeCheckoutInput = {
 };
 
 /**
- * Create a Stripe Checkout Session for Webflow (and other non-Wix) seats.
- * Prices come from Admin listed packages — no Stripe Price IDs required.
+ * Create a card Checkout Session for Webflow seats only.
+ * Wix stays on Wix App Market; Shopify uses Shopify Billing API.
  */
 export async function createStripeCheckoutSession(input: StripeCheckoutInput) {
   const platform = resolveSitePlatform(input.platform);
   if (isWixPlatform(platform)) {
     throw new Error("Wix checkout stays on Wix App Market.");
   }
+  if (!isWebflowPlatform(platform)) {
+    throw new Error("Card checkout is only for Webflow sites.");
+  }
   assertPaidPlanKey(input.planKey);
 
   const stripe = await getStripeClient();
   if (!stripe) {
-    throw new Error("Stripe is not configured. Add the secret key in Admin → Settings.");
+    throw new Error("Card checkout is not configured. Add payment keys in Admin → Settings.");
   }
 
   const [prices, trialDaysRaw, subscription, site] = await Promise.all([
@@ -47,8 +50,8 @@ export async function createStripeCheckoutSession(input: StripeCheckoutInput) {
     }),
   ]);
 
-  if (!site || site.platform === "WIX") {
-    throw new Error("Stripe checkout is only for non-Wix sites.");
+  if (!site || site.platform !== "WEBFLOW") {
+    throw new Error("Card checkout is only for Webflow sites.");
   }
 
   const listed = priceForPlan(prices, input.planKey);
@@ -67,10 +70,12 @@ export async function createStripeCheckoutSession(input: StripeCheckoutInput) {
     platform,
   };
 
+  // tax_code = SaaS (required when Managed Payments is on). Also opt out of Managed Payments
+  // so classic subscription checkout works on accounts that enable it by default.
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    success_url: `${origin}/billing?stripe=success`,
-    cancel_url: `${origin}/billing?stripe=cancel`,
+    success_url: `${origin}/billing?checkout=success`,
+    cancel_url: `${origin}/billing?checkout=cancel`,
     client_reference_id: input.organizationId,
     customer: subscription?.stripeCustomerId || undefined,
     customer_email: subscription?.stripeCustomerId ? undefined : input.email || undefined,
@@ -89,15 +94,17 @@ export async function createStripeCheckoutSession(input: StripeCheckoutInput) {
           product_data: {
             name: `tidyAgent ${planLabel(input.planKey)}`,
             description: `${platformLabel(platform)} plan for ${site.displayName || site.url || "your site"}`,
+            tax_code: "txcd_10103001",
           },
         },
       },
     ],
     allow_promotion_codes: true,
-  });
+    managed_payments: { enabled: false },
+  } as Parameters<typeof stripe.checkout.sessions.create>[0]);
 
   if (!session.url) {
-    throw new Error("Stripe did not return a checkout URL.");
+    throw new Error("Checkout did not return a payment URL.");
   }
 
   return { url: session.url, sessionId: session.id };
@@ -109,7 +116,7 @@ export async function createStripeBillingPortalSession(input: {
 }) {
   const stripe = await getStripeClient();
   if (!stripe) {
-    throw new Error("Stripe is not configured.");
+    throw new Error("Card billing is not configured.");
   }
 
   const subscription = await prisma.subscription.findFirst({
@@ -117,7 +124,7 @@ export async function createStripeBillingPortalSession(input: {
     orderBy: { createdAt: "desc" },
   });
   if (!subscription?.stripeCustomerId) {
-    throw new Error("No Stripe customer on this workspace yet.");
+    throw new Error("No billing customer on this workspace yet.");
   }
 
   const session = await stripe.billingPortal.sessions.create({

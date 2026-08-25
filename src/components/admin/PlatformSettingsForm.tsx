@@ -321,6 +321,10 @@ export function PlatformSettingsForm({
               app injects <code className="text-amber-200">widget.js</code> as a ScriptTag. Publish is not needed;
               the storefront picks it up after inject.
             </li>
+            <li>
+              Billing uses Shopify&apos;s native app subscriptions (not card checkout). Set Shopify package prices in
+              the pricing section. On development stores, charges run in test mode automatically until production.
+            </li>
             <li>Copy API key and API secret into the fields below, then save.</li>
             <li>
               Tick <strong className="text-white">Enable Shopify</strong> when you are ready to test OAuth. Test
@@ -363,11 +367,11 @@ export function PlatformSettingsForm({
       </div>
 
       <div className="panel p-6">
-        <h2 className="font-display text-xl text-white">Stripe (Webflow billing)</h2>
+        <h2 className="font-display text-xl text-white">Card payments (Webflow only)</h2>
         <p className="mt-2 text-sm text-navy-300">
-          Used for Webflow (and other non-Wix) checkout. Wix App Market billing is unchanged. Keys are stored
-          encrypted in the database — leave blank to keep the current value. Set Webflow package prices in the
-          pricing section below; Checkout builds Stripe prices from those amounts.
+          Used for Webflow checkout only. Shopify uses Shopify Billing. Wix App Market billing is unchanged. Keys are
+          stored encrypted — leave blank to keep the current value. Set Webflow package prices in the pricing section
+          below.
         </p>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
           <li>

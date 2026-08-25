@@ -85,6 +85,32 @@ export async function shopifySend<T>(
   return (await response.json()) as T;
 }
 
+export async function shopifyGraphql<T>(
+  shop: string,
+  accessToken: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const response = await fetch(shopifyApi(shop, "/graphql.json"), {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    data?: T;
+    errors?: Array<{ message?: string }>;
+  };
+  if (!response.ok || body.errors?.length) {
+    const message = body.errors?.map((e) => e.message).filter(Boolean).join("; ") || `Shopify GraphQL failed (${response.status})`;
+    throw new ShopifyApiError(message, response.status);
+  }
+  return body.data as T;
+}
+
 export type ShopifyShopRecord = {
   id?: number;
   name?: string;

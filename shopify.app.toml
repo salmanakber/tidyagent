@@ -23,3 +23,7 @@ api_version = "2024-07"
 [[webhooks.subscriptions]]
 compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"
+
+[[webhooks.subscriptions]]
+topics = [ "app_subscriptions/update" ]
+uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"

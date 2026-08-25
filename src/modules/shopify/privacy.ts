@@ -187,8 +187,12 @@ export async function dispatchShopifyPrivacyWebhook(topic: string, shopDomain: s
       return handleShopifyCustomersRedact(shopDomain, payload);
     case "shop/redact":
       return handleShopifyShopRedact(shopDomain, payload);
+    case "app_subscriptions/update": {
+      const { handleShopifySubscriptionWebhook } = await import("@/modules/shopify/billing");
+      return handleShopifySubscriptionWebhook(shopDomain, payload as Record<string, unknown>);
+    }
     default:
-      console.info("Shopify webhook (non-privacy)", { topic, shop: shopDomain });
+      console.info("Shopify webhook (other)", { topic, shop: shopDomain });
       return { ok: true as const };
   }
 }

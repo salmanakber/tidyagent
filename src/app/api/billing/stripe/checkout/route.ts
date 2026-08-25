@@ -4,7 +4,7 @@ import { getAppOrigin } from "@/lib/env";
 import { getSession } from "@/lib/security/session";
 import { createStripeCheckoutSession } from "@/modules/billing/stripe/checkout";
 import { isStripeCheckoutConfigured } from "@/modules/billing/stripe/config";
-import { isWixPlatform, resolveSitePlatform } from "@/modules/platforms";
+import { isShopifyPlatform, isWebflowPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +16,8 @@ const PLANS: Record<string, PlanKey> = {
 };
 
 /**
- * Stripe Checkout for Webflow (and other non-Wix) seats.
- * Wix keeps using /api/billing/checkout → Wix App Market.
+ * Card checkout for Webflow only.
+ * Wix → /api/billing/checkout. Shopify → /api/billing/shopify/checkout.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -35,9 +35,17 @@ export async function GET(request: Request) {
   if (isWixPlatform(platform)) {
     return NextResponse.redirect(new URL(`/api/billing/checkout?plan=${planKey}`, getAppOrigin()));
   }
+  if (isShopifyPlatform(platform)) {
+    return NextResponse.redirect(
+      new URL(`/api/billing/shopify/checkout?plan=${planKey}`, getAppOrigin()),
+    );
+  }
+  if (!isWebflowPlatform(platform)) {
+    return NextResponse.redirect(new URL("/billing", getAppOrigin()));
+  }
 
   if (!(await isStripeCheckoutConfigured())) {
-    return NextResponse.redirect(new URL("/billing?error=stripe_config", getAppOrigin()));
+    return NextResponse.redirect(new URL("/billing?error=checkout_config", getAppOrigin()));
   }
 
   try {
@@ -51,7 +59,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.redirect(checkout.url);
   } catch (error) {
-    console.error("Stripe checkout failed", error);
-    return NextResponse.redirect(new URL("/billing?error=stripe_checkout", getAppOrigin()));
+    console.error("Checkout failed", error);
+    return NextResponse.redirect(new URL("/billing?error=checkout", getAppOrigin()));
   }
 }

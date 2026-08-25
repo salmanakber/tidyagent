@@ -205,7 +205,7 @@ async function createShopifyTenant(input: {
       planKey: "FREE",
       status: "NONE",
       isFree: true,
-      billingProvider: "STRIPE",
+      billingProvider: "SHOPIFY",
     },
   });
 
