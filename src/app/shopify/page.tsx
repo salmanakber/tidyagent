@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAppOrigin } from "@/lib/env";
 import { getSession } from "@/lib/security/session";
 import { isShopifyAdapterEnabled, getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import { workspacePathForOrganization } from "@/modules/auth/workspace-path";
@@ -70,16 +71,19 @@ export default async function ShopifyAppHome({
     params.embedded === "1" ||
     params.embed === "1" ||
     Boolean(params.host);
-  const install = `/shopify/install${shop ? `?shop=${encodeURIComponent(shop)}${framed ? "&embed=1" : ""}` : ""}`;
 
   if (!shop) {
     redirect("/shopify/missing?error=no_shop");
   }
 
-  // Always prefer the embedded admin path when Shopify opened us with a host.
+  const origin = getAppOrigin();
+  const installPath = `/shopify/install?shop=${encodeURIComponent(shop)}${framed ? "&embed=1" : ""}`;
+  const installAbsolute = new URL(installPath, origin).toString();
+
+  // Inside Shopify Admin iframe: break out with target=_top (login pages refuse iframes).
   if (framed) {
-    return <ShopifyConnect installHref={install} />;
+    return <ShopifyConnect installHref={installAbsolute} />;
   }
 
-  redirect(install);
+  redirect(installPath);
 }

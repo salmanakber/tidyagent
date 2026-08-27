@@ -1,11 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { encryptSecret } from "@/lib/security/settings";
 import type { AppSession } from "@/lib/security/session";
 import { seedDefaultAgent } from "@/modules/agents/defaults";
 import { syntheticInstanceId } from "@/modules/platforms/types";
 import type { ShopifyShopRecord } from "@/modules/shopify/client";
 import { shopPublicUrl } from "@/modules/shopify/shop";
+import { tokenMetadataFields, type ShopifyTokenBundle } from "@/modules/shopify/tokens";
 
 type TokenMetadata = Prisma.JsonObject & {
   provider: "shopify";
@@ -19,6 +19,7 @@ export async function provisionTenantFromShopify(input: {
   shopRecord?: ShopifyShopRecord | null;
   accessToken: string;
   scope?: string;
+  tokens?: ShopifyTokenBundle;
 }): Promise<AppSession> {
   const shopifyShopDomain = input.shop;
   const instanceId = syntheticInstanceId("SHOPIFY", shopifyShopDomain);
@@ -38,12 +39,14 @@ export async function provisionTenantFromShopify(input: {
     name: ownerName,
   });
 
-  const tokenMetadata = {
-    provider: "shopify",
-    accessToken: encryptSecret(input.accessToken),
+  const tokens: ShopifyTokenBundle = input.tokens ?? {
+    accessToken: input.accessToken,
     scope: input.scope ?? "",
-    shopifyShopDomain,
-  } satisfies TokenMetadata;
+  };
+  const tokenMetadata = tokenMetadataFields({
+    shop: shopifyShopDomain,
+    tokens,
+  }) as TokenMetadata;
 
   const existingSite = await prisma.wixSite.findUnique({
     where: { shopifyShopDomain },

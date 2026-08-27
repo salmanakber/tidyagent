@@ -1,7 +1,7 @@
 import type { PlanKey, Prisma, SubscriptionStatus } from "@prisma/client";
 import { getAppOrigin, getEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
-import { decryptSecret, getSetting } from "@/lib/security/settings";
+import { getSetting } from "@/lib/security/settings";
 import { planLabel } from "@/modules/billing/catalog";
 import { loadPlatformPrices, priceForPlan } from "@/modules/billing/platform-prices";
 import { listedAmountToCents } from "@/modules/billing/stripe/amounts";
@@ -109,18 +109,17 @@ export function parsePlanKeyFromSubscriptionName(name?: string | null): Extract<
 export async function getShopifyShopCredentials(siteId: string) {
   const site = await prisma.wixSite.findUnique({
     where: { id: siteId },
-    include: { credential: true },
   });
   if (!site || !isShopifyPlatform(site.platform) || !site.shopifyShopDomain) {
     return null;
   }
-  const metadata = asRecord(site.credential?.metadata);
-  const accessToken = decryptSecret(String(metadata.accessToken ?? ""));
-  if (!accessToken) return null;
+  const { getValidShopifyAccessToken } = await import("@/modules/shopify/tokens");
+  const creds = await getValidShopifyAccessToken(siteId);
+  if (!creds) return null;
   return {
     site,
-    shop: site.shopifyShopDomain,
-    accessToken,
+    shop: creds.shop,
+    accessToken: creds.accessToken,
     organizationId: site.organizationId,
   };
 }

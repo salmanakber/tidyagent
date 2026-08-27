@@ -11,35 +11,7 @@ export class ShopifyApiError extends Error {
   }
 }
 
-export async function exchangeShopifyCode(input: {
-  shop: string;
-  apiKey: string;
-  apiSecret: string;
-  code: string;
-}) {
-  const response = await fetch(`https://${input.shop}/admin/oauth/access_token`, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: input.apiKey,
-      client_secret: input.apiSecret,
-      code: input.code,
-    }),
-  });
-  const body = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    scope?: string;
-    error?: string;
-    error_description?: string;
-  };
-  if (!response.ok || !body.access_token) {
-    throw new ShopifyApiError(
-      body.error_description || body.error || `Shopify token exchange failed (${response.status})`,
-      response.status,
-    );
-  }
-  return { accessToken: body.access_token, scope: body.scope ?? "" };
-}
+export { exchangeShopifyCode } from "@/modules/shopify/tokens";
 
 function shopifyApi(shop: string, path: string) {
   const suffix = path.startsWith("/") ? path : `/${path}`;

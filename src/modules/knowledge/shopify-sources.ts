@@ -1,13 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { decryptSecret } from "@/lib/security/settings";
 import { shopifyGraphql, ShopifyApiError } from "@/modules/shopify/client";
-import { normalizeShopifyShop, shopPublicUrl } from "@/modules/shopify/shop";
-import { isShopifyPlatform } from "@/modules/platforms/types";
+import { shopPublicUrl } from "@/modules/shopify/shop";
 import type { ScanScope } from "@/modules/knowledge/scan-scope";
 import { classifyPage, type ExtractedPage } from "@/modules/knowledge/extract";
 import type { ScanStage } from "@/modules/knowledge/types";
 import type { PlatformApiHarvest } from "@/modules/knowledge/webflow-sources";
+import { getValidShopifyAccessToken } from "@/modules/shopify/tokens";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -33,16 +32,11 @@ function errorDetail(error: unknown) {
 }
 
 async function getShopifyCreds(siteId: string) {
-  const site = await prisma.wixSite.findUnique({
-    where: { id: siteId },
-    include: { credential: true },
-  });
-  if (!site || !isShopifyPlatform(site.platform) || !site.shopifyShopDomain) return null;
-  const shop = normalizeShopifyShop(site.shopifyShopDomain) || site.shopifyShopDomain;
-  const metadata = asRecord(site.credential?.metadata);
-  const accessToken = decryptSecret(String(metadata.accessToken ?? ""));
-  if (!accessToken) return null;
-  return { site, shop, accessToken };
+  const creds = await getValidShopifyAccessToken(siteId);
+  if (!creds) return null;
+  const site = await prisma.wixSite.findUnique({ where: { id: siteId } });
+  if (!site) return null;
+  return { site, shop: creds.shop, accessToken: creds.accessToken };
 }
 
 type GqlMoney = { amount?: string; currencyCode?: string };
@@ -165,7 +159,7 @@ export async function harvestShopifyApis(input: {
 
   const creds = await getShopifyCreds(input.siteId);
   if (!creds) {
-    warnings.push("Shopify API token missing. Reconnect the Shopify app, then scan again.");
+    warnings.push("Shopify connection missing. Reopen tidyAgent from Shopify Admin, then scan again.");
     return { pages, products, stages, skipped, warnings };
   }
 
@@ -241,7 +235,7 @@ export async function harvestShopifyApis(input: {
       pages.push({
         url: `${siteUrl.replace(/\/$/, "")}/#shop-profile`,
         title: displayName || "Store profile",
-        description: "Store profile from Shopify Admin API",
+        description: "Store profile from Shopify",
         headings: [displayName || "Store"],
         text,
         emails: email ? [String(email)] : [],
@@ -290,9 +284,7 @@ export async function harvestShopifyApis(input: {
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push(
-        "Shopify shop profile could not be read via Admin API. Reconnect the app if scopes changed, then scan again.",
-      );
+      warnings.push("We could not read the store profile. Reopen tidyAgent from Shopify Admin, then scan again.");
     }
   }
 
@@ -357,9 +349,7 @@ export async function harvestShopifyApis(input: {
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push(
-        "Shopify pages could not be read. Confirm the app has the read_content scope, then reconnect and scan again.",
-      );
+      warnings.push("We could not read store pages. Reopen tidyAgent from Shopify Admin, then scan again.");
     }
 
     try {
@@ -554,12 +544,10 @@ export async function harvestShopifyApis(input: {
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push(
-        "Shopify products could not be read. Confirm the app has read_products, then reconnect and scan again.",
-      );
+      warnings.push("We could not read products. Reopen tidyAgent from Shopify Admin, then scan again.");
     }
   } else {
-    skipped.push("Ecommerce catalog reading is included on paid plans.");
+    skipped.push("Ecommerce products are included on paid plans.");
   }
 
   return { pages, products, stages, skipped, warnings, siteUrl, displayName, currency, locale };

@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import type { CrawlItem } from "@/modules/knowledge/types";
 import type { Prisma } from "@prisma/client";
 import { copyForPlatform, wizardCopyForPlatform } from "@/modules/platforms/copy";
-import { resolveSitePlatform, isWebflowPlatform } from "@/modules/platforms";
+import { resolveSitePlatform } from "@/modules/platforms";
 
 export const maxDuration = 120;
 
@@ -34,7 +34,6 @@ export default async function KnowledgePage() {
   });
   const copy = wizardCopyForPlatform(session.platform);
   const platform = resolveSitePlatform(session.platform);
-  const webflow = isWebflowPlatform(platform);
   const [storedFacts, conflicts, documents, scanSource, customNotes] = await Promise.all([
     prisma.knowledgeFact.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId },
@@ -94,14 +93,27 @@ export default async function KnowledgePage() {
       </div>
       <div className="panel p-6">
         <h2 className="font-display text-xl text-white">
-          {webflow ? "Webflow Data API sync" : "Website scanner"}
+          {copy.hideDomainCrawlToggle ? "Update what the AI knows" : "Website scanner"}
         </h2>
         <p className="mt-2 text-sm text-navy-300">
-          {webflow
-            ? "Re-run this after you change pages, CMS, or products in Webflow. Knowledge comes from official Webflow APIs — not a domain crawl. Last sync: "
+          {copy.hideDomainCrawlToggle
+            ? "Re-run this after you change pages or products. Last update: "
             : "Re-run this after you change pages, policies, or products. Last sync: "}
           {data.knowledge.lastSyncedAt ? new Date(data.knowledge.lastSyncedAt).toLocaleString() : "not yet"}
         </p>
+        {facts.hasStores || platform === "SHOPIFY" ? (
+          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Ecommerce</p>
+            <p className="mt-2 text-sm leading-6 text-navy-100">
+              Products, prices, and images are taught to your chat when you run the scanner on a paid plan. Ask the
+              widget about any product and it can reply with product cards.
+            </p>
+            <p className="mt-2 text-xs text-navy-400">
+              {indexedPages.filter((item) => item.contentType === "PRODUCT" && item.status === "crawled").length}{" "}
+              products currently loaded
+            </p>
+          </div>
+        ) : null}
         {data.profile?.summary ? (
           <p className="mt-4 rounded-2xl bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">{data.profile.summary}</p>
         ) : null}

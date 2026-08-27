@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { decryptSecret } from "@/lib/security/settings";
 import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import { isShopifyPlatform } from "@/modules/platforms/types";
 import { ShopifyApiError, shopifyGet, shopifySend } from "@/modules/shopify/client";
+import {
+  getValidShopifyAccessToken,
+  isNonExpiringTokenError,
+  merchantShopifyError,
+} from "@/modules/shopify/tokens";
 
 type ScriptTag = { id?: number; src?: string };
 
@@ -16,11 +20,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? { ...(value as Record<string, unknown>) }
     : {};
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof ShopifyApiError || error instanceof Error) return error.message;
-  return "Shopify script tag inject failed";
 }
 
 function widgetSrcForInstance(widgetSrc: string, instanceId: string) {
@@ -81,8 +80,10 @@ export async function ensureShopifyWidgetForSite(
   }
 
   const metadata = asRecord(site.credential?.metadata);
-  const accessToken = accessTokenOverride || decryptSecret(String(metadata.accessToken ?? ""));
-  if (!accessToken) {
+  const creds = accessTokenOverride
+    ? { shop: site.shopifyShopDomain, accessToken: accessTokenOverride }
+    : await getValidShopifyAccessToken(siteId);
+  if (!creds?.accessToken) {
     const result = { ok: false, error: "missing_token" };
     await saveInjectResult(siteId, metadata, result);
     return result;
@@ -91,16 +92,21 @@ export async function ensureShopifyWidgetForSite(
   const config = await getShopifyOAuthConfig();
   try {
     const result = await injectShopifyWidget({
-      shop: site.shopifyShopDomain,
-      accessToken,
+      shop: creds.shop,
+      accessToken: creds.accessToken,
       widgetSrc: config.widgetSrc,
       instanceId: site.wixInstanceId,
     });
     await saveInjectResult(siteId, metadata, result);
     return result;
   } catch (error) {
-    const result = { ok: false, error: errorMessage(error) };
-    console.error("Shopify widget inject failed", error);
+    const result = {
+      ok: false,
+      error: isNonExpiringTokenError(error)
+        ? merchantShopifyError(error)
+        : merchantShopifyError(error),
+    };
+    console.error("Shopify widget inject failed", error instanceof ShopifyApiError ? error.message : error);
     await saveInjectResult(siteId, metadata, result);
     return result;
   }

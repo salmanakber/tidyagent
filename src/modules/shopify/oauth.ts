@@ -127,6 +127,7 @@ async function completeShopifyLoginOnce(input: {
     shopRecord,
     accessToken: tokens.accessToken,
     scope: tokens.scope,
+    tokens,
   });
 
   await ensureShopifyWidgetForSite(session.siteId, tokens.accessToken);

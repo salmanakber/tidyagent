@@ -141,9 +141,9 @@ export async function scanOrganizationSite(input: {
     stages.push(...crawled.stages);
     warnings.push(...crawled.warnings);
   } else if (webflowSite) {
-    skipped.push("Webflow sites use official Webflow Data APIs only (no public-site crawl).");
+    skipped.push("Webflow sites load content from your Webflow account (no public-site crawl).");
   } else if (shopifySite) {
-    skipped.push("Shopify stores use official Admin GraphQL APIs only (no storefront crawl/scrape).");
+    skipped.push("Shopify stores load content from your Shopify account (no storefront crawl).");
   } else if (!scope.includeDomainCrawl) {
     skipped.push("Domain crawl is included after a paid plan is purchased.");
   }

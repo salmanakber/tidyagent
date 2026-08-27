@@ -14,7 +14,7 @@ export function copyForPlatform(platform: SitePlatform | string | null | undefin
     .replace(/\bWix Bookings\b/gi, "bookings")
     .replace(/\bWix CMS\b/gi, platform === "WEBFLOW" ? "CMS" : "content")
     .replace(/\bWix App Market\b/gi, "billing")
-    .replace(/\bWix APIs\b/gi, `${name} APIs`)
+    .replace(/\bWix APIs\b/gi, `${name} connection`)
     .replace(/\bWix site profile\b/gi, `${name} site profile`)
     .replace(/\bWix site\b/gi, `${name} site`)
     .replace(/\bon a Wix site\b/gi, `on a ${name} site`)
@@ -24,27 +24,31 @@ export function copyForPlatform(platform: SitePlatform | string | null | undefin
     out = out
       .replace(/\bShopify\b/gi, "the store")
       .replace(/\bApp Store\b/gi, "marketplace")
-      .replace(/\bFull-domain crawl plus\b/gi, "Webflow Data APIs:")
-      .replace(/\bFull website crawl,\b/gi, "Webflow pages, CMS, and")
+      .replace(/\bFull-domain crawl plus\b/gi, "Your Webflow site:")
+      .replace(/\bFull website crawl,\b/gi, "Your Webflow pages, CMS, and")
       .replace(
         /Reads every public page we can find \(sitemap and on-site links\), plus/gi,
-        "Reads site profile, pages, and CMS through Webflow Data APIs, plus",
+        "Reads your pages, CMS, and store details from Webflow, plus",
       )
-      .replace(/every public page we can find/gi, "Webflow pages via Data APIs")
-      .replace(/sitemap and on-site links/gi, "official Webflow APIs");
+      .replace(/every public page we can find/gi, "your Webflow pages")
+      .replace(/sitemap and on-site links/gi, "your Webflow site")
+      .replace(/\bWebflow Data APIs\b/gi, "your Webflow site")
+      .replace(/\bData APIs\b/gi, "your site");
   }
   if (isShopifyPlatform(platform)) {
     out = out
       .replace(/\bWebflow\b/gi, "the site")
       .replace(/\bApp Market\b/gi, "App Store")
-      .replace(/\bFull-domain crawl plus\b/gi, "Shopify Admin APIs:")
-      .replace(/\bFull website crawl,\b/gi, "Shopify Admin APIs,")
+      .replace(/\bFull-domain crawl plus\b/gi, "Your Shopify store:")
+      .replace(/\bFull website crawl,\b/gi, "Your Shopify store,")
       .replace(
         /Reads every public page we can find \(sitemap and on-site links\), plus/gi,
-        "Reads store profile, Online Store pages, and blogs through Shopify Admin APIs, plus",
+        "Reads your store profile, pages, and blogs from Shopify, plus",
       )
-      .replace(/every public page we can find/gi, "store content via Shopify Admin APIs")
-      .replace(/sitemap and on-site links/gi, "official Shopify Admin APIs")
+      .replace(/every public page we can find/gi, "your store content")
+      .replace(/sitemap and on-site links/gi, "your Shopify store")
+      .replace(/\bShopify Admin APIs\b/gi, "your Shopify store")
+      .replace(/\bAdmin APIs\b/gi, "your store")
       .replace(/\bproduct catalog\b/gi, "ecommerce catalog");
   }
 
@@ -66,15 +70,15 @@ export function wizardCopyForPlatform(platform?: string | null) {
       scanStages: [
         "Confirming the Wix site",
         "Reading every public page",
-        "Loading the Wix Stores catalog",
+        "Loading products & ecommerce",
         "Writing a business understanding",
       ],
       noUrl: "No public URL yet — publish the Wix site, then scan.",
       crawlHint: "Sitemap, on-site links, and Wix data. Uncheck to read only common pages like pricing, services, and FAQ.",
-      storeHint: "from Wix Stores",
-      factsHint: "Structured prices, contact details, hours, and services extracted from the live site and Wix APIs.",
+      storeHint: "from your product catalog",
+      factsHint: "Prices, contact details, hours, and services pulled from your live site.",
       knowledgeDescription: (name: string) =>
-        `The scanner reads every public page it can find on this ${name} site, plus the ecommerce catalog on paid plans. Custom notes you add sit above that and are never overwritten.`,
+        `We teach your AI employee from this ${name} site — including pages and your ecommerce products on paid plans. Custom notes you add sit above that and are never overwritten.`,
       scanButton: "Read and understand this website",
       scanPending: "Reading website…",
       scanLiveNote: "This reads the live site. It is not a canned demo.",
@@ -84,50 +88,50 @@ export function wizardCopyForPlatform(platform?: string | null) {
   if (platform === "SHOPIFY") {
     return {
       connected: (siteName: string, planLabel: string) =>
-        `${siteName} is identified through Shopify. The next step is a real read through Shopify Admin APIs — scoped to ${planLabel} — so the employee learns this business, not a generic script.`,
-      autoInstall: "Adds the widget to the storefront with a script tag.",
+        `${siteName} is connected through Shopify. Next, teach your AI employee this store — scoped to ${planLabel} — so answers match your real products and pages.`,
+      autoInstall: "Adds the chat widget to your online store automatically.",
       manualInstall: "Place the widget only where you want it in the theme editor.",
       scanStages: [
-        "Confirming the Shopify store",
-        "Reading store profile and pages via Admin APIs",
-        "Loading the ecommerce catalog",
+        "Confirming your Shopify store",
+        "Reading store pages and policies",
+        "Loading products & ecommerce",
         "Writing a business understanding",
       ],
-      noUrl: "No public URL yet — publish the Shopify store, then scan.",
+      noUrl: "No public store URL yet — publish your Shopify store, then scan.",
       crawlHint:
-        "tidyAgent reads your store through official Shopify Admin GraphQL APIs (shop profile, pages, blogs, and the ecommerce catalog on paid plans). It does not crawl or scrape the storefront — Shopify App Store and API terms disallow that.",
-      storeHint: "from the ecommerce catalog",
-      factsHint: "Structured prices, contact details, hours, and services extracted from Shopify Admin APIs.",
+        "We load your store profile, pages, blogs, and product catalog (prices, images, variants) from your Shopify store. Visitors then get accurate answers in chat.",
+      storeHint: "from your ecommerce catalog",
+      factsHint: "Prices, contact details, hours, and services pulled from your Shopify store.",
       knowledgeDescription: (name: string) =>
-        `Knowledge for this ${name} store comes from official Shopify Admin APIs (profile, pages, blogs, and the ecommerce catalog with variants, prices, and images on paid plans) — not from crawling the storefront. Custom notes you add sit above that and are never overwritten.`,
-      scanButton: "Read store via Shopify APIs",
-      scanPending: "Reading Shopify APIs…",
-      scanLiveNote: "This uses Shopify Admin APIs only. It is not a storefront crawl.",
+        `We teach your AI employee from this ${name} store — pages, policies, and your full ecommerce catalog (products, prices, and images) on paid plans. Custom notes you add sit above that and are never overwritten.`,
+      scanButton: "Teach AI from this store",
+      scanPending: "Learning your store…",
+      scanLiveNote: "This reads your real Shopify store content and products.",
       hideDomainCrawlToggle: true,
     };
   }
   const name = platformLabel(platform);
   return {
     connected: (siteName: string, planLabel: string) =>
-      `${siteName} is identified through ${name}. The next step is a real read of your Webflow site through official Data APIs — scoped to ${planLabel} — so the employee learns this business, not a generic script.`,
-    autoInstall: "Adds the widget through site-wide custom code. Publish the site so visitors can see it.",
-    manualInstall: "We'll still inject site-wide custom code. Choose this only if you will place the snippet yourself.",
+      `${siteName} is connected through ${name}. Next, teach your AI employee this site — scoped to ${planLabel} — so answers match your real pages and products.`,
+    autoInstall: "Adds the widget site-wide. Publish the site so visitors can see it.",
+    manualInstall: "We'll still add site-wide code. Choose this only if you will place the snippet yourself.",
     scanStages: [
-      "Confirming the Webflow site",
-      "Reading pages via Webflow APIs",
-      "Loading CMS and ecommerce data",
+      "Confirming your Webflow site",
+      "Reading pages and CMS content",
+      "Loading products & ecommerce",
       "Writing a business understanding",
     ],
     noUrl: "No public URL yet — publish the Webflow site, then scan.",
     crawlHint:
-      "tidyAgent reads your Webflow site through official Data APIs (site profile, pages, CMS, ecommerce when available). It does not crawl or scrape the published domain.",
-    storeHint: "from the ecommerce catalog",
-    factsHint: "Structured prices, contact details, hours, and services extracted from Webflow Data APIs.",
+      "We load your pages, CMS, and ecommerce catalog from your Webflow site so the chat can answer accurately.",
+    storeHint: "from your ecommerce catalog",
+    factsHint: "Prices, contact details, hours, and services pulled from your Webflow site.",
     knowledgeDescription: (nameLabel: string) =>
-      `Knowledge for this ${nameLabel} site comes from official Webflow Data APIs (pages, CMS, and ecommerce on paid plans) — not from crawling the published domain. Custom notes you add sit above that and are never overwritten.`,
-    scanButton: "Read site via Webflow APIs",
-    scanPending: "Reading Webflow APIs…",
-    scanLiveNote: "This uses Webflow Data APIs only. It is not a domain crawl.",
+      `We teach your AI employee from this ${nameLabel} site — pages, CMS, and ecommerce products on paid plans. Custom notes you add sit above that and are never overwritten.`,
+    scanButton: "Teach AI from this site",
+    scanPending: "Learning your site…",
+    scanLiveNote: "This reads your real Webflow site content and products.",
     hideDomainCrawlToggle: true,
   };
 }

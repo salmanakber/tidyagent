@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { resolveKnowledgeConflict } from "@/app/actions/workspace";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
-import { isShopifyPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
+import { isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 type IndexedPage = {
   id: string;
@@ -29,7 +29,6 @@ export function KnowledgeIntelligence({
   const [filter, setFilter] = useState<"all" | "pages" | "products" | "pending">("all");
   const copy = wizardCopyForPlatform(platform);
   const apiOnly = Boolean(copy.hideDomainCrawlToggle);
-  const shopify = isShopifyPlatform(platform);
 
   const counts = useMemo(() => {
     return {
@@ -101,9 +100,7 @@ export function KnowledgeIntelligence({
           ) : (
             <p className="text-sm text-navy-400">
               {apiOnly
-                ? shopify
-                  ? "Run the Shopify Admin API sync to extract facts from your store."
-                  : "Run the Webflow Data API sync to extract facts from your site."
+                ? "Run a store update to extract facts from your site."
                 : "Run the scanner to extract facts from the live website."}
             </p>
           )}
@@ -112,14 +109,11 @@ export function KnowledgeIntelligence({
 
       <section className="panel p-6">
         <h2 className="font-display text-xl text-white">
-          {apiOnly ? "API-loaded pages and ecommerce" : "Crawled pages and ecommerce"}
+          {apiOnly ? "Pages and ecommerce" : "Pages and ecommerce"}
         </h2>
         <p className="mt-2 text-sm text-navy-300">
-          {counts.crawled} {apiOnly ? "page" : "website page"}
-          {counts.crawled === 1 ? "" : "s"} {apiOnly ? (shopify ? "from Shopify Admin APIs" : "from Webflow APIs") : "read"}
-          {counts.products
-            ? ` · ${counts.products} ecommerce product${counts.products === 1 ? "" : "s"}`
-            : ""}
+          {counts.crawled} page{counts.crawled === 1 ? "" : "s"} loaded
+          {counts.products ? ` · ${counts.products} ecommerce product${counts.products === 1 ? "" : "s"}` : ""}
           {counts.pending ? ` · ${counts.pending} found but not yet read` : ""}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -164,9 +158,7 @@ export function KnowledgeIntelligence({
           ) : (
             <p className="text-sm text-navy-400">
               {apiOnly
-                ? shopify
-                  ? "Run the Shopify Admin API sync to list pages and ecommerce products."
-                  : "Run the Webflow Data API sync to list pages and store products."
+                ? "Run a store update to list pages and ecommerce products."
                 : "Run the scanner to list every page and store product that was read."}
             </p>
           )}
@@ -216,12 +208,12 @@ function originLabel(origin: string, contentType: string, platform?: string | nu
     if (origin === "shopify-store" || contentType === "PRODUCT") return "Ecommerce";
     if (origin === "shopify-cms") return "Store content";
     if (origin === "shopify-site") return "Store profile";
-    if (origin === "website") return "Shopify Admin APIs";
+    if (origin === "website") return "Store content";
     return contentType;
   }
   if (origin === "webflow-store" || contentType === "PRODUCT") return "Ecommerce";
   if (origin === "webflow-cms") return "CMS";
   if (origin === "webflow-site") return "Site profile";
-  if (origin === "website") return "Webflow APIs";
+  if (origin === "website") return "Site content";
   return contentType;
 }

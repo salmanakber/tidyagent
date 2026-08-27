@@ -59,18 +59,19 @@ export function knowledgeCardsForSite(input: {
 }) {
   const cards: { label: string; value: number; hint: string }[] = [
     {
-      label: isWebflowPlatform(input.platform) ? "Pages (APIs)" : "Website",
+      label: "Pages",
       value: input.pages,
-      hint: isWebflowPlatform(input.platform) ? "pages loaded via Webflow Data APIs" : "pages actually crawled",
+      hint: isWebflowPlatform(input.platform) || input.platform === "SHOPIFY" ? "loaded from your site" : "pages actually crawled",
     },
   ];
-  if (input.hasStores) {
-    cards.push({
-      label: "Products",
-      value: input.products,
-      hint: wizardCopyForPlatform(input.platform).storeHint,
-    });
-  }
+  // Always surface ecommerce for store platforms so merchants can find it.
+  cards.push({
+    label: "Ecommerce products",
+    value: input.products,
+    hint: input.hasStores
+      ? wizardCopyForPlatform(input.platform).storeHint
+      : "run a scan after you add products",
+  });
   if (input.faqs > 0) cards.push({ label: "FAQs", value: input.faqs, hint: "from the live site" });
   if (input.policies > 0) cards.push({ label: "Policies", value: input.policies, hint: "from the live site" });
   cards.push({ label: "Facts", value: input.facts ?? 0, hint: "structured business facts" });
