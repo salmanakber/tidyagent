@@ -53,7 +53,7 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
   },
   token: {
     title: "Could not finish Webflow login",
-    body: "The first marketplace redirect sometimes sends a one-time code before our app is ready. Click Connect Webflow again — that second pass is the one that sticks.",
+    body: "Authorization codes can only be used once. Click Connect Webflow again to complete the connection.",
   },
 };
 
@@ -66,7 +66,7 @@ export default async function WebflowMissingPage({
   const key = params.error ?? "";
   const copy = MESSAGES[key] ?? {
     title: "Webflow install did not finish",
-    body: "Click Install in Webflow again. Do not refresh the callback URL — that code can only be used once.",
+    body: "Click Connect Webflow again. Do not refresh the callback URL — that code can only be used once.",
   };
 
   return (
@@ -76,12 +76,9 @@ export default async function WebflowMissingPage({
         <h1 className="mt-6 font-display text-2xl text-white">{copy.title}</h1>
         <p className="mt-3 text-sm leading-6 text-navy-300">{copy.body}</p>
         {params.detail ? (
-          <p className="mt-3 break-words rounded-2xl bg-navy-950/50 px-3 py-2 text-left text-[11px] text-navy-400">
-            Webflow detail: {params.detail}
+          <p className="mt-3 break-words rounded-2xl bg-navy-950/50 px-3 py-2 text-left text-xs text-navy-400">
+            {params.detail}
           </p>
-        ) : null}
-        {key ? (
-          <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-navy-500">Error code: {key}</p>
         ) : null}
         <div className="mt-6 grid gap-3">
           <a href="/webflow/install?popup=1" className="btn-primary" target="_blank" rel="noopener">
