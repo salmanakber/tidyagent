@@ -1,6 +1,5 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAppOrigin } from "@/lib/env";
 import { getSession } from "@/lib/security/session";
 import { isShopifyAdapterEnabled, getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import { workspacePathForOrganization } from "@/modules/auth/workspace-path";
@@ -8,7 +7,7 @@ import { ensureShopifyWidgetForSite } from "@/modules/shopify/embed";
 import { verifyShopifyQueryHmac } from "@/modules/shopify/hmac";
 import { shopifyCallbackQuery } from "@/modules/shopify/open";
 import { normalizeShopifyShop } from "@/modules/shopify/shop";
-import { ShopifyConnect } from "./ShopifyConnect";
+import { ShopifyEmbeddedAuth } from "./ShopifyEmbeddedAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +22,7 @@ export default async function ShopifyAppHome({
     session?: string;
     embedded?: string;
     embed?: string;
+    id_token?: string;
     code?: string;
     state?: string;
     error?: string;
@@ -56,8 +56,8 @@ export default async function ShopifyAppHome({
   }
 
   const shop = normalizeShopifyShop(params.shop) ?? "";
+  const config = await getShopifyOAuthConfig();
   if (params.hmac) {
-    const config = await getShopifyOAuthConfig();
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (typeof value === "string" && value) search.set(key, value);
@@ -66,6 +66,7 @@ export default async function ShopifyAppHome({
       redirect("/shopify/missing?error=invalid_hmac");
     }
   }
+
   const framed =
     (await headers()).get("sec-fetch-dest") === "iframe" ||
     params.embedded === "1" ||
@@ -76,14 +77,14 @@ export default async function ShopifyAppHome({
     redirect("/shopify/missing?error=no_shop");
   }
 
-  const origin = getAppOrigin();
-  const installPath = `/shopify/install?shop=${encodeURIComponent(shop)}${framed ? "&embed=1" : ""}`;
-  const installAbsolute = new URL(installPath, origin).toString();
-
-  // Inside Shopify Admin iframe: break out with target=_top (login pages refuse iframes).
+  // Embedded Admin: App Bridge session-token exchange (stays in iframe, cycles expiring tokens).
   if (framed) {
-    return <ShopifyConnect installHref={installAbsolute} />;
+    if (!config.apiKey) {
+      redirect("/shopify/missing?error=not_configured");
+    }
+    return <ShopifyEmbeddedAuth apiKey={config.apiKey} host={params.host || ""} shop={shop} />;
   }
 
-  redirect(installPath);
+  // Standalone / top-level install (not inside Shopify Admin iframe).
+  redirect(`/shopify/install?shop=${encodeURIComponent(shop)}`);
 }

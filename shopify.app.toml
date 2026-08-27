@@ -5,6 +5,9 @@
 # Privacy webhooks are required for App Store distribution. You can ALSO paste the same
 # HTTPS URL in Partner Dashboard → App setup → GDPR / privacy webhooks. For CLI-managed
 # apps, TOML + deploy is the source of truth — pasting the URL alone is not enough.
+#
+# Embedded apps authenticate with App Bridge session tokens + expiring offline tokens.
+# Do not rely on legacy non-expiring offline tokens (Admin API rejects them).
 
 client_id = "cf0756196113f78ef60ca45598d8b344"
 name = "tidyAgent"
@@ -18,12 +21,8 @@ scopes = "read_products,read_orders,read_customers,read_content,read_themes,read
 redirect_urls = [ "https://agent.tidyflowapp.com/api/shopify/oauth/callback" ]
 
 [webhooks]
-api_version = "2024-07"
+api_version = "2025-01"
 
 [[webhooks.subscriptions]]
 compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
-uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = [ "app_subscriptions/update" ]
 uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"

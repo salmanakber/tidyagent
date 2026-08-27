@@ -82,8 +82,8 @@ export async function refreshShopifyOfflineToken(input: {
 }): Promise<ShopifyTokenBundle> {
   const response = await fetch(`https://${input.shop}/admin/oauth/access_token`, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
+    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
       client_id: input.apiKey,
       client_secret: input.apiSecret,
       grant_type: "refresh_token",
@@ -102,6 +102,47 @@ export async function refreshShopifyOfflineToken(input: {
   if (!response.ok || !body.access_token) {
     throw new ShopifyApiError(
       body.error_description || body.error || `Shopify token refresh failed (${response.status})`,
+      response.status,
+    );
+  }
+  return bundleFromResponse(body);
+}
+
+/**
+ * Embedded Admin auth: exchange App Bridge ID token for an expiring offline access token.
+ * This stays inside the Shopify iframe and cycles deprecated non-expiring tokens.
+ */
+export async function exchangeShopifySessionToken(input: {
+  shop: string;
+  apiKey: string;
+  apiSecret: string;
+  idToken: string;
+}): Promise<ShopifyTokenBundle> {
+  const response = await fetch(`https://${input.shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: input.apiKey,
+      client_secret: input.apiSecret,
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      subject_token: input.idToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+      requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token",
+      expiring: "1",
+    }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    refresh_token?: string;
+    scope?: string;
+    expires_in?: number;
+    refresh_token_expires_in?: number;
+    error?: string;
+    error_description?: string;
+  };
+  if (!response.ok || !body.access_token) {
+    throw new ShopifyApiError(
+      body.error_description || body.error || `Shopify session token exchange failed (${response.status})`,
       response.status,
     );
   }
