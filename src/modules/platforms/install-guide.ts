@@ -21,11 +21,10 @@ export type InstallGuide = {
 const WEBFLOW_WHY: Record<(typeof WEBFLOW_OAUTH_SCOPES)[number], string> = {
   "authorized_user:read": "Identify the Webflow user who installed tidyAgent and keep the workspace tied to that account.",
   "sites:read": "Read site name, domains, locales, and connection details for the workspace.",
-  "sites:write": "Keep the site connection and tidyAgent site settings in sync after install.",
-  "pages:read": "Read pages so the AI can learn your published content.",
-  "pages:write": "Support site setup flows that Webflow requires alongside custom code and page access.",
+  "sites:write": "Required by Webflow for site-level Custom Code apply/remove during install and disconnect.",
+  "pages:read": "Read page metadata through the Webflow Pages API so knowledge comes from official APIs (not a domain crawl).",
   "custom_code:read": "See whether the chat widget script is already applied on the site.",
-  "custom_code:write": "Inject the tidyAgent chat widget as site-wide custom code (you still publish for visitors to see it).",
+  "custom_code:write": "Inject and remove the tidyAgent chat widget as site-wide custom code (you still publish for visitors to see changes).",
   "cms:read": "Read CMS collections and items for knowledge (plan-scoped).",
   "ecommerce:read": "Read ecommerce catalog data when your site has a store (plan-scoped).",
 };
@@ -63,10 +62,7 @@ export const WEBFLOW_INSTALL_GUIDE: InstallGuide = {
   ],
   permissions: WEBFLOW_OAUTH_SCOPES.map((scope) => ({
     scope,
-    why:
-      scope === "pages:read"
-        ? "Read page metadata through the Webflow Pages API so knowledge comes from official APIs (not a domain crawl)."
-        : WEBFLOW_WHY[scope],
+    why: WEBFLOW_WHY[scope],
   })),
   notes: [
     "tidyAgent is hosted at agent.tidyflowapp.com — Webflow is not the operator of the dashboard or AI.",

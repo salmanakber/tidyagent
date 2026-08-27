@@ -21,6 +21,9 @@ describe("webflow oauth helpers", () => {
     );
     expect(url.searchParams.get("scope")).toContain("custom_code:write");
     expect(url.searchParams.get("scope")).toContain("authorized_user:read");
+    expect(url.searchParams.get("scope")).toContain("sites:write");
+    expect(url.searchParams.get("scope")).not.toContain("pages:write");
+    expect(url.searchParams.get("scope")).not.toContain("forms");
   });
 
   it("picks a preferred site, then a custom domain, then the most recently published", () => {

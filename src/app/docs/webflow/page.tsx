@@ -47,8 +47,9 @@ export default function WebflowDocsPage() {
           tidyAgent user guide
         </h1>
         <p className="mt-4 text-[15px] leading-7 text-navy-200">
-          tidyAgent is a Hybrid Webflow App: a Designer Extension opens the hosted dashboard, and a Data Client
-          connects your site. The AI answers visitors from{" "}
+          tidyAgent is a <strong className="text-white">Hybrid Webflow App</strong>: a Designer Extension{" "}
+          <strong className="text-white">Launch</strong> panel opens the hosted dashboard (it does not edit your
+          canvas), and a Data Client connects your site. The AI answers visitors from{" "}
           <strong className="text-white">official Webflow Data APIs</strong> (pages, CMS, ecommerce when available)
           plus owner notes you add. It does <strong className="text-white">not</strong> crawl or scrape your published
           domain.
@@ -223,21 +224,18 @@ export default function WebflowDocsPage() {
           <Section id="disconnect" title="9. Disconnecting the App and removing its widget">
             <ol className="list-decimal space-y-2 pl-5">
               <li>
-                In tidyAgent <strong className="text-white">Settings</strong>, use Disconnect to clear this browser
-                session.
+                In tidyAgent <strong className="text-white">Settings</strong>, use Disconnect. While your Webflow token
+                is still valid, tidyAgent removes <strong className="text-white">only</strong> its own site Custom Code
+                / registered script and leaves unrelated scripts alone.
               </li>
               <li>
                 In Webflow, uninstall tidyAgent from the site / Workspace apps so OAuth access is revoked.
               </li>
-              <li>
-                Open the Webflow site’s <strong className="text-white">Custom Code</strong> settings and remove any
-                tidyAgent / chat widget script the App registered. Do not delete unrelated custom code.
-              </li>
-              <li>Publish the Webflow site again so visitors no longer load the bubble.</li>
+              <li>Publish the Webflow site so visitors no longer load a cached bubble.</li>
             </ol>
             <p className="mt-3 text-sm text-navy-400">
-              After uninstall we delete or anonymize associated workspace data after a reasonable retention period.
-              If a bubble remains, it is almost always a publish that still includes the old Custom Code snippet.
+              After uninstall we delete or anonymize associated workspace data after a reasonable retention period. If a
+              bubble remains, publish again or remove any leftover tidyAgent snippet under Site settings → Custom Code.
             </p>
           </Section>
 

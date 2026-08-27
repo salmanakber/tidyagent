@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import type { CrawlItem } from "@/modules/knowledge/types";
 import type { Prisma } from "@prisma/client";
 import { copyForPlatform, wizardCopyForPlatform } from "@/modules/platforms/copy";
-import { resolveSitePlatform } from "@/modules/platforms";
+import { resolveSitePlatform, isWebflowPlatform } from "@/modules/platforms";
 
 export const maxDuration = 120;
 
@@ -34,6 +34,7 @@ export default async function KnowledgePage() {
   });
   const copy = wizardCopyForPlatform(session.platform);
   const platform = resolveSitePlatform(session.platform);
+  const webflow = isWebflowPlatform(platform);
   const [storedFacts, conflicts, documents, scanSource, customNotes] = await Promise.all([
     prisma.knowledgeFact.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId },
@@ -92,9 +93,13 @@ export default async function KnowledgePage() {
         ))}
       </div>
       <div className="panel p-6">
-        <h2 className="font-display text-xl text-white">Website scanner</h2>
+        <h2 className="font-display text-xl text-white">
+          {webflow ? "Webflow Data API sync" : "Website scanner"}
+        </h2>
         <p className="mt-2 text-sm text-navy-300">
-          Re-run this after you change pages, policies, or products. Last sync:{" "}
+          {webflow
+            ? "Re-run this after you change pages, CMS, or products in Webflow. Knowledge comes from official Webflow APIs — not a domain crawl. Last sync: "
+            : "Re-run this after you change pages, policies, or products. Last sync: "}
           {data.knowledge.lastSyncedAt ? new Date(data.knowledge.lastSyncedAt).toLocaleString() : "not yet"}
         </p>
         {data.profile?.summary ? (
@@ -110,6 +115,7 @@ export default async function KnowledgePage() {
         </div>
       </div>
       <AddKnowledgeForm
+        platform={session.platform}
         lastSynced={data.knowledge.lastSyncedAt?.toISOString() ?? null}
         notes={customNotes.map((row) => {
           const meta = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)

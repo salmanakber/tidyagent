@@ -128,6 +128,79 @@ export async function injectWebflowWidget(input: {
   return { ok: true, scriptId, version: appliedVersion };
 }
 
+/**
+ * Removes only tidyAgent’s applied site Custom Code. Leaves all other scripts untouched.
+ * Call before logout / uninstall while the OAuth token is still valid.
+ */
+export async function removeWebflowWidget(input: {
+  accessToken: string;
+  webflowSiteId: string;
+  scriptId?: string | null;
+}): Promise<WebflowWidgetInjectResult> {
+  const listed = await listScripts(input.accessToken, input.webflowSiteId);
+  const tidyIds = new Set(
+    listed
+      .filter(
+        (row) =>
+          row.displayName?.toLowerCase() === SCRIPT_NAME.toLowerCase() ||
+          row.id?.toLowerCase() === SCRIPT_NAME.toLowerCase() ||
+          (input.scriptId && row.id === input.scriptId),
+      )
+      .map((row) => row.id)
+      .filter(Boolean) as string[],
+  );
+  if (input.scriptId) tidyIds.add(input.scriptId);
+
+  const existingScripts = await currentAppliedScripts(input.accessToken, input.webflowSiteId);
+  const remaining = existingScripts.filter((row) => !tidyIds.has(row.id));
+  await webflowSend(input.accessToken, `/v2/sites/${input.webflowSiteId}/custom_code`, "PUT", {
+    scripts: remaining,
+  });
+
+  return { ok: true, scriptId: input.scriptId ?? undefined };
+}
+
+export async function removeWebflowWidgetForSite(siteId: string): Promise<WebflowWidgetInjectResult> {
+  const site = await prisma.wixSite.findUnique({
+    where: { id: siteId },
+    include: { credential: true },
+  });
+  if (!site || !isWebflowPlatform(site.platform) || !site.webflowSiteId) {
+    return { ok: false, error: "not_webflow" };
+  }
+
+  const metadata = asRecord(site.credential?.metadata);
+  const accessToken = decryptSecret(String(metadata.accessToken ?? ""));
+  if (!accessToken) {
+    return { ok: false, error: "missing_token" };
+  }
+
+  try {
+    const result = await removeWebflowWidget({
+      accessToken,
+      webflowSiteId: site.webflowSiteId,
+      scriptId: typeof metadata.widgetScriptId === "string" ? metadata.widgetScriptId : null,
+    });
+    await prisma.wixCredential.updateMany({
+      where: { siteId },
+      data: {
+        metadata: {
+          ...metadata,
+          widgetInjectedAt: null,
+          widgetInjectError: null,
+          widgetRemovedAt: new Date().toISOString(),
+          widgetScriptId: null,
+          widgetScriptVersion: null,
+        },
+      },
+    });
+    return result;
+  } catch (error) {
+    console.error("Webflow widget remove failed", error);
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
 export async function ensureWebflowWidgetForSite(
   siteId: string,
   accessTokenOverride?: string,

@@ -1,7 +1,7 @@
 import type { KnowledgeContentType } from "@prisma/client";
 import { detectWixCapabilities, type DetectedCapabilities } from "@/modules/wix/capabilities";
 import { capabilitiesForSite } from "@/modules/platforms/capabilities";
-import { isWixPlatform } from "@/modules/platforms/types";
+import { isWixPlatform, isWebflowPlatform } from "@/modules/platforms/types";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 
 export type SiteFacts = DetectedCapabilities & {
@@ -58,7 +58,11 @@ export function knowledgeCardsForSite(input: {
   platform?: string | null;
 }) {
   const cards: { label: string; value: number; hint: string }[] = [
-    { label: "Website", value: input.pages, hint: "pages actually crawled" },
+    {
+      label: isWebflowPlatform(input.platform) ? "Pages (APIs)" : "Website",
+      value: input.pages,
+      hint: isWebflowPlatform(input.platform) ? "pages loaded via Webflow Data APIs" : "pages actually crawled",
+    },
   ];
   if (input.hasStores) {
     cards.push({

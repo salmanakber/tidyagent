@@ -55,7 +55,7 @@ export default async function SettingsPage() {
               : isShopifyPlatform(session.platform)
                 ? "Clears this browser session. Reopen tidyAgent from Shopify Admin to authenticate again."
                 : isWebflowPlatform(session.platform)
-                  ? "Clears this browser session. Reopen tidyAgent from Webflow to authenticate again."
+                  ? "Clears this browser session and removes tidyAgent’s Webflow Custom Code widget (other scripts are left alone). Reopen from Webflow to connect again, then publish if the live bubble should disappear."
                   : `Clears this browser session for this ${name} site.`}
           </p>
         </div>

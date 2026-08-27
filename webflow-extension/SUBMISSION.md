@@ -61,8 +61,11 @@ Use these (or shorten as needed):
 - App home: `https://agent.tidyflowapp.com/webflow`
 - OAuth callback: `https://agent.tidyflowapp.com/api/webflow/oauth/callback`
 - **Documentation URL (use this in the Marketplace form):** `https://agent.tidyflowapp.com/docs/webflow`
+- **Architecture + scope mapping (attach / paste):** see `webflow-extension/SCOPE_MAPPING.md`
 - Install & permissions: `https://agent.tidyflowapp.com/install?platform=webflow`
 - Terms: `https://agent.tidyflowapp.com/terms?platform=webflow`
 - Privacy: `https://agent.tidyflowapp.com/privacy?platform=webflow`
+
+**Form:** Architecture = **Hybrid App**. Designer Extension = Launch only (hosted dashboard). Knowledge = Webflow Data APIs only (no domain crawl).
 
 See also: [Publishing your app](https://developers.webflow.com/apps/docs/publishing-your-app).

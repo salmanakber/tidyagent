@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getEnv, isDevMode } from "@/lib/env";
-import { setSessionCookie, clearSessionCookie } from "@/lib/security/session";
+import { isDevMode } from "@/lib/env";
+import { setSessionCookie, clearSessionCookie, getSession } from "@/lib/security/session";
 import { prisma } from "@/lib/prisma";
 import { completeWixLogin } from "@/modules/auth/wix-open";
+import { isWebflowPlatform } from "@/modules/platforms/types";
+import { removeWebflowWidgetForSite } from "@/modules/webflow/embed";
 
 export async function openFromWix(instance: string) {
   const { session, destination } = await completeWixLogin(instance);
@@ -44,7 +46,14 @@ export async function enterDevWorkspace() {
   redirect("/dashboard");
 }
 
+/** Clears session. For Webflow, removes tidyAgent Custom Code first while the token is valid. */
 export async function logout() {
+  const session = await getSession();
+  if (session && isWebflowPlatform(session.platform)) {
+    await removeWebflowWidgetForSite(session.siteId).catch((error) => {
+      console.error("Webflow widget cleanup on disconnect failed", error);
+    });
+  }
   await clearSessionCookie();
   redirect("/login?disconnected=1");
 }

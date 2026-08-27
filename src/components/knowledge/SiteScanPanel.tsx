@@ -99,7 +99,7 @@ export function SiteScanPanel({
         </div>
       ) : null}
 
-      {result ? <ScanSummary result={result} understanding={understanding} /> : null}
+      {result ? <ScanSummary result={result} understanding={understanding} webflow={copy.hideDomainCrawlToggle} /> : null}
 
       {error ? (
         <p className="flex items-center gap-2 text-sm text-rose-300">
@@ -117,9 +117,11 @@ export function SiteScanPanel({
 function ScanSummary({
   result,
   understanding,
+  webflow,
 }: {
   result: ScanResult;
   understanding?: SiteUnderstanding | null;
+  webflow?: boolean;
 }) {
   const leftover = (result.crawl ?? []).filter((item) => item.origin === "website" && item.status !== "crawled").length;
   return (
@@ -136,7 +138,9 @@ function ScanSummary({
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {result.counts.pages > 0 ? <Stat label="Pages crawled" value={result.counts.pages} /> : null}
+        {result.counts.pages > 0 ? (
+          <Stat label={webflow ? "Pages from APIs" : "Pages crawled"} value={result.counts.pages} />
+        ) : null}
         {result.counts.products > 0 ? <Stat label="Store products" value={result.counts.products} /> : null}
         {leftover > 0 ? <Stat label="Found, not yet read" value={leftover} /> : null}
         {result.counts.faqs > 0 ? <Stat label="FAQs" value={result.counts.faqs} /> : null}

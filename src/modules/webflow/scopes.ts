@@ -4,7 +4,6 @@ export const WEBFLOW_OAUTH_SCOPES = [
   "sites:read",
   "sites:write",
   "pages:read",
-  "pages:write",
   "custom_code:read",
   "custom_code:write",
   "cms:read",
