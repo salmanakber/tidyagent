@@ -30,6 +30,65 @@ describe("catalog cards", () => {
     expect(firstImageUrl("//images.example.com/a.png")).toBe("https://images.example.com/a.png");
   });
 
+  it("reads a Shopify-style featured image and images list", () => {
+    expect(
+      productImageFromRecord({
+        featuredImage: { url: "https://cdn.shopify.com/s/files/1/product.jpg" },
+        images: [{ src: "https://cdn.shopify.com/s/files/1/other.jpg" }],
+      }),
+    ).toBe("https://cdn.shopify.com/s/files/1/product.jpg");
+    expect(
+      productImageFromRecord({
+        images: { edges: [{ node: { url: "https://cdn.shopify.com/s/files/1/edge.jpg" } }] },
+      }),
+    ).toBe("https://cdn.shopify.com/s/files/1/edge.jpg");
+  });
+
+  it("builds rich cards from Shopify-style metadata", () => {
+    const card = cardFromMetadata({
+      title: "Trail Jacket — USD 89",
+      sourceUrl: "https://shop.example.com/products/trail-jacket",
+      cleanedContent: "Trail Jacket\nWaterproof shell for wet weather.",
+      metadata: {
+        name: "Trail Jacket",
+        price: "USD 89",
+        imageUrl: "https://cdn.shopify.com/s/files/1/jacket.jpg",
+        url: "https://shop.example.com/products/trail-jacket",
+        data: {
+          vendor: "Northline",
+          productType: "Outerwear",
+          tags: ["waterproof", "hiking"],
+          descriptionHtml: "<p>Waterproof shell for wet weather.</p>",
+          variants: {
+            edges: [
+              { node: { title: "Small", price: "89.00", availableForSale: true } },
+              { node: { title: "Large", price: "89.00", availableForSale: true } },
+            ],
+          },
+        },
+      },
+    });
+    expect(card?.name).toBe("Trail Jacket");
+    expect(card?.price).toBe("USD 89");
+    expect(card?.description).toMatch(/Waterproof/i);
+    expect(card?.variants?.map((row) => row.title)).toEqual(expect.arrayContaining(["Small", "Large"]));
+    expect(card?.vendor).toBe("Northline");
+  });
+
+  it("matches product questions using description and tags", () => {
+    const cards = matchCatalogCards("do you have a waterproof hiking jacket?", [
+      {
+        name: "Trail Jacket",
+        price: "USD 89",
+        description: "Waterproof shell for wet weather",
+        tags: ["waterproof", "hiking"],
+        imageUrl: "https://cdn.example.com/jacket.jpg",
+      },
+      { name: "Wool Socks", price: "USD 12", imageUrl: "https://cdn.example.com/socks.jpg" },
+    ]);
+    expect(cards[0]?.name).toBe("Trail Jacket");
+  });
+
   it("builds a card from knowledge metadata", () => {
     const card = cardFromMetadata({
       title: "Harbor Pontoon — $1500",

@@ -121,7 +121,7 @@ export async function harvestWixApis(input: {
       warnings.push(storesWarning(error));
     }
   } else {
-    skipped.push("Wix Stores catalog is included on Business and Pro.");
+    skipped.push("Ecommerce catalog reading is included on paid plans.");
     stages.push({
       key: "wix-stores",
       label: "Wix Stores catalog",

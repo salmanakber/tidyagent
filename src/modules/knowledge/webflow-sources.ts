@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/security/settings";
+import { firstImageUrl } from "@/modules/knowledge/media";
 import { webflowGet } from "@/modules/webflow/client";
 import { sitePublicUrl, type WebflowSiteRecord } from "@/modules/webflow/sites";
 import { isWebflowPlatform } from "@/modules/platforms/types";
@@ -258,12 +259,22 @@ export async function harvestWebflowApis(input: {
             ? `${priceObj.unit || priceObj.currency || currency || ""} ${amount}`.trim()
             : undefined;
         const url = siteUrl && slug ? `${siteUrl.replace(/\/$/, "")}/product/${slug}` : undefined;
+        const imageUrl =
+          firstImageUrl(
+            fieldData.image,
+            fieldData.mainImage,
+            fieldData.thumbnail,
+            product.image,
+            asRecord(skus[0])?.image,
+            asRecord(asRecord(skus[0])?.fieldData)?.image,
+          ) || undefined;
         products.push({
           id: String(product.id || row.id || ""),
           name,
           description,
           price,
           url,
+          imageUrl,
           data: row as Prisma.InputJsonValue,
         });
       }
@@ -282,7 +293,7 @@ export async function harvestWebflowApis(input: {
       });
     }
   } else {
-    skipped.push("Store catalog reading is included on Business and Pro.");
+    skipped.push("Ecommerce catalog reading is included on paid plans.");
   }
 
   return { pages, products, stages, skipped, warnings, siteUrl, displayName, currency, locale };

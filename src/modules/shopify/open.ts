@@ -38,3 +38,10 @@ export function shopifyCallbackQuery(params: Record<string, string | undefined>)
   }
   return `/api/shopify/oauth/callback?${query.toString()}`;
 }
+
+/** Re-enter the Shopify admin iframe after OAuth (Partner Dashboard embedded apps). */
+export function shopifyEmbeddedAdminAppUrl(shop: string, apiKey: string) {
+  const handle = shop.replace(/\.myshopify\.com$/i, "").toLowerCase();
+  if (!handle || !apiKey) return null;
+  return `https://admin.shopify.com/store/${handle}/apps/${encodeURIComponent(apiKey)}`;
+}

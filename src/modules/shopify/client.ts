@@ -1,4 +1,5 @@
-const SHOPIFY_API_VERSION = "2024-10";
+/** Prefer a current Admin API version; public apps should use GraphQL over legacy REST. */
+const SHOPIFY_API_VERSION = "2025-01";
 
 export class ShopifyApiError extends Error {
   constructor(
@@ -105,7 +106,9 @@ export async function shopifyGraphql<T>(
     errors?: Array<{ message?: string }>;
   };
   if (!response.ok || body.errors?.length) {
-    const message = body.errors?.map((e) => e.message).filter(Boolean).join("; ") || `Shopify GraphQL failed (${response.status})`;
+    const message =
+      body.errors?.map((e) => e.message).filter(Boolean).join("; ") ||
+      `Shopify GraphQL failed (${response.status})`;
     throw new ShopifyApiError(message, response.status);
   }
   return body.data as T;
@@ -123,6 +126,47 @@ export type ShopifyShopRecord = {
 };
 
 export async function fetchShopifyShop(shop: string, accessToken: string) {
-  const payload = await shopifyGet<{ shop?: ShopifyShopRecord }>(shop, accessToken, "/shop.json");
-  return payload.shop ?? null;
+  try {
+    const data = await shopifyGraphql<{
+      shop?: {
+        name?: string;
+        email?: string | null;
+        contactEmail?: string | null;
+        currencyCode?: string | null;
+        primaryLocale?: string | null;
+        myshopifyDomain?: string | null;
+        primaryDomain?: { host?: string | null; url?: string | null } | null;
+        shopOwnerName?: string | null;
+      };
+    }>(
+      shop,
+      accessToken,
+      `#graphql
+      query ShopifyShopBootstrap {
+        shop {
+          name
+          contactEmail
+          currencyCode
+          primaryLocale
+          myshopifyDomain
+          primaryDomain { host url }
+          shopOwnerName
+        }
+      }`,
+    );
+    const row = data.shop;
+    if (!row) return null;
+    return {
+      name: row.name,
+      email: row.contactEmail || undefined,
+      currency: row.currencyCode || undefined,
+      primary_locale: row.primaryLocale || undefined,
+      myshopify_domain: row.myshopifyDomain || undefined,
+      domain: row.primaryDomain?.host || row.myshopifyDomain || undefined,
+      shop_owner: row.shopOwnerName || undefined,
+    } satisfies ShopifyShopRecord;
+  } catch {
+    const payload = await shopifyGet<{ shop?: ShopifyShopRecord }>(shop, accessToken, "/shop.json");
+    return payload.shop ?? null;
+  }
 }

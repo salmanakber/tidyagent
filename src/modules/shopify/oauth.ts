@@ -9,6 +9,7 @@ import { verifyShopifyQueryHmac } from "@/modules/shopify/hmac";
 import { provisionTenantFromShopify } from "@/modules/shopify/provision";
 import { SHOPIFY_SCOPE_STRING } from "@/modules/shopify/scopes";
 import { normalizeShopifyShop } from "@/modules/shopify/shop";
+import { shopifyEmbeddedAdminAppUrl } from "@/modules/shopify/open";
 
 export class ShopifyInstallError extends Error {
   constructor(
@@ -130,8 +131,14 @@ async function completeShopifyLoginOnce(input: {
 
   await ensureShopifyWidgetForSite(session.siteId, tokens.accessToken);
 
+  let destination = await workspacePathForOrganization(session.organizationId);
+  if (state.embed) {
+    const embedded = shopifyEmbeddedAdminAppUrl(shop, config.apiKey);
+    if (embedded) destination = embedded;
+  }
+
   return {
     session,
-    destination: await workspacePathForOrganization(session.organizationId),
+    destination,
   };
 }

@@ -18,7 +18,9 @@ export async function GET(request: Request) {
   try {
     const { session, destination } = await completeShopifyLogin({ search: url.searchParams });
     const token = await createSessionToken(session);
-    const response = NextResponse.redirect(new URL(destination, origin));
+    // Absolute Shopify Admin URLs must not be prefixed with our app origin.
+    const location = /^https?:\/\//i.test(destination) ? destination : new URL(destination, origin).toString();
+    const response = NextResponse.redirect(location);
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (error) {

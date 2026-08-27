@@ -132,8 +132,8 @@ export async function scanOrganizationSite(input: {
   const pages: ExtractedPage[] = [];
   const crawl: CrawlItem[] = [];
 
-  // Webflow Marketplace: knowledge must come from official Data APIs only — no public-site crawl/scrape.
-  const allowDomainCrawl = scope.includeDomainCrawl && !webflowSite;
+  // Webflow Marketplace + Shopify API Terms: knowledge from official Admin/Data APIs only — no public-site crawl/scrape.
+  const allowDomainCrawl = scope.includeDomainCrawl && !webflowSite && !shopifySite;
   if (allowDomainCrawl && origin && host) {
     const crawled = await crawlDomain(origin, host, scope);
     pages.push(...crawled.pages);
@@ -142,6 +142,8 @@ export async function scanOrganizationSite(input: {
     warnings.push(...crawled.warnings);
   } else if (webflowSite) {
     skipped.push("Webflow sites use official Webflow Data APIs only (no public-site crawl).");
+  } else if (shopifySite) {
+    skipped.push("Shopify stores use official Admin GraphQL APIs only (no storefront crawl/scrape).");
   } else if (!scope.includeDomainCrawl) {
     skipped.push("Domain crawl is included after a paid plan is purchased.");
   }
@@ -407,6 +409,7 @@ async function persistScan(input: {
       price: product.price || null,
       imageUrl: product.imageUrl || null,
       url: product.url || null,
+      data: product.data ?? null,
     },
   }));
   const docs = [...productDocs, ...pageDocs]

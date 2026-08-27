@@ -15,7 +15,7 @@ import { loadHumanContact } from "@/modules/handoff/human";
 import { HANDOFF_WAIT_SECONDS, handoffState } from "@/modules/handoff/live";
 import { emailHandoffTranscript } from "@/modules/mail/resend";
 import { publishRealtime, scheduleHandoffExpiry } from "@/modules/realtime/publish";
-import { loadCatalogCards, type CatalogCard } from "@/modules/knowledge/catalog-cards";
+import { loadCatalogCards, formatCatalogCardsForPrompt, isCatalogQuestion, type CatalogCard } from "@/modules/knowledge/catalog-cards";
 import { liveLookupForQuestion } from "@/modules/knowledge/live-lookup";
 import {
   expandTerms,
@@ -331,7 +331,7 @@ export async function replyToVisitor(input: {
     if (!assignedScopes.includes("SERVICE")) assignedScopes.push("SERVICE");
     if (!assignedScopes.includes("CUSTOM")) assignedScopes.push("CUSTOM");
     if (!assignedScopes.includes("FAQ")) assignedScopes.push("FAQ");
-    if (scope.includeStores && on("shopping") && !assignedScopes.includes("PRODUCT")) {
+    if ((scope.includeStores || isCatalogQuestion(searchQuery) || isCatalogQuestion(message)) && !assignedScopes.includes("PRODUCT")) {
       assignedScopes.push("PRODUCT");
     }
   }
@@ -350,7 +350,7 @@ export async function replyToVisitor(input: {
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
         question: searchQuery,
-        includeStores: scope.includeStores && on("shopping"),
+        includeStores: scope.includeStores || isCatalogQuestion(searchQuery) || isCatalogQuestion(message),
         contentTypes: assignedScopes,
       });
 
@@ -364,7 +364,7 @@ export async function replyToVisitor(input: {
         organizationId: input.agent.organizationId,
         siteId: input.agent.siteId,
         question: searchQuery,
-        includeStores: scope.includeStores,
+        includeStores: true,
       });
 
   const thin =
@@ -781,9 +781,7 @@ async function generateReply(input: {
         .map((note) => `- ${note.priority ? "[PRIORITY] " : ""}${note.title}: ${note.content}`)
         .join("\n")
     : "(none)";
-  const productBlock = input.products.length
-    ? input.products.map((card) => `- ${card.name}${card.price ? ` — ${card.price}` : ""}${card.url ? ` (${card.url})` : ""}`).join("\n")
-    : "(none)";
+  const productBlock = input.products.length ? formatCatalogCardsForPrompt(input.products) : "(none)";
   const cleanedFacts = cleanedPriceFacts(input.structured.facts.filter((fact) => !fact.conflicted));
   const factBlock = cleanedFacts.length
     ? cleanedFacts.map((fact) => `- ${fact.entity}: ${fact.value}`).join("\n")
@@ -837,6 +835,7 @@ Never invent URLs, CMS paths, or booking pages. Only mention a page that appears
 If you mention a page, write markdown like [book here](url) or [this link](url). Never show https://, www, or a raw URL in the visible text.
 Never say you are connecting the visitor to a person unless the system already did.
 Never add "Anything else I can help with?"
+When catalog items are listed above, highlight the best matches in plain language (name, price, key options). The chat UI already shows rich product cards — do not invent extra products beyond that list.
 When prices are in evidence: one short sentence, then bullets with **name** and **price**.
 Do not dump marketing copy.
 ${sensitiveRule}

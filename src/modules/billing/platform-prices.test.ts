@@ -20,5 +20,8 @@ describe("platform prices", () => {
     expect(copyForPlatform("SHOPIFY", "Published on Webflow")).not.toMatch(/Webflow/i);
     expect(copyForPlatform("WEBFLOW", "Full-domain crawl plus Wix APIs")).toMatch(/Webflow Data APIs/i);
     expect(copyForPlatform("WEBFLOW", "Full-domain crawl plus Wix APIs")).not.toMatch(/crawl/i);
+    expect(copyForPlatform("SHOPIFY", "Full-domain crawl plus Wix APIs")).toMatch(/Shopify Admin APIs/i);
+    expect(copyForPlatform("SHOPIFY", "Full-domain crawl plus Wix APIs")).not.toMatch(/crawl/i);
+    expect(copyForPlatform("SHOPIFY", "Wix Stores catalog")).toMatch(/ecommerce catalog/i);
   });
 });

@@ -12,17 +12,18 @@ import { cmsCollectionAllowed, pathPriority, scanScopeForPlan } from "@/modules/
 import { heuristicUnderstanding } from "@/modules/knowledge/understand";
 
 describe("scan scope", () => {
-  it("keeps store catalog off Starter and on Business/Pro", () => {
-    expect(scanScopeForPlan("STARTER").includeStores).toBe(false);
+  it("keeps ecommerce catalog on Starter, Business, and Pro", () => {
+    expect(scanScopeForPlan("STARTER").includeStores).toBe(true);
+    expect(scanScopeForPlan("STARTER").maxProducts).toBeGreaterThan(0);
     expect(scanScopeForPlan("STARTER").includeCms).toBe(true);
     expect(scanScopeForPlan("STARTER").maxPages).toBeGreaterThan(scanScopeForPlan("FREE").maxPages);
     expect(scanScopeForPlan("GROWTH").includeStores).toBe(true);
     expect(scanScopeForPlan("PRO").maxProducts).toBeGreaterThan(scanScopeForPlan("GROWTH").maxProducts);
   });
 
-  it("does not let Starter ingest Stores CMS collections", () => {
+  it("lets Starter ingest Stores CMS collections for ecommerce", () => {
     const starter = scanScopeForPlan("STARTER");
-    expect(cmsCollectionAllowed("Stores/Products", starter)).toBe(false);
+    expect(cmsCollectionAllowed("Stores/Products", starter)).toBe(true);
     expect(cmsCollectionAllowed("TeamBios", starter)).toBe(true);
     expect(cmsCollectionAllowed("Members/PrivateMembersData", starter)).toBe(false);
     expect(cmsCollectionAllowed("Stores/Products", scanScopeForPlan("GROWTH"))).toBe(true);

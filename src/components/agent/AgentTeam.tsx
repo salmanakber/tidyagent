@@ -59,7 +59,7 @@ export function AgentTeam({
 
   const detected = [
     { label: "Pages & site", on: true },
-    { label: wix ? "Wix Stores" : "Store catalog", on: hasStores },
+    { label: wix ? "Ecommerce (Wix Stores)" : "Ecommerce", on: hasStores },
     { label: wix ? "Wix Bookings" : "Bookings", on: hasBookings },
     { label: "Blog", on: hasBlog },
     { label: "Events", on: hasEvents },

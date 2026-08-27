@@ -347,9 +347,10 @@ export function PlatformSettingsForm({
               </span>
             </li>
             <li>
-              Access scopes: products, orders, customers, content, themes, script tags (read + write), locales. The
-              app injects <code className="text-amber-200">widget.js</code> as a ScriptTag. Publish is not needed;
-              the storefront picks it up after inject.
+              Access scopes: products, orders, customers, content, themes, script tags (read + write), locales. Knowledge
+              and ecommerce training use Admin GraphQL (not storefront scraping). The app injects{" "}
+              <code className="text-amber-200">widget.js</code> as a ScriptTag. Publish is not needed; the storefront
+              picks it up after inject.
             </li>
             <li>
               Billing uses Shopify&apos;s native app subscriptions (not card checkout). Set Shopify package prices in

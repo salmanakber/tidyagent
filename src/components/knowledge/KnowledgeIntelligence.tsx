@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { resolveKnowledgeConflict } from "@/app/actions/workspace";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
-import { isWebflowPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 type IndexedPage = {
   id: string;
@@ -21,14 +21,15 @@ export function KnowledgeIntelligence({
   platform,
 }: {
   facts: { id: string; kind: string; entity: string; value: string; sourceUrl: string | null; confidence: string; extractionMethod: string }[];
-  conflicts: { id: string; entity: string; kind: string; values: { value?: string; sourceUrl?: string }[] }[];
+  conflicts: { id: string; kind: string; entity: string; values: { value?: string; sourceUrl?: string }[] }[];
   pages: IndexedPage[];
   platform?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "pages" | "products" | "pending">("all");
   const copy = wizardCopyForPlatform(platform);
-  const webflow = isWebflowPlatform(platform);
+  const apiOnly = Boolean(copy.hideDomainCrawlToggle);
+  const shopify = isShopifyPlatform(platform);
 
   const counts = useMemo(() => {
     return {
@@ -99,8 +100,10 @@ export function KnowledgeIntelligence({
             ))
           ) : (
             <p className="text-sm text-navy-400">
-              {webflow
-                ? "Run the Webflow Data API sync to extract facts from your site."
+              {apiOnly
+                ? shopify
+                  ? "Run the Shopify Admin API sync to extract facts from your store."
+                  : "Run the Webflow Data API sync to extract facts from your site."
                 : "Run the scanner to extract facts from the live website."}
             </p>
           )}
@@ -109,26 +112,33 @@ export function KnowledgeIntelligence({
 
       <section className="panel p-6">
         <h2 className="font-display text-xl text-white">
-          {webflow ? "API-loaded pages and catalog" : "Crawled pages and catalog"}
+          {apiOnly ? "API-loaded pages and ecommerce" : "Crawled pages and ecommerce"}
         </h2>
         <p className="mt-2 text-sm text-navy-300">
-          {counts.crawled} {webflow ? "page" : "website page"}
-          {counts.crawled === 1 ? "" : "s"} {webflow ? "from Webflow APIs" : "read"}
-          {counts.products ? ` · ${counts.products} store product${counts.products === 1 ? "" : "s"}` : ""}
+          {counts.crawled} {apiOnly ? "page" : "website page"}
+          {counts.crawled === 1 ? "" : "s"} {apiOnly ? (shopify ? "from Shopify Admin APIs" : "from Webflow APIs") : "read"}
+          {counts.products
+            ? ` · ${counts.products} ecommerce product${counts.products === 1 ? "" : "s"}`
+            : ""}
           {counts.pending ? ` · ${counts.pending} found but not yet read` : ""}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <FilterChip label="All" active={filter === "all"} onClick={() => setFilter("all")} count={pages.length} />
           <FilterChip
-            label={webflow ? "Pages loaded" : "Pages crawled"}
+            label={apiOnly ? "Pages loaded" : "Pages crawled"}
             active={filter === "pages"}
             onClick={() => setFilter("pages")}
             count={counts.crawled}
           />
-          <FilterChip label="Store products" active={filter === "products"} onClick={() => setFilter("products")} count={counts.products} />
+          <FilterChip
+            label="Ecommerce"
+            active={filter === "products"}
+            onClick={() => setFilter("products")}
+            count={counts.products}
+          />
           {counts.pending ? (
             <FilterChip
-              label={webflow ? "Not loaded yet" : "Not crawled yet"}
+              label={apiOnly ? "Not loaded yet" : "Not crawled yet"}
               active={filter === "pending"}
               onClick={() => setFilter("pending")}
               count={counts.pending}
@@ -146,15 +156,17 @@ export function KnowledgeIntelligence({
                 <div className="shrink-0 text-right">
                   <p className="text-[11px] uppercase tracking-[0.12em] text-navy-400">{originLabel(page.origin, page.contentType, platform)}</p>
                   <p className={page.status === "crawled" ? "text-[11px] text-emerald-300" : page.status === "failed" ? "text-[11px] text-rose-300" : "text-[11px] text-amber-200"}>
-                    {statusLabel(page.status, webflow)}
+                    {statusLabel(page.status, apiOnly)}
                   </p>
                 </div>
               </div>
             ))
           ) : (
             <p className="text-sm text-navy-400">
-              {webflow
-                ? "Run the Webflow Data API sync to list pages and store products."
+              {apiOnly
+                ? shopify
+                  ? "Run the Shopify Admin API sync to list pages and ecommerce products."
+                  : "Run the Webflow Data API sync to list pages and store products."
                 : "Run the scanner to list every page and store product that was read."}
             </p>
           )}
@@ -186,10 +198,10 @@ function FilterChip({
   );
 }
 
-function statusLabel(status: IndexedPage["status"], webflow?: boolean) {
-  if (status === "crawled") return webflow ? "Loaded" : "Crawled";
+function statusLabel(status: IndexedPage["status"], apiOnly?: boolean) {
+  if (status === "crawled") return apiOnly ? "Loaded" : "Crawled";
   if (status === "failed") return "Could not read";
-  return webflow ? "Found, not loaded yet" : "Found, not crawled yet";
+  return apiOnly ? "Found, not loaded yet" : "Found, not crawled yet";
 }
 
 function originLabel(origin: string, contentType: string, platform?: string | null) {
@@ -201,10 +213,10 @@ function originLabel(origin: string, contentType: string, platform?: string | nu
     return contentType;
   }
   if (resolved === "SHOPIFY") {
-    if (origin === "shopify-store" || contentType === "PRODUCT") return "Product catalog";
+    if (origin === "shopify-store" || contentType === "PRODUCT") return "Ecommerce";
     if (origin === "shopify-cms") return "Store content";
     if (origin === "shopify-site") return "Store profile";
-    if (origin === "website") return "Storefront";
+    if (origin === "website") return "Shopify Admin APIs";
     return contentType;
   }
   if (origin === "webflow-store" || contentType === "PRODUCT") return "Ecommerce";

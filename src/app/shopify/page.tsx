@@ -68,13 +68,15 @@ export default async function ShopifyAppHome({
   const framed =
     (await headers()).get("sec-fetch-dest") === "iframe" ||
     params.embedded === "1" ||
-    params.embed === "1";
+    params.embed === "1" ||
+    Boolean(params.host);
   const install = `/shopify/install${shop ? `?shop=${encodeURIComponent(shop)}${framed ? "&embed=1" : ""}` : ""}`;
 
   if (!shop) {
     redirect("/shopify/missing?error=no_shop");
   }
 
+  // Always prefer the embedded admin path when Shopify opened us with a host.
   if (framed) {
     return <ShopifyConnect installHref={install} />;
   }

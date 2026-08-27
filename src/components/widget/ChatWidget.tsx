@@ -28,7 +28,20 @@ export type WidgetProps = {
 };
 
 type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null; human?: boolean };
-type CatalogCard = { name: string; price?: string | null; imageUrl?: string | null; url?: string | null };
+type CatalogCard = {
+  name: string;
+  price?: string | null;
+  compareAtPrice?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  images?: string[];
+  url?: string | null;
+  vendor?: string | null;
+  productType?: string | null;
+  tags?: string[];
+  variants?: { title: string; price?: string | null; available?: boolean | null; sku?: string | null }[];
+  available?: boolean | null;
+};
 type BrowserSpeech = {
   lang: string;
   continuous: boolean;
@@ -831,23 +844,51 @@ function Face({ name, url, small }: { name: string; url?: string | null; small?:
 
 function ProductCards({ cards }: { cards: CatalogCard[] }) {
   return (
-    <div className="grid max-w-[min(92%,22rem)] grid-cols-1 gap-2 pt-1">
+    <div className="grid max-w-[min(96%,24rem)] grid-cols-1 gap-2.5 pt-1">
       {cards.slice(0, 4).map((card) => {
+        const variantHint = card.variants?.length
+          ? card.variants
+              .slice(0, 3)
+              .map((variant) => variant.title)
+              .filter((title) => title && title !== "Standard" && title !== "Default Title")
+              .join(" · ")
+          : "";
         const inner = (
           <>
             {card.imageUrl ? (
-              <img src={card.imageUrl} alt="" className="h-28 w-full object-cover" />
+              <img src={card.imageUrl} alt="" className="h-36 w-full object-cover" />
             ) : (
               <div className="flex items-center gap-3 bg-gradient-to-br from-slate-50 to-slate-100 px-3 py-3">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-semibold text-slate-700 shadow-sm">
                   {(card.name.trim()[0] || "•").toUpperCase()}
                 </span>
-                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">From the site</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">From the catalog</span>
               </div>
             )}
-            <div className="space-y-0.5 p-2.5">
-              <p className="text-[13px] font-semibold leading-5 text-slate-900">{card.name}</p>
-              {card.price ? <p className="text-sm font-medium text-slate-700">{card.price}</p> : null}
+            <div className="space-y-1.5 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-semibold leading-5 text-slate-900">{card.name}</p>
+                {card.available === false ? (
+                  <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600">
+                    Sold out
+                  </span>
+                ) : null}
+              </div>
+              {card.price ? (
+                <p className="text-sm font-semibold text-slate-800">
+                  {card.price}
+                  {card.compareAtPrice ? (
+                    <span className="ml-2 text-xs font-medium text-slate-400 line-through">{card.compareAtPrice}</span>
+                  ) : null}
+                </p>
+              ) : null}
+              {card.description ? (
+                <p className="line-clamp-3 text-[12px] leading-4 text-slate-600">{card.description}</p>
+              ) : null}
+              {variantHint ? <p className="text-[11px] leading-4 text-slate-500">Options: {variantHint}</p> : null}
+              {card.url ? (
+                <p className="pt-0.5 text-[11px] font-semibold text-slate-700">View product →</p>
+              ) : null}
             </div>
           </>
         );
@@ -857,7 +898,7 @@ function ProductCards({ cards }: { cards: CatalogCard[] }) {
             href={card.url}
             target="_blank"
             rel="noreferrer"
-            className="overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-black/5"
+            className="overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-black/5 transition hover:ring-black/15"
           >
             {inner}
           </a>

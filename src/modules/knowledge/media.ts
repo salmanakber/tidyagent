@@ -13,22 +13,28 @@ export function productImageFromRecord(data: unknown): string | null {
   const row = data as Record<string, unknown>;
   const media = asRecord(row.media);
   const main = asRecord(media?.mainMedia) || asRecord(row.mainMedia);
-  const image = asRecord(main?.image) || asRecord(row.image) || asRecord(row.coverImage);
-  const items = Array.isArray(media?.items)
+  const image = asRecord(main?.image) || asRecord(row.image) || asRecord(row.coverImage) || asRecord(row.featuredImage);
+  const rawImages = Array.isArray(media?.items)
     ? media.items
     : Array.isArray(row.mediaItems)
       ? row.mediaItems
       : Array.isArray(row.images)
         ? row.images
-        : [];
-  const firstItem = asRecord(items[0]);
-  const firstItemImage = asRecord(firstItem?.image) || firstItem;
+        : Array.isArray(asRecord(row.images)?.edges)
+          ? (asRecord(row.images)?.edges as unknown[])
+          : [];
+  const firstItem = asRecord(rawImages[0]);
+  const firstEdgeNode = asRecord(firstItem?.node) || firstItem;
+  const firstItemImage = asRecord(firstEdgeNode?.image) || firstEdgeNode;
 
   return firstImageUrl(
     image?.url,
+    image?.src,
     main?.url,
     firstItemImage?.url,
+    firstItemImage?.src,
     firstItem?.url,
+    firstItem?.src,
     row.thumbnail,
     row.imageUrl,
     row.image,
