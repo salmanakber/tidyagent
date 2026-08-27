@@ -2,27 +2,32 @@
 
 import { useEffect, useState } from "react";
 
+type ShopifyGlobal = {
+  ready?: Promise<void>;
+  idToken: () => Promise<string>;
+  config?: { apiKey?: string; host?: string; shop?: string };
+};
+
 declare global {
   interface Window {
-    shopify?: {
-      idToken: () => Promise<string>;
-    };
+    shopify?: ShopifyGlobal;
   }
 }
 
 /**
  * Embedded Shopify Admin auth via App Bridge session tokens.
- * Never break out to accounts.shopify.com inside/outside the iframe — that causes
- * the "browser cookies" error and the stuck Connecting screen.
+ * App Bridge itself is injected in the root layout <head> for /shopify.
  */
 export function ShopifyEmbeddedAuth({
   apiKey,
   host,
   shop,
+  bootstrapIdToken = "",
 }: {
   apiKey: string;
   host: string;
   shop: string;
+  bootstrapIdToken?: string;
 }) {
   const [status, setStatus] = useState("Opening tidyAgent…");
   const [error, setError] = useState<string | null>(null);
@@ -32,48 +37,23 @@ export function ShopifyEmbeddedAuth({
 
     async function run() {
       try {
-        await ensureAppBridge(apiKey, host);
-        if (cancelled) return;
-        setStatus("Securing your store connection…");
+        ensureShopifyApiKeyMeta(apiKey);
 
-        const idToken = await window.shopify!.idToken();
+        let idToken = bootstrapIdToken.trim();
+        if (!idToken) {
+          const shopify = await waitForShopifyGlobal();
+          if (cancelled) return;
+          setStatus("Securing your store connection…");
+          if (shopify.ready) await shopify.ready;
+          idToken = await shopify.idToken();
+        } else {
+          setStatus("Securing your store connection…");
+        }
         if (cancelled) return;
 
         setStatus("Loading your dashboard…");
-        const response = await fetch("/api/shopify/session", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-            Accept: "application/json",
-          },
-          credentials: "include",
-        });
-
-        if (response.status === 401 && response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1") {
-          const retryToken = await window.shopify!.idToken();
-          const retry = await fetch("/api/shopify/session", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${retryToken}`,
-              Accept: "application/json",
-            },
-            credentials: "include",
-          });
-          if (!retry.ok) {
-            const body = (await retry.json().catch(() => ({}))) as { error?: string };
-            throw new Error(body.error || "Could not connect this store");
-          }
-          const retryBody = (await retry.json()) as { redirect?: string };
-          window.location.assign(retryBody.redirect || "/");
-          return;
-        }
-
-        if (!response.ok) {
-          const body = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error || "Could not connect this store");
-        }
-
-        const body = (await response.json()) as { redirect?: string };
+        const body = await exchangeSession(idToken);
+        if (cancelled) return;
         window.location.assign(body.redirect || "/");
       } catch (err) {
         if (cancelled) return;
@@ -87,7 +67,7 @@ export function ShopifyEmbeddedAuth({
     return () => {
       cancelled = true;
     };
-  }, [apiKey, host, shop]);
+  }, [apiKey, host, shop, bootstrapIdToken]);
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-brand-gradient p-6 text-center">
@@ -100,9 +80,15 @@ export function ShopifyEmbeddedAuth({
             : "Stay on this page — your store dashboard will open automatically inside Shopify."}
         </p>
         {error ? (
-          <button type="button" className="btn-primary mt-6 w-full" onClick={() => window.location.reload()}>
-            Try again
-          </button>
+          <div className="mt-6 space-y-3">
+            <button type="button" className="btn-primary w-full" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+            <p className="text-xs leading-5 text-navy-500">
+              Open tidyAgent from <span className="text-navy-300">Shopify Admin → Apps</span>. Make sure the Shopify
+              API key in tidyAgent Admin Settings matches your Partner Dashboard client ID.
+            </p>
+          </div>
         ) : (
           <p className="mt-6 text-xs text-navy-500">Connecting {shop}…</p>
         )}
@@ -111,52 +97,102 @@ export function ShopifyEmbeddedAuth({
   );
 }
 
-function ensureAppBridge(apiKey: string, host: string) {
+function ensureShopifyApiKeyMeta(apiKey: string) {
+  let meta = document.querySelector('meta[name="shopify-api-key"]') as HTMLMetaElement | null;
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "shopify-api-key";
+    document.head.appendChild(meta);
+  }
+  meta.content = apiKey;
+}
+
+async function waitForShopifyGlobal(timeoutMs = 20_000): Promise<ShopifyGlobal> {
+  const started = Date.now();
+  const inAdminFrame = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true; // cross-origin parent ⇒ almost certainly Admin iframe
+    }
+  })();
+
+  // Head should already include App Bridge; inject only if the SSR tag is missing.
+  if (!document.querySelector('script[src*="shopifycloud/app-bridge.js"]')) {
+    await loadAppBridgeScript();
+  }
+
+  while (Date.now() - started < timeoutMs) {
+    const shopify = window.shopify;
+    if (shopify) {
+      try {
+        if (shopify.ready) await shopify.ready;
+      } catch {
+        /* ready rejected — still try idToken */
+      }
+      if (typeof shopify.idToken === "function") return shopify;
+    }
+    await sleep(40);
+  }
+
+  if (!inAdminFrame) {
+    throw new Error("Shopify App Bridge did not load. Reopen tidyAgent from Apps in Shopify Admin (not a bookmark or new tab).");
+  }
+
+  const metaKey = document.querySelector('meta[name="shopify-api-key"]')?.getAttribute("content") || "";
+  throw new Error(
+    metaKey
+      ? "Shopify App Bridge did not initialize. Confirm the Shopify API key in tidyAgent Admin Settings exactly matches your Partner Dashboard client ID, then reopen from Apps."
+      : "Shopify App Bridge did not load (missing API key meta). Save your Shopify API key in tidyAgent Admin Settings, then reopen from Apps.",
+  );
+}
+
+function loadAppBridgeScript() {
   return new Promise<void>((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("App Bridge only runs in the browser"));
-      return;
-    }
-
-    if (!document.querySelector('meta[name="shopify-api-key"]')) {
-      const meta = document.createElement("meta");
-      meta.name = "shopify-api-key";
-      meta.content = apiKey;
-      document.head.appendChild(meta);
-    } else {
-      const meta = document.querySelector('meta[name="shopify-api-key"]') as HTMLMetaElement;
-      meta.content = apiKey;
-    }
-
-    const existing = document.querySelector("script[data-tidyagent-app-bridge]");
-    if (existing && window.shopify?.idToken) {
-      resolve();
-      return;
-    }
-
     const script = document.createElement("script");
     script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
-    script.async = true;
-    script.dataset.tidyagentAppBridge = "1";
-    script.dataset.apiKey = apiKey;
-    if (host) script.dataset.host = host;
-
-    const started = Date.now();
-    const waitForShopify = () => {
-      if (window.shopify?.idToken) {
-        resolve();
-        return;
-      }
-      if (Date.now() - started > 12_000) {
-        reject(new Error("Shopify App Bridge did not load. Reopen tidyAgent from Apps in Shopify Admin."));
-        return;
-      }
-      window.setTimeout(waitForShopify, 50);
-    };
-
-    script.onload = () => waitForShopify();
-    script.onerror = () => reject(new Error("Could not load Shopify App Bridge"));
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Could not download Shopify App Bridge from cdn.shopify.com"));
     document.head.appendChild(script);
-    waitForShopify();
   });
+}
+
+async function exchangeSession(idToken: string) {
+  const response = await fetch("/api/shopify/session", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      Accept: "application/json",
+    },
+    credentials: "include",
+  });
+
+  if (response.status === 401 && response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1") {
+    const shopify = window.shopify;
+    if (!shopify?.idToken) throw new Error("Could not refresh Shopify session");
+    const retryToken = await shopify.idToken();
+    const retry = await fetch("/api/shopify/session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${retryToken}`,
+        Accept: "application/json",
+      },
+      credentials: "include",
+    });
+    if (!retry.ok) {
+      const body = (await retry.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error || "Could not connect this store");
+    }
+    return (await retry.json()) as { redirect?: string };
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error || "Could not connect this store");
+  }
+  return (await response.json()) as { redirect?: string };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

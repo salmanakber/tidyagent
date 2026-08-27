@@ -78,11 +78,19 @@ export default async function ShopifyAppHome({
   }
 
   // Embedded Admin: App Bridge session-token exchange (stays in iframe, cycles expiring tokens).
+  // Prefer App Bridge idToken(); URL id_token is a rare bootstrap fallback Shopify may include.
   if (framed) {
     if (!config.apiKey) {
       redirect("/shopify/missing?error=not_configured");
     }
-    return <ShopifyEmbeddedAuth apiKey={config.apiKey} host={params.host || ""} shop={shop} />;
+    return (
+      <ShopifyEmbeddedAuth
+        apiKey={config.apiKey}
+        host={params.host || ""}
+        shop={shop}
+        bootstrapIdToken={params.id_token || ""}
+      />
+    );
   }
 
   // Standalone / top-level install (not inside Shopify Admin iframe).

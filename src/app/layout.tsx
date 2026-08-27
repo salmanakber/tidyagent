@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Outfit, Syne } from "next/font/google";
+import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import "./globals.css";
 
 const sans = Outfit({
@@ -30,7 +32,14 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const path = (await headers()).get("x-tidyagent-path") || "";
+  const shopifyEmbedded = path === "/shopify" || path.startsWith("/shopify/");
+  let shopifyApiKey = "";
+  if (shopifyEmbedded) {
+    shopifyApiKey = (await getShopifyOAuthConfig()).apiKey || "";
+  }
+
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <head>
@@ -39,6 +48,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{if(localStorage.getItem("tidyagent-theme")==="light")document.documentElement.classList.add("theme-light")}catch(e){}})();`,
           }}
         />
+        {shopifyApiKey ? (
+          <>
+            {/* Must be a real sync <script> in initial HTML — not next/script (preload). */}
+            <meta name="shopify-api-key" content={shopifyApiKey} />
+            <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
+          </>
+        ) : null}
       </head>
       <body className="font-sans antialiased">{children}</body>
     </html>
