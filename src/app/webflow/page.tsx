@@ -19,6 +19,7 @@ export default async function WebflowAppHome({
     code?: string;
     state?: string;
     error?: string;
+    error_description?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -30,6 +31,7 @@ export default async function WebflowAppHome({
         siteId: params.siteId,
         site: params.site,
         error: params.error,
+        error_description: params.error_description,
       }),
     );
   }

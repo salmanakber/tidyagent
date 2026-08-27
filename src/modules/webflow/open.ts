@@ -15,17 +15,26 @@ export function isWebflowExtensionHost(hostname: string) {
 }
 
 /**
- * True when /webflow is inside Designer / Launch. Never start OAuth in that iframe —
- * Webflow's authorize page refuses to be framed ("refused to connect").
+ * True when /webflow is inside Designer / Launch iframe.
+ * Never start OAuth inside that iframe — Webflow's authorize page refuses to be framed.
+ *
+ * Top-level navigations (sec-fetch-dest=document), including “Continue in a new tab”,
+ * must NOT be treated as embedded just because Referer is Webflow — otherwise OAuth never starts.
  */
 export function isEmbeddedWebflowRequest(input: {
   embed?: string | null;
   dest?: string | null;
   site?: string | null;
   referer?: string | null;
+  /** Explicit “opened as popup / new tab for OAuth” — always top-level. */
+  popup?: string | null;
 }) {
+  if (input.popup === "1" || input.popup === "true") return false;
   if (input.embed === "1" || input.embed === "true") return true;
   if (input.dest === "iframe" || input.dest === "embed") return true;
+  // Full-page / new-tab navigation — allow OAuth even when Referer is Webflow.
+  if (input.dest === "document") return false;
+
   if (input.referer) {
     try {
       const host = new URL(input.referer).hostname;
@@ -59,6 +68,7 @@ export function webflowCallbackQuery(params: {
   siteId?: string;
   site?: string;
   error?: string;
+  error_description?: string;
 }) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

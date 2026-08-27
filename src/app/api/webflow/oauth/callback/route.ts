@@ -5,14 +5,30 @@ import { getAppOrigin } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
+function mapOauthError(raw: string | null) {
+  const code = (raw || "denied").toLowerCase();
+  if (code === "access_denied") return "denied";
+  if (code === "invalid_scope") return "invalid_scope";
+  if (code === "invalid_request") return "invalid_request";
+  if (code === "unauthorized_client") return "unauthorized_client";
+  if (code === "server_error" || code === "temporarily_unavailable") return "oauth_server";
+  return code.replace(/[^a-z0-9_-]/gi, "").slice(0, 64) || "denied";
+}
+
 export async function GET(request: Request) {
   const origin = getAppOrigin();
   const bounce = bounceOffBindAddress(request, origin);
   if (bounce) return NextResponse.redirect(bounce);
 
   const url = new URL(request.url);
-  if (url.searchParams.get("error")) {
-    return NextResponse.redirect(new URL("/webflow/missing?error=denied", origin));
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) {
+    const mapped = mapOauthError(oauthError);
+    const desc = url.searchParams.get("error_description") || "";
+    console.error("Webflow OAuth authorize error", { oauthError, desc });
+    const target = new URL(`/webflow/missing?error=${encodeURIComponent(mapped)}`, origin);
+    if (desc) target.searchParams.set("detail", desc.slice(0, 300));
+    return NextResponse.redirect(target);
   }
 
   const code = url.searchParams.get("code");

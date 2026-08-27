@@ -68,6 +68,13 @@ describe("webflow app home detection", () => {
       isEmbeddedWebflowRequest({ referer: "https://d111111abcdef8.cloudfront.net/index.html" }),
     ).toBe(true);
     expect(isEmbeddedWebflowRequest({ dest: "document", site: "cross-site" })).toBe(false);
+    expect(
+      isEmbeddedWebflowRequest({
+        dest: "document",
+        referer: "https://design.webflow.com/site/abc",
+      }),
+    ).toBe(false);
+    expect(isEmbeddedWebflowRequest({ popup: "1", embed: "1" })).toBe(false);
   });
 });
 

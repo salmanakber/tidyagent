@@ -21,8 +21,11 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const siteId = url.searchParams.get("siteId") || url.searchParams.get("site") || "";
+  const popup = url.searchParams.get("popup");
   if (
     isEmbeddedWebflowRequest({
+      embed: url.searchParams.get("embed"),
+      popup,
       dest: request.headers.get("sec-fetch-dest"),
       site: request.headers.get("sec-fetch-site"),
       referer: request.headers.get("referer"),
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   const state = await createWebflowOAuthState({
-    embed: url.searchParams.get("embed") === "1",
+    embed: false,
     siteId: siteId || undefined,
   });
   return NextResponse.redirect(
