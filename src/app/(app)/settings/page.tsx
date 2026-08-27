@@ -77,12 +77,16 @@ export default async function SettingsPage() {
                 platform === "WEBFLOW"
                   ? "/docs/webflow"
                   : platform === "SHOPIFY"
-                    ? "/install/shopify"
+                    ? "/docs/shopify"
                     : "/install"
               }
               className="text-amber-300 hover:underline"
             >
-              {platform === "WEBFLOW" ? "Webflow guide" : "Install guide"}
+              {platform === "WEBFLOW"
+                ? "Webflow guide"
+                : platform === "SHOPIFY"
+                  ? "Shopify guide"
+                  : "Install guide"}
             </a>
             {" · "}
             <a href={legalHref("/terms", platform)} className="text-amber-300 hover:underline">

@@ -4,6 +4,7 @@ export const SHOPIFY_OAUTH_SCOPES = [
   "read_orders",
   "read_customers",
   "read_content",
+  "read_legal_policies",
   "read_themes",
   "read_script_tags",
   "write_script_tags",

@@ -164,6 +164,8 @@ export async function harvestShopifyApis(input: {
   }
 
   if (input.scope.includeSiteProperties) {
+    // Core shop fields do not need read_legal_policies. Policies are fetched separately
+    // so a missing legal-policies scope cannot fail the whole store profile stage.
     try {
       const data = await shopifyGraphql<{
         shop?: {
@@ -182,12 +184,6 @@ export async function harvestShopifyApis(input: {
             country?: string | null;
             phone?: string | null;
           } | null;
-          shopPolicies?: Array<{
-            type?: string | null;
-            title?: string | null;
-            body?: string | null;
-            url?: string | null;
-          } | null>;
         };
       }>(
         creds.shop,
@@ -197,6 +193,7 @@ export async function harvestShopifyApis(input: {
           shop {
             name
             contactEmail
+            email
             description
             currencyCode
             primaryLocale
@@ -204,7 +201,6 @@ export async function harvestShopifyApis(input: {
             url
             primaryDomain { url host }
             shopAddress { address1 city country phone }
-            shopPolicies { type title body url }
           }
         }`,
       );
@@ -246,14 +242,51 @@ export async function harvestShopifyApis(input: {
         imageUrl: undefined,
       });
 
-      for (const policy of shop.shopPolicies ?? []) {
+      stages.push({
+        key: "shopify-shop",
+        label: "Read Shopify store profile",
+        status: "done",
+        detail: displayName || creds.shop,
+      });
+    } catch (error) {
+      stages.push({
+        key: "shopify-shop",
+        label: "Read Shopify store profile",
+        status: "failed",
+        detail: errorDetail(error),
+      });
+      warnings.push("We could not read the store profile. Reopen tidyAgent from Shopify Admin, then scan again.");
+    }
+
+    try {
+      const policyData = await shopifyGraphql<{
+        shop?: {
+          shopPolicies?: Array<{
+            type?: string | null;
+            title?: string | null;
+            body?: string | null;
+            url?: string | null;
+          } | null>;
+        };
+      }>(
+        creds.shop,
+        creds.accessToken,
+        `#graphql
+        query ShopifyShopPolicies {
+          shop {
+            shopPolicies { type title body url }
+          }
+        }`,
+      );
+      let policyCount = 0;
+      for (const policy of policyData.shop?.shopPolicies ?? []) {
         if (!policy) continue;
         const title = String(policy.title || policy.type || "Policy");
         const body = stripHtml(String(policy.body || ""));
         if (body.length < 20) continue;
         const url = policy.url
           ? String(policy.url)
-          : `${siteUrl.replace(/\/$/, "")}/policies/${String(policy.type || title)
+          : `${(siteUrl || `https://${creds.shop}`).replace(/\/$/, "")}/policies/${String(policy.type || title)
               .toLowerCase()
               .replace(/\s+/g, "-")}`;
         pages.push({
@@ -269,22 +302,24 @@ export async function harvestShopifyApis(input: {
           jsonLd: [],
           imageUrl: undefined,
         });
+        policyCount += 1;
       }
-
       stages.push({
-        key: "shopify-shop",
-        label: "Read Shopify store profile",
+        key: "shopify-policies",
+        label: "Read Shopify store policies",
         status: "done",
-        detail: displayName || creds.shop,
+        detail: policyCount ? `${policyCount} policies` : "No published policies",
       });
     } catch (error) {
       stages.push({
-        key: "shopify-shop",
-        label: "Read Shopify store profile",
-        status: "failed",
+        key: "shopify-policies",
+        label: "Read Shopify store policies",
+        status: "skipped",
         detail: errorDetail(error),
       });
-      warnings.push("We could not read the store profile. Reopen tidyAgent from Shopify Admin, then scan again.");
+      skipped.push(
+        "Store policies need the read_legal_policies permission. Update the app scopes in Partner Dashboard, reopen tidyAgent from Apps to approve, then scan again.",
+      );
     }
   }
 

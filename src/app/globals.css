@@ -685,3 +685,107 @@ html.theme-light .widget-isolate .border-white\/5,
 html.theme-light .widget-isolate .border-white\/10 {
   border-color: rgba(255, 255, 255, 0.14) !important;
 }
+
+/* Shopify embedded auth loading */
+.shopify-auth-panel {
+  animation: shopify-auth-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.shopify-auth-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 65% 55% at 50% 45%, black, transparent);
+}
+
+.shopify-auth-orb-a {
+  animation: shopify-auth-drift 9s ease-in-out infinite alternate;
+}
+
+.shopify-auth-orb-b {
+  animation: shopify-auth-drift-alt 11s ease-in-out infinite alternate;
+}
+
+.shopify-auth-ring {
+  animation: shopify-auth-pulse 2.2s ease-out infinite;
+}
+
+.shopify-auth-ring-delay {
+  animation-delay: 0.7s;
+}
+
+.shopify-auth-mark {
+  animation: shopify-auth-glow 1.8s ease-in-out infinite;
+}
+
+.shopify-auth-bar {
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: shopify-auth-shimmer 1.4s linear infinite;
+  background-size: 200% 100%;
+}
+
+@keyframes shopify-auth-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shopify-auth-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(28px, -18px, 0) scale(1.08);
+  }
+}
+
+@keyframes shopify-auth-drift-alt {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-22px, 16px, 0) scale(1.06);
+  }
+}
+
+@keyframes shopify-auth-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@keyframes shopify-auth-glow {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes shopify-auth-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}

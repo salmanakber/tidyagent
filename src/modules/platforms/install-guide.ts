@@ -33,7 +33,8 @@ const SHOPIFY_WHY: Record<(typeof SHOPIFY_OAUTH_SCOPES)[number], string> = {
   read_products: "Learn product titles, prices, and catalog details so the chat can answer shoppers accurately.",
   read_orders: "Support order-related questions when the AI needs order context from your store.",
   read_customers: "Support customer-related help and Shopify privacy webhook obligations for your store.",
-  read_content: "Read Online Store pages and content the scanner uses for knowledge.",
+  read_content: "Read Online Store pages and blogs the scanner uses for knowledge.",
+  read_legal_policies: "Read refund, privacy, shipping, and other store policies so the AI can answer policy questions accurately.",
   read_themes: "Understand theme/script placement so the widget can be installed safely.",
   read_script_tags: "Detect an existing tidyAgent script tag before adding or updating it.",
   write_script_tags: "Install the chat widget script on the storefront.",
@@ -87,6 +88,7 @@ export const SHOPIFY_INSTALL_GUIDE: InstallGuide = {
     "Choose a plan through Shopify Billing when prompted (charges appear on your Shopify invoice).",
   ],
   afterInstall: [
+    "Full user guide: https://agent.tidyflowapp.com/docs/shopify",
     "Reopen tidyAgent from Shopify Admin → Apps, or https://agent.tidyflowapp.com/shopify?shop=your-store.myshopify.com.",
     "Billing, trial, and cancellation stay in Shopify; tidyAgent only enforces plan limits after Shopify reports the subscription.",
     "Shopify mandatory privacy webhooks (customers/data_request, customers/redact, shop/redact) are handled at /api/shopify/webhooks.",
@@ -97,8 +99,9 @@ export const SHOPIFY_INSTALL_GUIDE: InstallGuide = {
   })),
   notes: [
     "tidyAgent is hosted at agent.tidyflowapp.com — Shopify is not the operator of the dashboard or AI.",
+    "Knowledge uses Shopify Admin APIs only. tidyAgent does not crawl or scrape your storefront.",
     "Script tags require write_script_tags; we do not edit your theme Liquid files by default.",
-    "Terms for this listing: /terms?platform=shopify — Privacy: /privacy?platform=shopify.",
+    "User guide: /docs/shopify — Terms: /terms?platform=shopify — Privacy: /privacy?platform=shopify.",
   ],
 };
 

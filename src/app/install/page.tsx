@@ -62,7 +62,11 @@ export default async function InstallIndexPage({
             <p className="mt-2 text-sm leading-6 text-navy-300">
               App Store install, Admin API scopes, script tag widget, Shopify Billing.
             </p>
-            <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Shopify guide →</span>
+            <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Shopify permissions →</span>
+            <span className="mt-2 block text-xs text-navy-400">
+              Full guide:{" "}
+              <span className="text-amber-300">/docs/shopify</span>
+            </span>
           </Link>
         </div>
       </main>

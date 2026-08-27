@@ -6,7 +6,7 @@ import type { InstallGuide } from "@/modules/platforms/install-guide";
 
 export function InstallGuideView({ guide }: { guide: InstallGuide }) {
   const platform = guide.id === "shopify" ? "SHOPIFY" : "WEBFLOW";
-  const docsHref = guide.id === "webflow" ? "/docs/webflow" : null;
+  const docsHref = guide.id === "webflow" ? "/docs/webflow" : guide.id === "shopify" ? "/docs/shopify" : null;
 
   return (
     <AuroraScene>

@@ -10,12 +10,13 @@
 # Do not rely on legacy non-expiring offline tokens (Admin API rejects them).
 
 client_id = "cf0756196113f78ef60ca45598d8b344"
+
 name = "tidyAgent"
 application_url = "https://agent.tidyflowapp.com/shopify"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,read_orders,read_customers,read_content,read_themes,read_script_tags,write_script_tags,read_locales"
+scopes = "read_products,read_orders,read_customers,read_content,read_legal_policies,read_themes,read_script_tags,write_script_tags,read_locales"
 
 [auth]
 redirect_urls = [ "https://agent.tidyflowapp.com/api/shopify/oauth/callback" ]
