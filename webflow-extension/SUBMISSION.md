@@ -62,7 +62,7 @@ Use these (or shorten as needed):
 - OAuth callback: `https://agent.tidyflowapp.com/api/webflow/oauth/callback`
 - **Documentation URL (use this in the Marketplace form):** `https://agent.tidyflowapp.com/docs/webflow`
 - **Architecture + scope mapping (attach / paste):** see `webflow-extension/SCOPE_MAPPING.md`
-- Install & permissions: `https://agent.tidyflowapp.com/install?platform=webflow`
+- Install & permissions: `https://agent.tidyflowapp.com/install/webflow`
 - Terms: `https://agent.tidyflowapp.com/terms?platform=webflow`
 - Privacy: `https://agent.tidyflowapp.com/privacy?platform=webflow`
 

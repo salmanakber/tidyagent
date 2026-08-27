@@ -17,7 +17,7 @@ Those strings come from enabling the **Designer Extension** building block (requ
 **Artifacts:** Designer Extension zip + source maps + Preflight receipt (same build). Demo video should show Launch from Designer opening the dashboard.
 
 Documentation: `https://agent.tidyflowapp.com/docs/webflow`  
-Permissions list: `https://agent.tidyflowapp.com/install?platform=webflow`
+Permissions list: `https://agent.tidyflowapp.com/install/webflow`
 
 ## Custom Code (disclose on listing)
 

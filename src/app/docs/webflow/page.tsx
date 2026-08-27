@@ -31,7 +31,7 @@ export default function WebflowDocsPage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3.5">
           <Logo href="/" />
           <div className="flex items-center gap-4 text-sm text-navy-200">
-            <Link href="/install?platform=webflow" className="transition hover:text-white">
+            <Link href="/install/webflow" className="transition hover:text-white">
               Permissions
             </Link>
             <Link href="/" className="transition hover:text-white">
@@ -73,8 +73,8 @@ export default function WebflowDocsPage() {
             <ol className="list-decimal space-y-2 pl-5">
               <li>Open tidyAgent from the Webflow Marketplace or the Designer Extension on your site.</li>
               <li>Approve the Data Client permissions (see the permissions list on{" "}
-                <Link href="/install?platform=webflow" className={legalLinkClass}>
-                  /install?platform=webflow
+                <Link href="/install/webflow" className={legalLinkClass}>
+                  /install/webflow
                 </Link>
                 ).
               </li>
@@ -270,7 +270,7 @@ export default function WebflowDocsPage() {
               Privacy
             </Link>
             {" · "}
-            <Link href="/install?platform=webflow" className={legalLinkClass}>
+            <Link href="/install/webflow" className={legalLinkClass}>
               Permissions
             </Link>
             . Support: support@tidyflowapp.com
@@ -285,7 +285,7 @@ export default function WebflowDocsPage() {
             <Link href="/docs/webflow" className="transition hover:text-white">
               Docs
             </Link>
-            <Link href="/install?platform=webflow" className="transition hover:text-white">
+            <Link href="/install/webflow" className="transition hover:text-white">
               Install
             </Link>
             <Link href={legalHref("/terms", "WEBFLOW")} className="transition hover:text-white">

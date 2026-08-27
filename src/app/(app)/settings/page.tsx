@@ -77,7 +77,7 @@ export default async function SettingsPage() {
                 platform === "WEBFLOW"
                   ? "/docs/webflow"
                   : platform === "SHOPIFY"
-                    ? "/install?platform=shopify"
+                    ? "/install/shopify"
                     : "/install"
               }
               className="text-amber-300 hover:underline"

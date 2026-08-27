@@ -57,7 +57,7 @@ export default async function WebflowMissingPage({
           <a href="/webflow/install" className="btn-primary">
             Connect Webflow again
           </a>
-          <Link href="/install?platform=webflow" className="btn-secondary">
+          <Link href="/install/webflow" className="btn-secondary">
             Install &amp; permissions guide
           </Link>
           <Link href="/login" className="btn-secondary">
