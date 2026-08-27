@@ -132,12 +132,16 @@ export async function scanOrganizationSite(input: {
   const pages: ExtractedPage[] = [];
   const crawl: CrawlItem[] = [];
 
-  if (scope.includeDomainCrawl && origin && host) {
+  // Webflow Marketplace: knowledge must come from official Data APIs only — no public-site crawl/scrape.
+  const allowDomainCrawl = scope.includeDomainCrawl && !webflowSite;
+  if (allowDomainCrawl && origin && host) {
     const crawled = await crawlDomain(origin, host, scope);
     pages.push(...crawled.pages);
     crawl.push(...crawled.crawl);
     stages.push(...crawled.stages);
     warnings.push(...crawled.warnings);
+  } else if (webflowSite) {
+    skipped.push("Webflow sites use official Webflow Data APIs only (no public-site crawl).");
   } else if (!scope.includeDomainCrawl) {
     skipped.push("Domain crawl is included after a paid plan is purchased.");
   }

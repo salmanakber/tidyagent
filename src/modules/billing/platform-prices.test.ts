@@ -18,5 +18,7 @@ describe("platform prices", () => {
     expect(copyForPlatform("WEBFLOW", "Checkout stays on Wix")).not.toMatch(/Wix/);
     expect(copyForPlatform("WEBFLOW", "Checkout stays on Wix")).not.toMatch(/Shopify/i);
     expect(copyForPlatform("SHOPIFY", "Published on Webflow")).not.toMatch(/Webflow/i);
+    expect(copyForPlatform("WEBFLOW", "Full-domain crawl plus Wix APIs")).toMatch(/Webflow Data APIs/i);
+    expect(copyForPlatform("WEBFLOW", "Full-domain crawl plus Wix APIs")).not.toMatch(/crawl/i);
   });
 });

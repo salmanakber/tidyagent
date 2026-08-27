@@ -62,8 +62,8 @@ async function getWebflowCreds(siteId: string) {
 }
 
 /**
- * Native Webflow Data API harvest (site, pages, CMS, ecommerce) + caller still runs public crawl.
- * Does not touch Wix paths.
+ * Native Webflow Data API harvest (site, pages, CMS, ecommerce).
+ * Domain crawl is never used for Webflow (Marketplace Data access rules).
  */
 export async function harvestWebflowApis(input: {
   siteId: string;
@@ -82,7 +82,7 @@ export async function harvestWebflowApis(input: {
 
   const creds = await getWebflowCreds(input.siteId);
   if (!creds) {
-    warnings.push("Webflow API token missing. Public website crawl still runs when a URL is available.");
+    warnings.push("Webflow API token missing. Reconnect the app from Webflow to refresh Data API access.");
     return { pages, products, stages, skipped, warnings };
   }
 
@@ -125,7 +125,7 @@ export async function harvestWebflowApis(input: {
         status: "failed",
         detail: error instanceof Error ? error.message : "Site profile unavailable",
       });
-      warnings.push("Webflow site profile could not be read. Public crawl still runs.");
+      warnings.push("Webflow site profile could not be read. Check sites:read permission and reconnect if needed.");
     }
   }
 

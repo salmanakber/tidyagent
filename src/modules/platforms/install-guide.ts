@@ -45,29 +45,34 @@ export const WEBFLOW_INSTALL_GUIDE: InstallGuide = {
   id: "webflow",
   name: "Webflow",
   summary:
-    "Install tidyAgent from the Webflow Marketplace or Designer, approve the Data Client permissions, then scan and publish so the chat bubble appears on the live site.",
+    "Install tidyAgent from the Webflow Marketplace or Designer, approve Data Client permissions, then load knowledge through official Webflow Data APIs (not a domain crawl) and publish so the chat widget appears.",
   startHref: "/webflow",
   startLabel: "Connect Webflow",
   steps: [
     "Open tidyAgent from the Webflow Marketplace listing, or launch the Designer Extension on your site.",
     "Sign in to Webflow if prompted, then approve the tidyAgent permission screen (scopes listed below).",
-    "You land in the hosted tidyAgent dashboard for that site — complete onboarding and run a knowledge scan.",
+    "You land in the hosted tidyAgent dashboard for that site — complete onboarding and run a knowledge scan via Webflow Data APIs.",
     "Publish the Webflow site so custom code (the chat widget) goes live for visitors.",
     "Optional: pick a plan in tidyAgent billing (card checkout). Review / testing mode may unlock Pro without checkout.",
   ],
   afterInstall: [
+    "Full user guide: https://agent.tidyflowapp.com/docs/webflow",
     "Reopen tidyAgent anytime from the Designer Extension or https://agent.tidyflowapp.com/webflow.",
     "Widget look and agent settings live in the tidyAgent dashboard (AI Agent), not in Webflow Designer styles.",
-    "Uninstall from Webflow when you want to revoke access; we delete or anonymize workspace data after a reasonable period.",
+    "Uninstall from Webflow when you want to revoke access; remove the tidyAgent Custom Code snippet if it remains, then publish. We delete or anonymize workspace data after a reasonable period.",
   ],
   permissions: WEBFLOW_OAUTH_SCOPES.map((scope) => ({
     scope,
-    why: WEBFLOW_WHY[scope],
+    why:
+      scope === "pages:read"
+        ? "Read page metadata through the Webflow Pages API so knowledge comes from official APIs (not a domain crawl)."
+        : WEBFLOW_WHY[scope],
   })),
   notes: [
     "tidyAgent is hosted at agent.tidyflowapp.com — Webflow is not the operator of the dashboard or AI.",
+    "Knowledge uses Webflow Data APIs only. tidyAgent does not crawl or scrape the published domain.",
     "Custom code inject does not auto-publish; visitors see the bubble only after you publish.",
-    "Terms for this listing: /terms?platform=webflow — Privacy: /privacy?platform=webflow.",
+    "User guide: /docs/webflow — Terms: /terms?platform=webflow — Privacy: /privacy?platform=webflow.",
   ],
 };
 

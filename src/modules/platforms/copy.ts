@@ -23,7 +23,15 @@ export function copyForPlatform(platform: SitePlatform | string | null | undefin
   if (isWebflowPlatform(platform)) {
     out = out
       .replace(/\bShopify\b/gi, "the store")
-      .replace(/\bApp Store\b/gi, "marketplace");
+      .replace(/\bApp Store\b/gi, "marketplace")
+      .replace(/\bFull-domain crawl plus\b/gi, "Webflow Data APIs:")
+      .replace(/\bFull website crawl,\b/gi, "Webflow pages, CMS, and")
+      .replace(
+        /Reads every public page we can find \(sitemap and on-site links\), plus/gi,
+        "Reads site profile, pages, and CMS through Webflow Data APIs, plus",
+      )
+      .replace(/every public page we can find/gi, "Webflow pages via Data APIs")
+      .replace(/sitemap and on-site links/gi, "official Webflow APIs");
   }
   if (isShopifyPlatform(platform)) {
     out = out
@@ -58,6 +66,10 @@ export function wizardCopyForPlatform(platform?: string | null) {
       factsHint: "Structured prices, contact details, hours, and services extracted from the live site and Wix APIs.",
       knowledgeDescription: (name: string) =>
         `The scanner reads every public page it can find on this ${name} site, plus Wix Stores on Business and Pro. Custom notes you add sit above that and are never overwritten.`,
+      scanButton: "Read and understand this website",
+      scanPending: "Reading website…",
+      scanLiveNote: "This reads the live site. It is not a canned demo.",
+      hideDomainCrawlToggle: false,
     };
   }
   if (platform === "SHOPIFY") {
@@ -78,25 +90,34 @@ export function wizardCopyForPlatform(platform?: string | null) {
       factsHint: "Structured prices, contact details, hours, and services extracted from the live storefront and Shopify Admin APIs.",
       knowledgeDescription: (name: string) =>
         `The scanner reads every public page it can find on this ${name} store, plus the product catalog on Business and Pro. Custom notes you add sit above that and are never overwritten.`,
+      scanButton: "Read and understand this website",
+      scanPending: "Reading website…",
+      scanLiveNote: "This reads the live site. It is not a canned demo.",
+      hideDomainCrawlToggle: false,
     };
   }
   const name = platformLabel(platform);
   return {
     connected: (siteName: string, planLabel: string) =>
-      `${siteName} is identified through ${name}. The next step is a real read of the live site — scoped to ${planLabel} — so the employee learns this business, not a generic script.`,
+      `${siteName} is identified through ${name}. The next step is a real read of your Webflow site through official Data APIs — scoped to ${planLabel} — so the employee learns this business, not a generic script.`,
     autoInstall: "Adds the widget through site-wide custom code. Publish the site so visitors can see it.",
     manualInstall: "We'll still inject site-wide custom code. Choose this only if you will place the snippet yourself.",
     scanStages: [
       "Confirming the Webflow site",
-      "Reading every public page",
+      "Reading pages via Webflow APIs",
       "Loading CMS and ecommerce data",
       "Writing a business understanding",
     ],
     noUrl: "No public URL yet — publish the Webflow site, then scan.",
-    crawlHint: "Sitemap, on-site links, Webflow pages, CMS, and ecommerce when available. Uncheck to read only common pages like pricing, services, and FAQ.",
+    crawlHint:
+      "tidyAgent reads your Webflow site through official Data APIs (site profile, pages, CMS, ecommerce when available). It does not crawl or scrape the published domain.",
     storeHint: "from the ecommerce catalog",
-    factsHint: "Structured prices, contact details, hours, and services extracted from the live site and Webflow Data APIs.",
+    factsHint: "Structured prices, contact details, hours, and services extracted from Webflow Data APIs.",
     knowledgeDescription: (nameLabel: string) =>
-      `The scanner reads every public page it can find on this ${nameLabel} site, plus CMS and ecommerce on Business and Pro. Custom notes you add sit above that and are never overwritten.`,
+      `Knowledge for this ${nameLabel} site comes from official Webflow Data APIs (pages, CMS, and ecommerce on Business and Pro) — not from crawling the published domain. Custom notes you add sit above that and are never overwritten.`,
+    scanButton: "Read site via Webflow APIs",
+    scanPending: "Reading Webflow APIs…",
+    scanLiveNote: "This uses Webflow Data APIs only. It is not a domain crawl.",
+    hideDomainCrawlToggle: true,
   };
 }

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { publicSupportChannels } from "@/modules/support/channels";
 import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
+import { isWebflowPlatform } from "@/modules/platforms/types";
 
 const STEPS = ["Connected", "Scan", "Business", "Your team", "Owner notes", "Style", "Test", "Go live"];
 
@@ -84,6 +85,7 @@ export function OnboardingWizard({
   const understanding = scan?.understanding ?? existingUnderstanding ?? null;
   const teamReady = personName.trim().length >= 2 && aiName.trim().length >= 1;
   const copy = wizardCopyForPlatform(platform);
+  const webflow = isWebflowPlatform(platform);
 
   function next() {
     if (step === 2 && !scan?.ok && !existingUnderstanding) return;
@@ -166,8 +168,12 @@ export function OnboardingWizard({
 
         {step === 2 && (
           <Step
-            title="Read and understand the website"
-            body="This pulls pages, policies, and (on Business/Pro) catalog data from the live site. Re-run it whenever the site changes."
+            title={webflow ? "Read your Webflow site via Data APIs" : "Read and understand the website"}
+            body={
+              webflow
+                ? "This loads pages, CMS, and (on Business/Pro) ecommerce through official Webflow APIs — not a domain crawl. Re-run it whenever the site changes."
+                : "This pulls pages, policies, and (on Business/Pro) catalog data from the live site. Re-run it whenever the site changes."
+            }
           >
             <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />
           </Step>
@@ -176,7 +182,11 @@ export function OnboardingWizard({
         {step === 3 && (
           <Step
             title="What we understand about this business"
-            body="This profile is built from pages the scanner actually read. If something is thin, add owner notes in the next steps rather than inventing it."
+            body={
+              webflow
+                ? "This profile is built from Webflow Data API content the scanner read. If something is thin, add owner notes in the next steps rather than inventing it."
+                : "This profile is built from pages the scanner actually read. If something is thin, add owner notes in the next steps rather than inventing it."
+            }
           >
             {understanding ? (
               <div className="space-y-4">
@@ -255,7 +265,11 @@ export function OnboardingWizard({
         {step === 5 && (
           <Step
             title="Owner notes the AI must follow"
-            body="Add prices, exceptions, or sensitive instructions the website does not spell out. These sit above crawled pages. You can skip this and add more later in Knowledge."
+            body={
+              webflow
+                ? "Add prices, exceptions, or sensitive instructions the site does not spell out. These sit above API-loaded knowledge. You can skip this and add more later in Knowledge."
+                : "Add prices, exceptions, or sensitive instructions the website does not spell out. These sit above crawled pages. You can skip this and add more later in Knowledge."
+            }
           >
             <div className="grid gap-3">
               <input className="field" placeholder="Title (e.g. Weekend rates)" value={noteTitle} onChange={(event) => setNoteTitle(event.target.value)} />
@@ -339,10 +353,12 @@ export function OnboardingWizard({
             >
               <ul className="space-y-2 text-sm">
                 {[
-                  `${aiName} answers from the live site`,
+                  webflow
+                    ? `${aiName} answers from Webflow Data API knowledge`
+                    : `${aiName} answers from the live site`,
                   `Unknown questions connect to ${personName.trim() || "your team member"}`,
                   "Matching products show as photo cards",
-                  "Owner notes sit above crawled pages",
+                  webflow ? "Owner notes sit above API-loaded knowledge" : "Owner notes sit above crawled pages",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-amber-400" /> {item}

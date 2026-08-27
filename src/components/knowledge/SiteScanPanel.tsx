@@ -59,21 +59,26 @@ export function SiteScanPanel({
         ) : (
           <p className="mt-2 text-xs text-rose-200">{copy.noUrl}</p>
         )}
-        <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={fullSite}
-            onChange={(event) => setFullSite(event.target.checked)}
-            disabled={pending}
-          />
-          <span>
-            Crawl every public page we can find
-            <span className="mt-1 block text-xs text-navy-400">
-              {copy.crawlHint}
+        {copy.hideDomainCrawlToggle ? (
+          <p className="mt-4 text-sm leading-6 text-navy-100">
+            How knowledge is loaded
+            <span className="mt-1 block text-xs text-navy-400">{copy.crawlHint}</span>
+          </p>
+        ) : (
+          <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={fullSite}
+              onChange={(event) => setFullSite(event.target.checked)}
+              disabled={pending}
+            />
+            <span>
+              Crawl every public page we can find
+              <span className="mt-1 block text-xs text-navy-400">{copy.crawlHint}</span>
             </span>
-          </span>
-        </label>
+          </label>
+        )}
       </div>
 
       {pending ? (
@@ -90,7 +95,7 @@ export function SiteScanPanel({
               <span className={index <= tick ? "text-white" : "text-navy-400"}>{label}</span>
             </div>
           ))}
-          <p className="text-xs text-navy-400">This reads the live site. It is not a canned demo.</p>
+          <p className="text-xs text-navy-400">{copy.scanLiveNote}</p>
         </div>
       ) : null}
 
@@ -103,7 +108,7 @@ export function SiteScanPanel({
       ) : null}
 
       <button className="btn-primary" onClick={run} disabled={pending}>
-        {pending ? "Reading website…" : result ? "Re-run scanner" : "Read and understand this website"}
+        {pending ? copy.scanPending : result ? "Re-run scanner" : copy.scanButton}
       </button>
     </div>
   );
