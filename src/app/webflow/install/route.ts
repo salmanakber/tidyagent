@@ -39,6 +39,7 @@ export async function GET(request: Request) {
 
   const state = await createWebflowOAuthState({
     embed: false,
+    popup: popup === "1" || popup === "true",
     siteId: siteId || undefined,
   });
   return NextResponse.redirect(

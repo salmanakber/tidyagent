@@ -29,10 +29,15 @@ export function webflowAuthorizeUrl(input: { clientId: string; redirectUri: stri
   return url.toString();
 }
 
-export async function createWebflowOAuthState(input?: { embed?: boolean; siteId?: string }) {
+export async function createWebflowOAuthState(input?: {
+  embed?: boolean;
+  popup?: boolean;
+  siteId?: string;
+}) {
   return new SignJWT({
     intent: "webflow-install",
     embed: Boolean(input?.embed),
+    popup: Boolean(input?.popup),
     siteId: input?.siteId || null,
   })
     .setProtectedHeader({ alg: "HS256" })
@@ -42,28 +47,32 @@ export async function createWebflowOAuthState(input?: { embed?: boolean; siteId?
 }
 
 export async function readWebflowOAuthState(state?: string | null) {
-  if (!state) return { ours: false, embed: false, siteId: null as string | null };
+  if (!state) return { ours: false, embed: false, popup: false, siteId: null as string | null };
   try {
     const { payload } = await jwtVerify(state, new TextEncoder().encode(getEnv().SESSION_SECRET));
     return {
       ours: true,
       embed: Boolean(payload.embed),
+      popup: Boolean(payload.popup),
       siteId: typeof payload.siteId === "string" && payload.siteId ? payload.siteId : null,
     };
   } catch {
     // Marketplace / Open app often send Webflow's own state. Do not consume the code
     // by failing before the token exchange — Connect again would then be required.
-    return { ours: false, embed: false, siteId: null as string | null };
+    return { ours: false, embed: false, popup: false, siteId: null as string | null };
   }
 }
 
-const inflightLogins = new Map<string, Promise<{ session: AppSession; destination: string }>>();
+const inflightLogins = new Map<
+  string,
+  Promise<{ session: AppSession; destination: string; popup: boolean }>
+>();
 
 export async function completeWebflowLogin(input: {
   code: string;
   state?: string | null;
   preferredSiteId?: string | null;
-}): Promise<{ session: AppSession; destination: string }> {
+}): Promise<{ session: AppSession; destination: string; popup: boolean }> {
   const existing = inflightLogins.get(input.code);
   if (existing) return existing;
   const work = completeWebflowLoginOnce(input).finally(() => {
@@ -77,7 +86,7 @@ async function completeWebflowLoginOnce(input: {
   code: string;
   state?: string | null;
   preferredSiteId?: string | null;
-}): Promise<{ session: AppSession; destination: string }> {
+}): Promise<{ session: AppSession; destination: string; popup: boolean }> {
   const config = await getWebflowOAuthConfig();
   if (!config.clientId || !config.clientSecret) {
     throw new WebflowInstallError(
@@ -139,8 +148,10 @@ async function completeWebflowLoginOnce(input: {
 
   await ensureWebflowWidgetForSite(session.siteId, tokens.accessToken);
 
+  const workspace = await workspacePathForOrganization(session.organizationId);
   return {
     session,
-    destination: await workspacePathForOrganization(session.organizationId),
+    popup: state.popup,
+    destination: state.popup ? "/webflow/connected" : workspace,
   };
 }

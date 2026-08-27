@@ -1,7 +1,12 @@
 "use client";
 
+import { useState } from "react";
+
 export function WebflowConnect({ installHref }: { installHref: string }) {
+  const [blocked, setBlocked] = useState(false);
+
   function connect() {
+    setBlocked(false);
     let href = installHref;
     try {
       const url = new URL(installHref, window.location.origin);
@@ -11,10 +16,19 @@ export function WebflowConnect({ installHref }: { installHref: string }) {
     } catch {
       href = installHref.includes("?") ? `${installHref}&popup=1` : `${installHref}?popup=1`;
     }
-    const opened = window.open(href, "_blank", "noopener,noreferrer");
+
+    // Sized popup — never navigate this Designer iframe (that logs you out of Webflow).
+    const width = 560;
+    const height = 720;
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+    const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},noopener=yes`;
+    const opened = window.open(href, "tidyagent_webflow_oauth", features);
     if (!opened) {
-      window.location.href = href;
+      setBlocked(true);
+      return;
     }
+    opened.focus();
   }
 
   return (
@@ -23,12 +37,23 @@ export function WebflowConnect({ installHref }: { installHref: string }) {
         <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Webflow</p>
         <h1 className="mt-3 font-display text-2xl text-white">Open your AI employee</h1>
         <p className="mt-3 text-sm leading-6 text-navy-300">
-          Webflow cannot show the login screen inside this panel. Continue in a new tab, approve access,
-          then return here. If the tab is blocked, allow popups and try again.
+          Webflow cannot show the login screen inside this Launch panel. A small popup will open so you can
+          approve access — keep the Designer open; do not continue inside this panel.
         </p>
         <button type="button" onClick={connect} className="btn-primary mt-6 w-full">
-          Continue in a new tab
+          Continue in a popup
         </button>
+        {blocked ? (
+          <p className="mt-4 text-sm leading-6 text-rose-200">
+            Popup was blocked. Allow popups for agent.tidyflowapp.com, then try again. Do not open the link
+            inside this panel — that can sign you out of the Webflow Designer.
+          </p>
+        ) : (
+          <p className="mt-4 text-xs leading-5 text-navy-400">
+            After you approve, the popup says you are connected. Close it and reopen tidyAgent from Launch if
+            needed.
+          </p>
+        )}
       </div>
     </div>
   );

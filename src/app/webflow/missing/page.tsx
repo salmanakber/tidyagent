@@ -84,7 +84,7 @@ export default async function WebflowMissingPage({
           <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-navy-500">Error code: {key}</p>
         ) : null}
         <div className="mt-6 grid gap-3">
-          <a href="/webflow/install?popup=1" className="btn-primary">
+          <a href="/webflow/install?popup=1" className="btn-primary" target="_blank" rel="noopener">
             Connect Webflow again
           </a>
           <Link href="/install/webflow" className="btn-secondary">

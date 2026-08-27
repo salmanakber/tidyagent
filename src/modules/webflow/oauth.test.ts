@@ -83,5 +83,6 @@ describe("webflow oauth state", () => {
     const parsed = await readWebflowOAuthState("webflow-marketplace-state");
     expect(parsed.ours).toBe(false);
     expect(parsed.siteId).toBeNull();
+    expect(parsed.popup).toBe(false);
   });
 });
