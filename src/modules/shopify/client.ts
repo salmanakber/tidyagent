@@ -74,16 +74,38 @@ export async function shopifyGraphql<T>(
     body: JSON.stringify({ query, variables }),
   });
   const body = (await response.json().catch(() => ({}))) as {
-    data?: T;
-    errors?: Array<{ message?: string }>;
+    data?: T | null;
+    errors?: Array<{ message?: string; extensions?: { code?: string } }>;
   };
-  if (!response.ok || body.errors?.length) {
-    const message =
-      body.errors?.map((e) => e.message).filter(Boolean).join("; ") ||
-      `Shopify GraphQL failed (${response.status})`;
+
+  const message =
+    body.errors?.map((e) => e.message).filter(Boolean).join("; ") ||
+    `Shopify GraphQL failed (${response.status})`;
+
+  // Auth / hard failures: no usable payload.
+  if (!response.ok) {
     throw new ShopifyApiError(message, response.status);
   }
-  return body.data as T;
+
+  // Shopify often returns field-level ACCESS_DENIED with partial `data`.
+  // Prefer usable data over failing the entire harvest stage.
+  if (body.data != null && hasGraphqlPayload(body.data)) {
+    if (body.errors?.length) {
+      console.warn("Shopify GraphQL partial errors", { shop, message });
+    }
+    return body.data;
+  }
+
+  if (body.errors?.length) {
+    throw new ShopifyApiError(message, response.status);
+  }
+
+  throw new ShopifyApiError(message, response.status);
+}
+
+function hasGraphqlPayload(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  return Object.values(data as Record<string, unknown>).some((value) => value != null);
 }
 
 export type ShopifyShopRecord = {

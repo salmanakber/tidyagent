@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { shopifyGraphql, ShopifyApiError } from "@/modules/shopify/client";
+import { shopifyGraphql, shopifyGet, ShopifyApiError } from "@/modules/shopify/client";
 import { shopPublicUrl } from "@/modules/shopify/shop";
 import type { ScanScope } from "@/modules/knowledge/scan-scope";
 import { classifyPage, type ExtractedPage } from "@/modules/knowledge/extract";
@@ -138,6 +138,150 @@ function productTrainingText(input: {
     .join("\n\n");
 }
 
+type ShopProfile = {
+  name: string;
+  email: string;
+  phone: string;
+  description: string;
+  currencyCode: string | null;
+  primaryLocale: string | null;
+  myshopifyDomain: string | null;
+  primaryDomainUrl: string | null;
+  url: string | null;
+  address1: string;
+  city: string;
+  country: string;
+};
+
+/**
+ * Try rich GraphQL first, then a minimal shop query, then REST /shop.json.
+ * Field-level denials must not wipe the whole profile.
+ */
+async function fetchShopifyShopProfile(shop: string, accessToken: string): Promise<ShopProfile> {
+  const queries = [
+    `query ShopifyShopProfileRich {
+      shop {
+        name
+        contactEmail
+        email
+        description
+        currencyCode
+        primaryLocale
+        myshopifyDomain
+        url
+        primaryDomain { url host }
+        shopAddress { address1 city country phone }
+      }
+    }`,
+    `query ShopifyShopProfileBasic {
+      shop {
+        name
+        contactEmail
+        currencyCode
+        primaryLocale
+        myshopifyDomain
+        url
+        primaryDomain { url host }
+      }
+    }`,
+    `query ShopifyShopProfileMinimal {
+      shop {
+        name
+        currencyCode
+        myshopifyDomain
+        primaryDomain { url host }
+      }
+    }`,
+  ];
+
+  let lastError: unknown = null;
+  for (const query of queries) {
+    try {
+      const data = await shopifyGraphql<{
+        shop?: {
+          name?: string;
+          contactEmail?: string | null;
+          email?: string | null;
+          description?: string | null;
+          currencyCode?: string | null;
+          primaryLocale?: string | null;
+          myshopifyDomain?: string | null;
+          url?: string | null;
+          primaryDomain?: { url?: string | null; host?: string | null } | null;
+          shopAddress?: {
+            address1?: string | null;
+            city?: string | null;
+            country?: string | null;
+            phone?: string | null;
+          } | null;
+        };
+      }>(shop, accessToken, query);
+      const row = data.shop;
+      if (!row?.name && !row?.myshopifyDomain) {
+        lastError = new ShopifyApiError("Shopify returned an empty shop profile");
+        continue;
+      }
+      return {
+        name: String(row.name || shop),
+        email: String(row.contactEmail || row.email || ""),
+        phone: String(row.shopAddress?.phone || ""),
+        description: row.description ? stripHtml(String(row.description)) : "",
+        currencyCode: row.currencyCode ? String(row.currencyCode) : null,
+        primaryLocale: row.primaryLocale ? String(row.primaryLocale) : null,
+        myshopifyDomain: row.myshopifyDomain ? String(row.myshopifyDomain) : null,
+        primaryDomainUrl: row.primaryDomain?.url || row.primaryDomain?.host || null,
+        url: row.url ? String(row.url) : null,
+        address1: String(row.shopAddress?.address1 || ""),
+        city: String(row.shopAddress?.city || ""),
+        country: String(row.shopAddress?.country || ""),
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  try {
+    const payload = await shopifyGet<{
+      shop?: {
+        name?: string;
+        email?: string;
+        phone?: string;
+        domain?: string;
+        myshopify_domain?: string;
+        primary_locale?: string;
+        currency?: string;
+        address1?: string;
+        city?: string;
+        country?: string;
+        description?: string;
+      };
+    }>(shop, accessToken, "/shop.json");
+    const row = payload.shop;
+    if (row) {
+      return {
+        name: String(row.name || shop),
+        email: String(row.email || ""),
+        phone: String(row.phone || ""),
+        description: row.description ? stripHtml(String(row.description)) : "",
+        currencyCode: row.currency ? String(row.currency) : null,
+        primaryLocale: row.primary_locale ? String(row.primary_locale) : null,
+        myshopifyDomain: row.myshopify_domain ? String(row.myshopify_domain) : null,
+        primaryDomainUrl: row.domain ? String(row.domain) : null,
+        url: null,
+        address1: String(row.address1 || ""),
+        city: String(row.city || ""),
+        country: String(row.country || ""),
+      };
+    }
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ShopifyApiError("Could not read Shopify store profile");
+}
+
 /**
  * Shopify App Store + API Terms: knowledge must come from Admin APIs (GraphQL),
  * not storefront scraping. Public domain crawl is disabled for Shopify sites.
@@ -164,66 +308,24 @@ export async function harvestShopifyApis(input: {
   }
 
   if (input.scope.includeSiteProperties) {
-    // Core shop fields do not need read_legal_policies. Policies are fetched separately
-    // so a missing legal-policies scope cannot fail the whole store profile stage.
+    // Progressive queries: a single field ACCESS_DENIED must not fail the whole profile.
     try {
-      const data = await shopifyGraphql<{
-        shop?: {
-          name?: string;
-          contactEmail?: string | null;
-          email?: string | null;
-          description?: string | null;
-          currencyCode?: string | null;
-          primaryLocale?: string | null;
-          myshopifyDomain?: string | null;
-          url?: string | null;
-          primaryDomain?: { url?: string | null; host?: string | null } | null;
-          shopAddress?: {
-            address1?: string | null;
-            city?: string | null;
-            country?: string | null;
-            phone?: string | null;
-          } | null;
-        };
-      }>(
-        creds.shop,
-        creds.accessToken,
-        `#graphql
-        query ShopifyShopProfile {
-          shop {
-            name
-            contactEmail
-            email
-            description
-            currencyCode
-            primaryLocale
-            myshopifyDomain
-            url
-            primaryDomain { url host }
-            shopAddress { address1 city country phone }
-          }
-        }`,
-      );
-      const shop = data.shop ?? {};
+      const shop = await fetchShopifyShopProfile(creds.shop, creds.accessToken);
       displayName = String(shop.name || creds.shop);
-      currency = shop.currencyCode ? String(shop.currencyCode) : null;
-      locale = shop.primaryLocale ? String(shop.primaryLocale) : null;
-      siteUrl = shopPublicUrl(
-        creds.shop,
-        shop.myshopifyDomain,
-        shop.primaryDomain?.url || shop.primaryDomain?.host || shop.url,
-      );
-      const email = shop.contactEmail || shop.email || "";
-      const phone = shop.shopAddress?.phone || "";
+      currency = shop.currencyCode;
+      locale = shop.primaryLocale;
+      siteUrl = shopPublicUrl(creds.shop, shop.myshopifyDomain, shop.primaryDomainUrl || shop.url);
+      const email = shop.email || "";
+      const phone = shop.phone || "";
       const text = [
         displayName,
         siteUrl,
-        shop.description ? stripHtml(String(shop.description)) : "",
+        shop.description || "",
         email ? `Email: ${email}` : "",
         phone ? `Phone: ${phone}` : "",
-        shop.shopAddress?.address1 ? `Address: ${shop.shopAddress.address1}` : "",
-        shop.shopAddress?.city ? `City: ${shop.shopAddress.city}` : "",
-        shop.shopAddress?.country ? `Country: ${shop.shopAddress.country}` : "",
+        shop.address1 ? `Address: ${shop.address1}` : "",
+        shop.city ? `City: ${shop.city}` : "",
+        shop.country ? `Country: ${shop.country}` : "",
         currency ? `Currency: ${currency}` : "",
       ]
         .filter(Boolean)
@@ -234,8 +336,8 @@ export async function harvestShopifyApis(input: {
         description: "Store profile from Shopify",
         headings: [displayName || "Store"],
         text,
-        emails: email ? [String(email)] : [],
-        phones: phone ? [String(phone)] : [],
+        emails: email ? [email] : [],
+        phones: phone ? [phone] : [],
         links: [siteUrl],
         contentType: "PAGE",
         jsonLd: [],
@@ -249,13 +351,19 @@ export async function harvestShopifyApis(input: {
         detail: displayName || creds.shop,
       });
     } catch (error) {
+      console.error("Shopify store profile harvest failed", {
+        shop: creds.shop,
+        detail: errorDetail(error),
+      });
       stages.push({
         key: "shopify-shop",
         label: "Read Shopify store profile",
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push("We could not read the store profile. Reopen tidyAgent from Shopify Admin, then scan again.");
+      warnings.push(
+        `We could not read the store profile (${errorDetail(error)}). Reopen tidyAgent from Shopify Admin to refresh the connection, then scan again.`,
+      );
     }
 
     try {
@@ -271,8 +379,7 @@ export async function harvestShopifyApis(input: {
       }>(
         creds.shop,
         creds.accessToken,
-        `#graphql
-        query ShopifyShopPolicies {
+        `query ShopifyShopPolicies {
           shop {
             shopPolicies { type title body url }
           }
