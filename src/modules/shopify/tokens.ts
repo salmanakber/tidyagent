@@ -2,10 +2,16 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/security/settings";
 import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
 import { isShopifyPlatform } from "@/modules/platforms/types";
-import { ShopifyApiError } from "@/modules/shopify/client";
+import { shopifyGet, shopifyGraphql, ShopifyApiError } from "@/modules/shopify/client";
 import { normalizeShopifyShop } from "@/modules/shopify/shop";
 
 const REFRESH_SKEW_MS = 5 * 60 * 1000;
+
+export type ShopifySiteCreds = {
+  shop: string;
+  accessToken: string;
+  scope: string;
+};
 
 export type ShopifyTokenBundle = {
   accessToken: string;
@@ -24,6 +30,27 @@ function asRecord(value: unknown): Record<string, unknown> {
 export function isNonExpiringTokenError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return /non-expiring access tokens are no longer accepted/i.test(message);
+}
+
+export function isShopifyAuthFailure(error: unknown) {
+  if (!(error instanceof ShopifyApiError)) return false;
+  if (error.status === 401) return true;
+  if (error.status === 403 && isNonExpiringTokenError(error)) return true;
+  return false;
+}
+
+function parseAccessTokenExpiry(metadata: Record<string, unknown>) {
+  return typeof metadata.accessTokenExpiresAt === "string"
+    ? Date.parse(metadata.accessTokenExpiresAt)
+    : NaN;
+}
+
+function accessTokenNeedsRefresh(expiresAt: number) {
+  return !Number.isFinite(expiresAt) || expiresAt - Date.now() <= REFRESH_SKEW_MS;
+}
+
+function accessTokenIsExpired(expiresAt: number) {
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
 }
 
 export function merchantShopifyError(error: unknown) {
@@ -189,14 +216,7 @@ export function tokenMetadataFields(input: {
   };
 }
 
-/**
- * Returns a usable Admin API access token, refreshing when the offline token is near expiry.
- */
-export async function getValidShopifyAccessToken(siteId: string): Promise<{
-  shop: string;
-  accessToken: string;
-  scope: string;
-} | null> {
+async function loadShopifySiteAuth(siteId: string) {
   const site = await prisma.wixSite.findUnique({
     where: { id: siteId },
     include: { credential: true },
@@ -205,35 +225,111 @@ export async function getValidShopifyAccessToken(siteId: string): Promise<{
 
   const shop = normalizeShopifyShop(site.shopifyShopDomain) || site.shopifyShopDomain;
   const metadata = asRecord(site.credential?.metadata);
-  let accessToken = decryptSecret(String(metadata.accessToken ?? ""));
+  const accessToken = decryptSecret(String(metadata.accessToken ?? ""));
   if (!accessToken) return null;
 
-  const expiresAt = typeof metadata.accessTokenExpiresAt === "string" ? Date.parse(metadata.accessTokenExpiresAt) : NaN;
-  const refreshToken = decryptSecret(String(metadata.refreshToken ?? ""));
-  const needsRefresh =
-    Boolean(refreshToken) && (!Number.isFinite(expiresAt) || expiresAt - Date.now() <= REFRESH_SKEW_MS);
+  return {
+    siteId,
+    shop,
+    metadata,
+    accessToken,
+    refreshToken: decryptSecret(String(metadata.refreshToken ?? "")),
+    expiresAt: parseAccessTokenExpiry(metadata),
+    scope: String(metadata.scope ?? ""),
+  };
+}
 
-  if (needsRefresh && refreshToken) {
-    const config = await getShopifyOAuthConfig();
-    if (config.apiKey && config.apiSecret) {
-      try {
-        const tokens = await refreshShopifyOfflineToken({
-          shop,
-          apiKey: config.apiKey,
-          apiSecret: config.apiSecret,
-          refreshToken,
-        });
-        await prisma.wixCredential.updateMany({
-          where: { siteId },
-          data: { metadata: tokenMetadataFields({ shop, tokens, previous: metadata }) },
-        });
-        accessToken = tokens.accessToken;
-        return { shop, accessToken, scope: tokens.scope || String(metadata.scope ?? "") };
-      } catch (error) {
-        console.error("Shopify token refresh failed", error);
-      }
-    }
+/**
+ * Force-refresh an expiring offline token and persist it.
+ */
+export async function refreshShopifyAccessTokenForSite(siteId: string): Promise<ShopifySiteCreds | null> {
+  const row = await loadShopifySiteAuth(siteId);
+  if (!row?.refreshToken) return null;
+
+  const config = await getShopifyOAuthConfig();
+  if (!config.apiKey || !config.apiSecret) return null;
+
+  try {
+    const tokens = await refreshShopifyOfflineToken({
+      shop: row.shop,
+      apiKey: config.apiKey,
+      apiSecret: config.apiSecret,
+      refreshToken: row.refreshToken,
+    });
+    await prisma.wixCredential.updateMany({
+      where: { siteId },
+      data: { metadata: tokenMetadataFields({ shop: row.shop, tokens, previous: row.metadata }) },
+    });
+    return { shop: row.shop, accessToken: tokens.accessToken, scope: tokens.scope || row.scope };
+  } catch (error) {
+    console.error("Shopify token refresh failed", { siteId, shop: row.shop, error });
+    return null;
+  }
+}
+
+/**
+ * Returns a usable Admin API access token, refreshing when the offline token is near expiry.
+ */
+export async function getValidShopifyAccessToken(
+  siteId: string,
+  options?: { forceRefresh?: boolean },
+): Promise<ShopifySiteCreds | null> {
+  const row = await loadShopifySiteAuth(siteId);
+  if (!row) return null;
+
+  const shouldRefresh =
+    Boolean(options?.forceRefresh) ||
+    (Boolean(row.refreshToken) && accessTokenNeedsRefresh(row.expiresAt));
+
+  if (shouldRefresh && row.refreshToken) {
+    const refreshed = await refreshShopifyAccessTokenForSite(siteId);
+    if (refreshed) return refreshed;
+    if (accessTokenIsExpired(row.expiresAt)) return null;
   }
 
-  return { shop, accessToken, scope: String(metadata.scope ?? "") };
+  if (accessTokenIsExpired(row.expiresAt) && !row.refreshToken) {
+    return null;
+  }
+
+  return { shop: row.shop, accessToken: row.accessToken, scope: row.scope };
+}
+
+/**
+ * Run a Shopify Admin API call with automatic token refresh + one retry on auth failure.
+ */
+export async function withShopifySiteAuth<T>(
+  siteId: string,
+  fn: (creds: ShopifySiteCreds) => Promise<T>,
+): Promise<T> {
+  let creds = await getValidShopifyAccessToken(siteId);
+  if (!creds) {
+    throw new ShopifyApiError(
+      "Shopify connection expired. Reopen tidyAgent from Shopify Admin → Apps, then scan again.",
+      401,
+    );
+  }
+
+  try {
+    return await fn(creds);
+  } catch (error) {
+    if (!isShopifyAuthFailure(error)) throw error;
+    const refreshed = await refreshShopifyAccessTokenForSite(siteId);
+    if (!refreshed) throw error;
+    creds = refreshed;
+    return await fn(creds);
+  }
+}
+
+export async function shopifyGraphqlForSite<T>(
+  siteId: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  return withShopifySiteAuth(siteId, (creds) =>
+    shopifyGraphql<T>(creds.shop, creds.accessToken, query, variables),
+  );
+}
+
+export async function shopifyGetForSite<T>(siteId: string, path: string): Promise<T> {
+  return withShopifySiteAuth(siteId, (creds) => shopifyGet<T>(creds.shop, creds.accessToken, path));
 }

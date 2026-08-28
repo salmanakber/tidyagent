@@ -1,12 +1,17 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { shopifyGraphql, shopifyGet, ShopifyApiError } from "@/modules/shopify/client";
+import { ShopifyApiError } from "@/modules/shopify/client";
 import { shopPublicUrl } from "@/modules/shopify/shop";
 import type { ScanScope } from "@/modules/knowledge/scan-scope";
 import { classifyPage, type ExtractedPage } from "@/modules/knowledge/extract";
 import type { ScanStage } from "@/modules/knowledge/types";
 import type { PlatformApiHarvest } from "@/modules/knowledge/webflow-sources";
-import { getValidShopifyAccessToken } from "@/modules/shopify/tokens";
+import {
+  getValidShopifyAccessToken,
+  isShopifyAuthFailure,
+  shopifyGetForSite,
+  shopifyGraphqlForSite,
+} from "@/modules/shopify/tokens";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -31,12 +36,19 @@ function errorDetail(error: unknown) {
   return error instanceof Error ? error.message : "Unavailable";
 }
 
+function shopifyConnectionWarning(error?: unknown) {
+  if (isShopifyAuthFailure(error)) {
+    return "Your Shopify connection expired. Reopen tidyAgent from Shopify Admin → Apps, wait for the dashboard to load, then scan again.";
+  }
+  return "Shopify connection missing. Reopen tidyAgent from Shopify Admin → Apps, then scan again.";
+}
+
 async function getShopifyCreds(siteId: string) {
   const creds = await getValidShopifyAccessToken(siteId);
   if (!creds) return null;
   const site = await prisma.wixSite.findUnique({ where: { id: siteId } });
   if (!site) return null;
-  return { site, shop: creds.shop, accessToken: creds.accessToken };
+  return { site, siteId, shop: creds.shop, accessToken: creds.accessToken };
 }
 
 type GqlMoney = { amount?: string; currencyCode?: string };
@@ -157,7 +169,7 @@ type ShopProfile = {
  * Try rich GraphQL first, then a minimal shop query, then REST /shop.json.
  * Field-level denials must not wipe the whole profile.
  */
-async function fetchShopifyShopProfile(shop: string, accessToken: string): Promise<ShopProfile> {
+async function fetchShopifyShopProfile(siteId: string, shop: string): Promise<ShopProfile> {
   const queries = [
     `query ShopifyShopProfileRich {
       shop {
@@ -197,7 +209,7 @@ async function fetchShopifyShopProfile(shop: string, accessToken: string): Promi
   let lastError: unknown = null;
   for (const query of queries) {
     try {
-      const data = await shopifyGraphql<{
+      const data = await shopifyGraphqlForSite<{
         shop?: {
           name?: string;
           contactEmail?: string | null;
@@ -215,7 +227,7 @@ async function fetchShopifyShopProfile(shop: string, accessToken: string): Promi
             phone?: string | null;
           } | null;
         };
-      }>(shop, accessToken, query);
+      }>(siteId, query);
       const row = data.shop;
       if (!row?.name && !row?.myshopifyDomain) {
         lastError = new ShopifyApiError("Shopify returned an empty shop profile");
@@ -241,7 +253,7 @@ async function fetchShopifyShopProfile(shop: string, accessToken: string): Promi
   }
 
   try {
-    const payload = await shopifyGet<{
+    const payload = await shopifyGetForSite<{
       shop?: {
         name?: string;
         email?: string;
@@ -255,7 +267,7 @@ async function fetchShopifyShopProfile(shop: string, accessToken: string): Promi
         country?: string;
         description?: string;
       };
-    }>(shop, accessToken, "/shop.json");
+    }>(siteId, "/shop.json");
     const row = payload.shop;
     if (row) {
       return {
@@ -303,14 +315,14 @@ export async function harvestShopifyApis(input: {
 
   const creds = await getShopifyCreds(input.siteId);
   if (!creds) {
-    warnings.push("Shopify connection missing. Reopen tidyAgent from Shopify Admin, then scan again.");
+    warnings.push(shopifyConnectionWarning());
     return { pages, products, stages, skipped, warnings };
   }
 
   if (input.scope.includeSiteProperties) {
     // Progressive queries: a single field ACCESS_DENIED must not fail the whole profile.
     try {
-      const shop = await fetchShopifyShopProfile(creds.shop, creds.accessToken);
+      const shop = await fetchShopifyShopProfile(input.siteId, creds.shop);
       displayName = String(shop.name || creds.shop);
       currency = shop.currencyCode;
       locale = shop.primaryLocale;
@@ -362,12 +374,14 @@ export async function harvestShopifyApis(input: {
         detail: errorDetail(error),
       });
       warnings.push(
-        `We could not read the store profile (${errorDetail(error)}). Reopen tidyAgent from Shopify Admin to refresh the connection, then scan again.`,
+        isShopifyAuthFailure(error)
+          ? shopifyConnectionWarning(error)
+          : `We could not read the store profile (${errorDetail(error)}). Reopen tidyAgent from Shopify Admin, then scan again.`,
       );
     }
 
     try {
-      const policyData = await shopifyGraphql<{
+      const policyData = await shopifyGraphqlForSite<{
         shop?: {
           shopPolicies?: Array<{
             type?: string | null;
@@ -377,8 +391,7 @@ export async function harvestShopifyApis(input: {
           } | null>;
         };
       }>(
-        creds.shop,
-        creds.accessToken,
+        input.siteId,
         `query ShopifyShopPolicies {
           shop {
             shopPolicies { type title body url }
@@ -433,13 +446,11 @@ export async function harvestShopifyApis(input: {
   if (input.scope.includeCms) {
     try {
       const limit = Math.min(100, Math.max(1, input.scope.maxPages));
-      const payload = await shopifyGraphql<{
+      const payload = await shopifyGraphqlForSite<{
         pages?: { edges?: Array<{ node?: { title?: string; handle?: string; body?: string; isPublished?: boolean } | null }> };
       }>(
-        creds.shop,
-        creds.accessToken,
-        `#graphql
-        query ShopifyPages($first: Int!) {
+        input.siteId,
+        `query ShopifyPages($first: Int!) {
           pages(first: $first) {
             edges {
               node {
@@ -491,12 +502,16 @@ export async function harvestShopifyApis(input: {
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push("We could not read store pages. Reopen tidyAgent from Shopify Admin, then scan again.");
+      warnings.push(
+        isShopifyAuthFailure(error)
+          ? shopifyConnectionWarning(error)
+          : "We could not read store pages. Reopen tidyAgent from Shopify Admin, then scan again.",
+      );
     }
 
     try {
       const articleLimit = Math.min(50, Math.max(1, input.scope.maxCmsItemsPerCollection));
-      const payload = await shopifyGraphql<{
+      const payload = await shopifyGraphqlForSite<{
         articles?: {
           edges?: Array<{
             node?: {
@@ -510,10 +525,8 @@ export async function harvestShopifyApis(input: {
           }>;
         };
       }>(
-        creds.shop,
-        creds.accessToken,
-        `#graphql
-        query ShopifyArticles($first: Int!) {
+        input.siteId,
+        `query ShopifyArticles($first: Int!) {
           articles(first: $first) {
             edges {
               node {
@@ -587,11 +600,9 @@ export async function harvestShopifyApis(input: {
 
       while (hasNext && products.length < input.scope.maxProducts) {
         const first = Math.min(pageSize, input.scope.maxProducts - products.length);
-        const payload: ProductsPayload = await shopifyGraphql<ProductsPayload>(
-          creds.shop,
-          creds.accessToken,
-          `#graphql
-          query ShopifyProducts($first: Int!, $after: String) {
+        const payload: ProductsPayload = await shopifyGraphqlForSite<ProductsPayload>(
+          input.siteId,
+          `query ShopifyProducts($first: Int!, $after: String) {
             products(first: $first, after: $after) {
               pageInfo { hasNextPage endCursor }
               edges {
@@ -686,7 +697,11 @@ export async function harvestShopifyApis(input: {
         status: "failed",
         detail: errorDetail(error),
       });
-      warnings.push("We could not read products. Reopen tidyAgent from Shopify Admin, then scan again.");
+      warnings.push(
+        isShopifyAuthFailure(error)
+          ? shopifyConnectionWarning(error)
+          : "We could not read products. Reopen tidyAgent from Shopify Admin, then scan again.",
+      );
     }
   } else {
     skipped.push("Ecommerce products are included on paid plans.");

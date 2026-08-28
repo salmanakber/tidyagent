@@ -7,6 +7,12 @@ import type { ShopifyShopRecord } from "@/modules/shopify/client";
 import { shopPublicUrl } from "@/modules/shopify/shop";
 import { tokenMetadataFields, type ShopifyTokenBundle } from "@/modules/shopify/tokens";
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 type TokenMetadata = Prisma.JsonObject & {
   provider: "shopify";
   accessToken: string;
@@ -43,15 +49,19 @@ export async function provisionTenantFromShopify(input: {
     accessToken: input.accessToken,
     scope: input.scope ?? "",
   };
-  const tokenMetadata = tokenMetadataFields({
-    shop: shopifyShopDomain,
-    tokens,
-  }) as TokenMetadata;
 
   const existingSite = await prisma.wixSite.findUnique({
     where: { shopifyShopDomain },
     include: { organization: true, credential: true },
   });
+
+  const tokenMetadata = tokenMetadataFields({
+    shop: shopifyShopDomain,
+    tokens,
+    previous: existingSite?.credential?.metadata
+      ? asRecord(existingSite.credential.metadata)
+      : undefined,
+  }) as TokenMetadata;
 
   if (existingSite) {
     return connectExistingShopifySite({

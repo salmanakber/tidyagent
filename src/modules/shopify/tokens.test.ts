@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isNonExpiringTokenError, merchantShopifyError } from "@/modules/shopify/tokens";
+import {
+  isNonExpiringTokenError,
+  isShopifyAuthFailure,
+  merchantShopifyError,
+} from "@/modules/shopify/tokens";
 import { ShopifyApiError } from "@/modules/shopify/client";
 import { shopifyEmbeddedAdminAppUrl } from "@/modules/shopify/open";
 
@@ -23,6 +27,16 @@ describe("shopify tokens helpers", () => {
       ),
     ).toMatch(/reopen tidyAgent/i);
     expect(merchantShopifyError(new ShopifyApiError("boom", 403))).toMatch(/Shopify Admin/i);
+  });
+
+  it("detects auth failures that should trigger token refresh", () => {
+    expect(isShopifyAuthFailure(new ShopifyApiError("unauthorized", 401))).toBe(true);
+    expect(
+      isShopifyAuthFailure(
+        new ShopifyApiError("Non-expiring access tokens are no longer accepted for the Admin API", 403),
+      ),
+    ).toBe(true);
+    expect(isShopifyAuthFailure(new ShopifyApiError("missing scope", 403))).toBe(false);
   });
 
   it("builds the embedded admin app URL", () => {
