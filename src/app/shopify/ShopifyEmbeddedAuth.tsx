@@ -15,7 +15,7 @@ declare global {
 }
 
 const STATUS_STEPS = [
-  "Opening tidyAgent…",
+  "Refreshing your store connection…",
   "Securing your store connection…",
   "Loading your dashboard…",
 ] as const;

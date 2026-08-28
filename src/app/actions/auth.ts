@@ -5,8 +5,9 @@ import { isDevMode } from "@/lib/env";
 import { setSessionCookie, clearSessionCookie, getSession } from "@/lib/security/session";
 import { prisma } from "@/lib/prisma";
 import { completeWixLogin } from "@/modules/auth/wix-open";
-import { isWebflowPlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWebflowPlatform } from "@/modules/platforms/types";
 import { removeWebflowWidgetForSite } from "@/modules/webflow/embed";
+import { shopifyReconnectPath } from "@/modules/shopify/open";
 
 export async function openFromWix(instance: string) {
   const { session, destination } = await completeWixLogin(instance);
@@ -46,14 +47,26 @@ export async function enterDevWorkspace() {
   redirect("/dashboard");
 }
 
-/** Clears session. For Webflow, removes tidyAgent Custom Code first while the token is valid. */
+/** Clears session. Platform-specific reconnect path; Webflow also removes Custom Code while the token is valid. */
 export async function logout() {
   const session = await getSession();
-  if (session && isWebflowPlatform(session.platform)) {
-    await removeWebflowWidgetForSite(session.siteId).catch((error) => {
-      console.error("Webflow widget cleanup on disconnect failed", error);
-    });
+  let redirectTo = "/login?disconnected=1";
+
+  if (session) {
+    const site = await prisma.wixSite.findUnique({ where: { id: session.siteId } });
+
+    if (isWebflowPlatform(session.platform)) {
+      await removeWebflowWidgetForSite(session.siteId).catch((error) => {
+        console.error("Webflow widget cleanup on disconnect failed", error);
+      });
+      redirectTo = "/login?disconnected=1&platform=webflow";
+    } else if (isShopifyPlatform(session.platform) && site?.shopifyShopDomain) {
+      redirectTo = shopifyReconnectPath(site.shopifyShopDomain);
+    } else {
+      redirectTo = "/login?disconnected=1&platform=wix";
+    }
   }
+
   await clearSessionCookie();
-  redirect("/login?disconnected=1");
+  redirect(redirectTo);
 }

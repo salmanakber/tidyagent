@@ -41,7 +41,7 @@ export function AuthCard({
   title,
   subtitle,
   action,
-  submitLabel,
+  submitLabel = "Sign in",
   extraFields,
   lead,
   footer,
@@ -49,13 +49,14 @@ export function AuthCard({
 }: {
   title: string;
   subtitle: string;
-  action: (formData: FormData) => void | Promise<void>;
-  submitLabel: string;
+  action?: (formData: FormData) => void | Promise<void>;
+  submitLabel?: string;
   extraFields?: React.ReactNode;
   lead?: React.ReactNode;
-  footer: React.ReactNode;
+  footer?: React.ReactNode;
   error?: string;
 }) {
+  const showEmail = Boolean(action);
   return (
     <div className="w-full max-w-md rounded-[28px] border border-amber-400/15 bg-navy-900/55 p-8 shadow-[0_30px_80px_-28px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
       <Logo href="/" />
@@ -65,26 +66,32 @@ export function AuthCard({
         <p className="mt-4 rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p>
       ) : null}
       {lead ? <div className="mt-6 space-y-3">{lead}</div> : null}
-      {lead ? (
+      {showEmail && lead ? (
         <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-navy-400">
           <span className="h-px flex-1 bg-white/10" />
           or email
           <span className="h-px flex-1 bg-white/10" />
         </div>
       ) : null}
-      <form action={action} className={lead ? "space-y-3" : "mt-6 space-y-3"}>
-        {extraFields}
-        <input className="field" name="email" type="email" placeholder="Email" required />
-        <input className="field" name="password" type="password" placeholder="Password" minLength={8} required />
-        <button className="btn-primary w-full">{submitLabel}</button>
-      </form>
-      <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-navy-400">
-        <span className="h-px flex-1 bg-white/10" />
-        or
-        <span className="h-px flex-1 bg-white/10" />
-      </div>
-      <GoogleButton label="Continue with Google" />
-      <div className="mt-6 text-sm text-navy-300">{footer}</div>
+      {showEmail ? (
+        <form action={action} className={lead ? "space-y-3" : "mt-6 space-y-3"}>
+          {extraFields}
+          <input className="field" name="email" type="email" placeholder="Email" required />
+          <input className="field" name="password" type="password" placeholder="Password" minLength={8} required />
+          <button className="btn-primary w-full">{submitLabel}</button>
+        </form>
+      ) : null}
+      {showEmail ? (
+        <>
+          <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-navy-400">
+            <span className="h-px flex-1 bg-white/10" />
+            or
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <GoogleButton label="Continue with Google" />
+        </>
+      ) : null}
+      {footer ? <div className="mt-6 text-sm text-navy-300">{footer}</div> : null}
     </div>
   );
 }

@@ -43,14 +43,6 @@ export default async function ShopifyAppHome({
     );
   }
 
-  const session = await getSession();
-  if (session) {
-    await ensureShopifyWidgetForSite(session.siteId).catch((error) => {
-      console.error("Shopify widget inject on open failed", error);
-    });
-    redirect(await workspacePathForOrganization(session.organizationId));
-  }
-
   if (!(await isShopifyAdapterEnabled())) {
     redirect("/shopify/missing?error=disabled");
   }
@@ -77,8 +69,8 @@ export default async function ShopifyAppHome({
     redirect("/shopify/missing?error=no_shop");
   }
 
-  // Embedded Admin: App Bridge session-token exchange (stays in iframe, cycles expiring tokens).
-  // Prefer App Bridge idToken(); URL id_token is a rare bootstrap fallback Shopify may include.
+  // Embedded Admin: always run session-token exchange (even if a tidyAgent cookie exists).
+  // Skipping this left expired offline tokens in the DB and broke knowledge scans with 401.
   if (framed) {
     if (!config.apiKey) {
       redirect("/shopify/missing?error=not_configured");
@@ -91,6 +83,14 @@ export default async function ShopifyAppHome({
         bootstrapIdToken={params.id_token || ""}
       />
     );
+  }
+
+  const session = await getSession();
+  if (session) {
+    await ensureShopifyWidgetForSite(session.siteId).catch((error) => {
+      console.error("Shopify widget inject on open failed", error);
+    });
+    redirect(await workspacePathForOrganization(session.organizationId));
   }
 
   // Standalone / top-level install (not inside Shopify Admin iframe).

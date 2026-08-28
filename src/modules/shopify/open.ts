@@ -22,6 +22,14 @@ export function isShopifyOpenRequest(input: {
   }
 }
 
+export function shopifyReconnectPath(shop: string) {
+  const normalized = shop.trim().toLowerCase();
+  if (!normalized) return "/shopify";
+  const domain = normalized.includes(".myshopify.com") ? normalized : `${normalized}.myshopify.com`;
+  const query = new URLSearchParams({ shop: domain, embedded: "1" });
+  return `/shopify?${query.toString()}`;
+}
+
 export function shopifyAppQuery(params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
