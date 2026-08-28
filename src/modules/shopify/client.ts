@@ -18,6 +18,46 @@ function shopifyApi(shop: string, path: string) {
   return `https://${shop}/admin/api/${SHOPIFY_API_VERSION}${suffix}`;
 }
 
+/** Shopify GraphQL/REST may return errors as an array, string, or keyed object. */
+export function graphqlErrorMessages(errors: unknown): string[] {
+  if (errors == null) return [];
+
+  if (Array.isArray(errors)) {
+    return errors
+      .flatMap((entry) => graphqlErrorMessages(entry))
+      .filter(Boolean);
+  }
+
+  if (typeof errors === "string") {
+    const trimmed = errors.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (typeof errors === "object") {
+    const record = errors as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return [record.message.trim()];
+    }
+    const nested: string[] = [];
+    for (const value of Object.values(record)) {
+      nested.push(...graphqlErrorMessages(value));
+    }
+    if (nested.length) return nested;
+  }
+
+  return [String(errors)];
+}
+
+function graphqlErrorSummary(errors: unknown, status?: number) {
+  const messages = graphqlErrorMessages(errors);
+  if (messages.length) return messages.join("; ");
+  return `Shopify GraphQL failed (${status ?? "unknown"})`;
+}
+
+function hasGraphqlErrors(errors: unknown) {
+  return graphqlErrorMessages(errors).length > 0;
+}
+
 export async function shopifyGet<T>(shop: string, accessToken: string, path: string): Promise<T> {
   const response = await fetch(shopifyApi(shop, path), {
     headers: {
@@ -26,7 +66,19 @@ export async function shopifyGet<T>(shop: string, accessToken: string, path: str
     },
   });
   if (!response.ok) {
-    throw new ShopifyApiError(`Shopify GET ${path} failed (${response.status})`, response.status);
+    const text = await response.text().catch(() => "");
+    let detail = text.slice(0, 240);
+    try {
+      const parsed = JSON.parse(text) as { errors?: unknown; error?: string };
+      const messages = graphqlErrorMessages(parsed.errors ?? parsed.error);
+      if (messages.length) detail = messages.join("; ");
+    } catch {
+      /* keep raw text */
+    }
+    throw new ShopifyApiError(
+      `Shopify GET ${path} failed (${response.status})${detail ? `: ${detail}` : ""}`,
+      response.status,
+    );
   }
   return (await response.json()) as T;
 }
@@ -75,28 +127,25 @@ export async function shopifyGraphql<T>(
   });
   const body = (await response.json().catch(() => ({}))) as {
     data?: T | null;
-    errors?: Array<{ message?: string; extensions?: { code?: string } }>;
+    errors?: unknown;
+    error?: unknown;
   };
 
-  const message =
-    body.errors?.map((e) => e.message).filter(Boolean).join("; ") ||
-    `Shopify GraphQL failed (${response.status})`;
+  const message = graphqlErrorSummary(body.errors ?? body.error, response.status);
 
-  // Auth / hard failures: no usable payload.
   if (!response.ok) {
     throw new ShopifyApiError(message, response.status);
   }
 
   // Shopify often returns field-level ACCESS_DENIED with partial `data`.
-  // Prefer usable data over failing the entire harvest stage.
   if (body.data != null && hasGraphqlPayload(body.data)) {
-    if (body.errors?.length) {
+    if (hasGraphqlErrors(body.errors ?? body.error)) {
       console.warn("Shopify GraphQL partial errors", { shop, message });
     }
     return body.data;
   }
 
-  if (body.errors?.length) {
+  if (hasGraphqlErrors(body.errors ?? body.error)) {
     throw new ShopifyApiError(message, response.status);
   }
 
@@ -135,8 +184,7 @@ export async function fetchShopifyShop(shop: string, accessToken: string) {
     }>(
       shop,
       accessToken,
-      `#graphql
-      query ShopifyShopBootstrap {
+      `query ShopifyShopBootstrap {
         shop {
           name
           contactEmail
@@ -159,7 +207,8 @@ export async function fetchShopifyShop(shop: string, accessToken: string) {
       domain: row.primaryDomain?.host || row.myshopifyDomain || undefined,
       shop_owner: row.shopOwnerName || undefined,
     } satisfies ShopifyShopRecord;
-  } catch {
+  } catch (error) {
+    if (error instanceof ShopifyApiError && error.status === 401) throw error;
     const payload = await shopifyGet<{ shop?: ShopifyShopRecord }>(shop, accessToken, "/shop.json");
     return payload.shop ?? null;
   }

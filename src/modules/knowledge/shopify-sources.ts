@@ -36,6 +36,11 @@ function errorDetail(error: unknown) {
   return error instanceof Error ? error.message : "Unavailable";
 }
 
+function isLegalPoliciesScopeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /read_legal_policies|legal polic/i.test(message);
+}
+
 function shopifyConnectionWarning(error?: unknown) {
   if (isShopifyAuthFailure(error)) {
     return "Your Shopify connection expired. Reopen tidyAgent from Shopify Admin → Apps, wait for the dashboard to load, then scan again.";
@@ -248,8 +253,13 @@ async function fetchShopifyShopProfile(siteId: string, shop: string): Promise<Sh
         country: String(row.shopAddress?.country || ""),
       };
     } catch (error) {
+      if (isShopifyAuthFailure(error)) throw error;
       lastError = error;
     }
+  }
+
+  if (isShopifyAuthFailure(lastError)) {
+    throw lastError;
   }
 
   try {
@@ -437,9 +447,15 @@ export async function harvestShopifyApis(input: {
         status: "skipped",
         detail: errorDetail(error),
       });
-      skipped.push(
-        "Store policies need the read_legal_policies permission. Update the app scopes in Partner Dashboard, reopen tidyAgent from Apps to approve, then scan again.",
-      );
+      if (isShopifyAuthFailure(error)) {
+        skipped.push(shopifyConnectionWarning(error));
+      } else if (isLegalPoliciesScopeError(error)) {
+        skipped.push(
+          "Store policies need the read_legal_policies permission. Update the app scopes in Partner Dashboard, reopen tidyAgent from Apps to approve, then scan again.",
+        );
+      } else {
+        skipped.push(`Store policies could not be read (${errorDetail(error)}).`);
+      }
     }
   }
 
