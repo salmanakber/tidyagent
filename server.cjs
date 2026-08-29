@@ -1,6 +1,7 @@
 /**
  * Custom Next.js HTTP server with a native WebSocket on the same process.
  * PM2: `npm start` → this file. Restart with `pm2 restart tidyagent`.
+ * Production binds 127.0.0.1 (see ecosystem.config.cjs) — nginx proxies :443 → :5070.
  *
  * Nginx must forward upgrades:
  *   proxy_http_version 1.1;

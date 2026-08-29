@@ -11,7 +11,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: "5070",
-        HOST: "0.0.0.0",
+        // Localhost only — nginx on :443 proxies here. Do not bind 0.0.0.0 or dev ports stay public.
+        HOST: "127.0.0.1",
       },
     },
   ],
