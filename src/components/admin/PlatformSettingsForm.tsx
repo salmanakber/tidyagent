@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { savePlatformSettings, testAIProviders, openReviewerDashboard } from "@/app/actions/settings";
 import { VoiceSelect, VoiceTestButton } from "@/components/voice/VoiceTestButton";
+import { shopifyDocsPath } from "@/modules/legal/platform";
 
 export function PlatformSettingsForm({
   failoverEnabled,
@@ -349,8 +350,8 @@ export function PlatformSettingsForm({
             <li>
               Access scopes: products, orders, customers, content, legal policies, themes, script tags (read + write),
               locales. Knowledge and ecommerce training use Admin GraphQL (not storefront scraping). See{" "}
-              <a href="/docs/shopify" className="text-amber-300 hover:underline">
-                /docs/shopify
+              <a href={shopifyDocsPath()} className="text-amber-300 hover:underline">
+                {shopifyDocsPath()}
               </a>
               . The app injects <code className="text-amber-200">widget.js</code> as a ScriptTag. Publish is not
               needed; the storefront picks it up after inject.

@@ -1,5 +1,6 @@
 import { WEBFLOW_OAUTH_SCOPES } from "@/modules/webflow/scopes";
 import { SHOPIFY_OAUTH_SCOPES } from "@/modules/shopify/scopes";
+import { legalHref, shopifyDocsPath } from "@/modules/legal/platform";
 
 export type InstallPermission = {
   scope: string;
@@ -88,7 +89,7 @@ export const SHOPIFY_INSTALL_GUIDE: InstallGuide = {
     "Choose a plan through Shopify Billing when prompted (charges appear on your Shopify invoice).",
   ],
   afterInstall: [
-    "Full user guide: https://agent.tidyflowapp.com/docs/shopify",
+    `Full user guide: https://agent.tidyflowapp.com${shopifyDocsPath()}`,
     "Reopen tidyAgent from Shopify Admin → Apps, or https://agent.tidyflowapp.com/shopify?shop=your-store.myshopify.com.",
     "Billing, trial, and cancellation stay in Shopify; tidyAgent only enforces plan limits after Shopify reports the subscription.",
     "Shopify mandatory privacy webhooks (customers/data_request, customers/redact, shop/redact) are handled at /api/shopify/webhooks.",
@@ -101,7 +102,7 @@ export const SHOPIFY_INSTALL_GUIDE: InstallGuide = {
     "tidyAgent is hosted at agent.tidyflowapp.com — Shopify is not the operator of the dashboard or AI.",
     "Knowledge uses Shopify Admin APIs only. tidyAgent does not crawl or scrape your storefront.",
     "Script tags require write_script_tags; we do not edit your theme Liquid files by default.",
-    "User guide: /docs/shopify — Terms: /terms?platform=shopify — Privacy: /privacy?platform=shopify.",
+    `User guide: ${shopifyDocsPath()} — Terms: ${legalHref("/terms", "SHOPIFY")} — Privacy: ${legalHref("/privacy", "SHOPIFY")}.`,
   ],
 };
 

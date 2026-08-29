@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Logo } from "@/components/brand/Logo";
 import { AuroraScene } from "@/components/brand/AuroraScene";
 import { legalLinkClass } from "@/components/marketing/LegalShell";
+import { shopifyDocsPath } from "@/modules/legal/platform";
 import { installGuideFor } from "@/modules/platforms/install-guide";
 
 export const metadata: Metadata = {
@@ -65,7 +66,7 @@ export default async function InstallIndexPage({
             <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Shopify permissions →</span>
             <span className="mt-2 block text-xs text-navy-400">
               Full guide:{" "}
-              <span className="text-amber-300">/docs/shopify</span>
+              <span className="text-amber-300">{shopifyDocsPath()}</span>
             </span>
           </Link>
         </div>

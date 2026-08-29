@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
 import { AuroraScene } from "@/components/brand/AuroraScene";
-import { legalHref } from "@/modules/legal/platform";
+import { legalHref, shopifyDocsPath } from "@/modules/legal/platform";
 import type { InstallGuide } from "@/modules/platforms/install-guide";
 
 export function InstallGuideView({ guide }: { guide: InstallGuide }) {
   const platform = guide.id === "shopify" ? "SHOPIFY" : "WEBFLOW";
-  const docsHref = guide.id === "webflow" ? "/docs/webflow" : guide.id === "shopify" ? "/docs/shopify" : null;
+  const docsHref = guide.id === "webflow" ? "/docs/webflow" : guide.id === "shopify" ? shopifyDocsPath() : null;
 
   return (
     <AuroraScene>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LegalH, LegalShell, LEGAL_CONTACT, LEGAL_SITE, legalLinkClass } from "@/components/marketing/LegalShell";
 import {
   legalHref,
@@ -7,6 +8,7 @@ import {
   legalPrivacySharingLine,
   legalSiteNoun,
   resolveLegalPlatform,
+  SHOPIFY_LISTING_SLUG,
 } from "@/modules/legal/platform";
 import { platformLabel } from "@/modules/platforms/types";
 
@@ -21,6 +23,9 @@ export default async function PrivacyPage({
   searchParams: Promise<{ platform?: string }>;
 }) {
   const params = await searchParams;
+  if (params.platform?.trim().toLowerCase() === "shopify") {
+    redirect(`/privacy?platform=${SHOPIFY_LISTING_SLUG}`);
+  }
   const platform = await resolveLegalPlatform(params.platform);
   const name = platformLabel(platform);
   const site = legalSiteNoun(platform);

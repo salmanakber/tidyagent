@@ -6,6 +6,20 @@ import {
   type SitePlatform,
 } from "@/modules/platforms/types";
 
+/** URL slug for Shopify listing pages (Partner Dashboard forbids "shopify" in public URLs). */
+export const SHOPIFY_LISTING_SLUG = "sy";
+
+export function shopifyDocsPath() {
+  return `/docs/${SHOPIFY_LISTING_SLUG}`;
+}
+
+/** Query value for /terms and /privacy when the workspace is Shopify. */
+export function legalPlatformQuerySlug(platform: SitePlatform) {
+  if (platform === "WIX") return null;
+  if (platform === "SHOPIFY") return SHOPIFY_LISTING_SLUG;
+  return platform.toLowerCase();
+}
+
 /** Marketplace / install surface name for legal copy. */
 export function legalMarketplace(platform: SitePlatform) {
   if (platform === "WEBFLOW") return "Webflow Marketplace";
@@ -80,14 +94,16 @@ export function legalPrivacySharingLine(platform: SitePlatform) {
 }
 
 export function legalHref(path: "/terms" | "/privacy", platform: SitePlatform) {
-  if (platform === "WIX") return path;
-  return `${path}?platform=${platform.toLowerCase()}`;
+  const slug = legalPlatformQuerySlug(platform);
+  if (!slug) return path;
+  return `${path}?platform=${slug}`;
 }
 
 export function parseLegalPlatformParam(raw?: string | null): SitePlatform | null {
   if (!raw) return null;
   const normalized = raw.trim().toUpperCase();
   if (normalized === "WF") return "WEBFLOW";
+  if (normalized === "SY" || normalized === "SHOPIFY") return "SHOPIFY";
   return isSitePlatform(normalized) ? normalized : null;
 }
 

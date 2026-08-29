@@ -2,6 +2,7 @@ import Link from "next/link";
 import { loginWithEmail } from "@/app/actions/owner-auth";
 import { AuthCard, AuthShell } from "@/components/auth/AuthCard";
 import { wixInstallUrl, wixReconnectUrl } from "@/modules/billing/catalog";
+import { shopifyDocsPath } from "@/modules/legal/platform";
 import { shopifyReconnectPath } from "@/modules/shopify/open";
 
 const ERRORS: Record<string, string> = {
@@ -58,8 +59,8 @@ export default async function LoginPage({
               )}
               <p className="text-xs leading-5 text-navy-400">
                 Guide:{" "}
-                <Link href="/docs/shopify" className="text-amber-300 hover:underline">
-                  /docs/shopify
+                <Link href={shopifyDocsPath()} className="text-amber-300 hover:underline">
+                  {shopifyDocsPath()}
                 </Link>
               </p>
             </>

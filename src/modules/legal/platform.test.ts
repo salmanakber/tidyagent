@@ -5,6 +5,7 @@ describe("legal platform helpers", () => {
   it("parses platform query values", () => {
     expect(parseLegalPlatformParam("webflow")).toBe("WEBFLOW");
     expect(parseLegalPlatformParam("SHOPIFY")).toBe("SHOPIFY");
+    expect(parseLegalPlatformParam("sy")).toBe("SHOPIFY");
     expect(parseLegalPlatformParam("wf")).toBe("WEBFLOW");
     expect(parseLegalPlatformParam("nope")).toBeNull();
   });
@@ -12,7 +13,8 @@ describe("legal platform helpers", () => {
   it("keeps Wix terms URL clean and versions others", () => {
     expect(legalHref("/terms", "WIX")).toBe("/terms");
     expect(legalHref("/privacy", "WEBFLOW")).toBe("/privacy?platform=webflow");
-    expect(legalHref("/terms", "SHOPIFY")).toBe("/terms?platform=shopify");
+    expect(legalHref("/terms", "SHOPIFY")).toBe("/terms?platform=sy");
+    expect(legalHref("/privacy", "SHOPIFY")).toBe("/privacy?platform=sy");
   });
 
   it("does not mention Wix billing on Webflow/Shopify blurbs", () => {

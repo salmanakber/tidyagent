@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { shopifyDocsPath } from "@/modules/legal/platform";
 
 type ShopifyGlobal = {
   ready?: Promise<void>;
@@ -136,8 +137,8 @@ export function ShopifyEmbeddedAuth({
             <p className="text-xs leading-5 text-navy-500">
               Open tidyAgent from <span className="text-navy-300">Shopify Admin → Apps</span>. Make sure the Shopify
               API key in tidyAgent Admin Settings matches your Partner Dashboard client ID. Guide:{" "}
-              <a href="/docs/shopify" className="text-amber-300 hover:underline">
-                /docs/shopify
+              <a href={shopifyDocsPath()} className="text-amber-300 hover:underline">
+                {shopifyDocsPath()}
               </a>
             </p>
           </div>

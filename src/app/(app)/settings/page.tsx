@@ -5,7 +5,7 @@ import { logout } from "@/app/actions/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { planLabel } from "@/modules/billing/catalog";
-import { legalHref } from "@/modules/legal/platform";
+import { legalHref, shopifyDocsPath } from "@/modules/legal/platform";
 import { isWixPlatform, isShopifyPlatform, isWebflowPlatform, platformLabel, resolveSitePlatform } from "@/modules/platforms";
 
 export default async function SettingsPage() {
@@ -77,7 +77,7 @@ export default async function SettingsPage() {
                 platform === "WEBFLOW"
                   ? "/docs/webflow"
                   : platform === "SHOPIFY"
-                    ? "/docs/shopify"
+                    ? shopifyDocsPath()
                     : "/install"
               }
               className="text-amber-300 hover:underline"
