@@ -2,18 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { shopifyDocsPath } from "@/modules/legal/platform";
-
-type ShopifyGlobal = {
-  ready?: Promise<void>;
-  idToken: () => Promise<string>;
-  config?: { apiKey?: string; host?: string; shop?: string };
-};
-
-declare global {
-  interface Window {
-    shopify?: ShopifyGlobal;
-  }
-}
+import { postShopifyIdToken, waitForShopifyGlobal } from "@/lib/shopify/app-bridge-client";
 
 const STATUS_STEPS = [
   "Refreshing your store connection…",
@@ -48,22 +37,14 @@ export function ShopifyEmbeddedAuth({
 
     async function run() {
       try {
-        ensureShopifyApiKeyMeta(apiKey);
-
-        let idToken = bootstrapIdToken.trim();
-        if (!idToken) {
-          const shopify = await waitForShopifyGlobal();
-          if (cancelled) return;
-          setStatus("Securing your store connection…");
-          if (shopify.ready) await shopify.ready;
-          idToken = await shopify.idToken();
-        } else {
-          setStatus("Securing your store connection…");
+        setStatus("Securing your store connection…");
+        if (!bootstrapIdToken.trim()) {
+          await waitForShopifyGlobal(apiKey);
         }
         if (cancelled) return;
 
         setStatus("Loading your dashboard…");
-        const body = await exchangeSession(idToken);
+        const body = await exchangeSession(apiKey, bootstrapIdToken);
         if (cancelled) return;
         window.location.assign(body.redirect || "/");
       } catch (err) {
@@ -148,80 +129,11 @@ export function ShopifyEmbeddedAuth({
   );
 }
 
-function ensureShopifyApiKeyMeta(apiKey: string) {
-  let meta = document.querySelector('meta[name="shopify-api-key"]') as HTMLMetaElement | null;
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.name = "shopify-api-key";
-    document.head.appendChild(meta);
-  }
-  meta.content = apiKey;
-}
-
-async function waitForShopifyGlobal(timeoutMs = 20_000): Promise<ShopifyGlobal> {
-  const started = Date.now();
-  const inAdminFrame = (() => {
-    try {
-      return window.self !== window.top;
-    } catch {
-      return true;
-    }
-  })();
-
-  if (!document.querySelector('script[src*="shopifycloud/app-bridge.js"]')) {
-    await loadAppBridgeScript();
-  }
-
-  while (Date.now() - started < timeoutMs) {
-    const shopify = window.shopify;
-    if (shopify) {
-      try {
-        if (shopify.ready) await shopify.ready;
-      } catch {
-        /* ready rejected — still try idToken */
-      }
-      if (typeof shopify.idToken === "function") return shopify;
-    }
-    await sleep(40);
-  }
-
-  if (!inAdminFrame) {
-    throw new Error(
-      "Shopify App Bridge did not load. Reopen tidyAgent from Apps in Shopify Admin (not a bookmark or new tab).",
-    );
-  }
-
-  const metaKey = document.querySelector('meta[name="shopify-api-key"]')?.getAttribute("content") || "";
-  throw new Error(
-    metaKey
-      ? "Shopify App Bridge did not initialize. Confirm the Shopify API key in tidyAgent Admin Settings exactly matches your Partner Dashboard client ID, then reopen from Apps."
-      : "Shopify App Bridge did not load (missing API key meta). Save your Shopify API key in tidyAgent Admin Settings, then reopen from Apps.",
-  );
-}
-
-function loadAppBridgeScript() {
-  return new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Could not download Shopify App Bridge from cdn.shopify.com"));
-    document.head.appendChild(script);
-  });
-}
-
-async function exchangeSession(idToken: string) {
-  const response = await fetch("/api/shopify/session", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      Accept: "application/json",
-    },
-    credentials: "include",
-  });
+async function exchangeSession(apiKey: string, bootstrapIdToken: string) {
+  const response = await postShopifyIdToken("/api/shopify/session", apiKey, bootstrapIdToken);
 
   if (response.status === 401 && response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1") {
-    const shopify = window.shopify;
-    if (!shopify?.idToken) throw new Error("Could not refresh Shopify session");
+    const shopify = await waitForShopifyGlobal(apiKey);
     const retryToken = await shopify.idToken();
     const retry = await fetch("/api/shopify/session", {
       method: "POST",
@@ -243,8 +155,4 @@ async function exchangeSession(idToken: string) {
     throw new Error(body.error || "Could not connect this store");
   }
   return (await response.json()) as { redirect?: string };
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

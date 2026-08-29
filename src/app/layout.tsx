@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Outfit, Syne } from "next/font/google";
+import { getSession } from "@/lib/security/session";
 import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
+import { isShopifyPlatform } from "@/modules/platforms/types";
 import "./globals.css";
 
 const sans = Outfit({
@@ -34,7 +36,9 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const path = (await headers()).get("x-tidyagent-path") || "";
-  const shopifyEmbedded = path === "/shopify" || path.startsWith("/shopify/");
+  const session = await getSession();
+  const shopifyEmbedded =
+    path === "/shopify" || path.startsWith("/shopify/") || isShopifyPlatform(session?.platform);
   let shopifyApiKey = "";
   if (shopifyEmbedded) {
     shopifyApiKey = (await getShopifyOAuthConfig()).apiKey || "";

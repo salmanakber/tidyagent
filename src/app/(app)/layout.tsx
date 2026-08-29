@@ -5,7 +5,9 @@ import { getImpersonation } from "@/lib/security/admin-session";
 import { getWorkspace } from "@/modules/organizations/workspace";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { AppShell } from "@/components/layout/AppShell";
-import { platformLabel } from "@/modules/platforms";
+import { ShopifyEmbeddedSession } from "@/components/shopify/ShopifyEmbeddedSession";
+import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
+import { isShopifyPlatform, platformLabel } from "@/modules/platforms";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -18,6 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const paid = entitlements.isPaidSeat || Boolean(impersonating);
   const path = (await headers()).get("x-tidyagent-path") || "";
   const setupComplete = workspace.organization.onboardingStatus === "PUBLISHED";
+  const shopify = isShopifyPlatform(session.platform);
+  const shopifyApiKey = shopify ? (await getShopifyOAuthConfig()).apiKey || "" : "";
 
   if (!paid && !path.startsWith("/billing")) {
     redirect("/billing");
@@ -27,19 +31,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell
-      orgName={workspace.organization.name}
-      siteName={workspace.site.displayName || workspace.organization.name}
-      userName={session.name}
-      agentStatus={workspace.agent?.status}
-      impersonating={impersonating}
-      suspended={suspended}
-      suspendedReason={workspace.organization.suspendedReason}
-      locked={!paid}
-      setupIncomplete={paid && !setupComplete}
-      platformLabel={platformLabel(session.platform)}
-    >
-      {children}
-    </AppShell>
+    <>
+      {shopifyApiKey ? <ShopifyEmbeddedSession apiKey={shopifyApiKey} /> : null}
+      <AppShell
+        orgName={workspace.organization.name}
+        siteName={workspace.site.displayName || workspace.organization.name}
+        userName={session.name}
+        agentStatus={workspace.agent?.status}
+        impersonating={impersonating}
+        suspended={suspended}
+        suspendedReason={workspace.organization.suspendedReason}
+        locked={!paid}
+        setupIncomplete={paid && !setupComplete}
+        platformLabel={platformLabel(session.platform)}
+      >
+        {children}
+      </AppShell>
+    </>
   );
 }
