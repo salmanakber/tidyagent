@@ -7,9 +7,9 @@ import {
   legalPrivacyControllers,
   legalPrivacySharingLine,
   legalSiteNoun,
-  resolveLegalPlatform,
   SHOPIFY_LISTING_SLUG,
 } from "@/modules/legal/platform";
+import { resolveLegalPlatform } from "@/modules/legal/resolve-platform";
 import { platformLabel } from "@/modules/platforms/types";
 
 export const metadata: Metadata = {

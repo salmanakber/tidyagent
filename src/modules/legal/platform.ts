@@ -1,8 +1,6 @@
-import { getSession } from "@/lib/security/session";
 import {
   isSitePlatform,
   platformLabel,
-  resolveSitePlatform,
   type SitePlatform,
 } from "@/modules/platforms/types";
 
@@ -105,12 +103,4 @@ export function parseLegalPlatformParam(raw?: string | null): SitePlatform | nul
   if (normalized === "WF") return "WEBFLOW";
   if (normalized === "SY" || normalized === "SHOPIFY") return "SHOPIFY";
   return isSitePlatform(normalized) ? normalized : null;
-}
-
-/** Prefer explicit ?platform=, else signed-in workspace platform, else Wix. */
-export async function resolveLegalPlatform(rawParam?: string | null): Promise<SitePlatform> {
-  const fromQuery = parseLegalPlatformParam(rawParam);
-  if (fromQuery) return fromQuery;
-  const session = await getSession();
-  return resolveSitePlatform(session?.platform);
 }
