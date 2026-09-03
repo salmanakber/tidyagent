@@ -14,13 +14,11 @@ export const legalLinkClass = "text-amber-300 underline-offset-2 hover:underline
 export function LegalShell({
   eyebrow,
   title,
-  doc,
   platform = "WIX",
   children,
 }: {
   eyebrow: string;
   title: string;
-  doc: "terms" | "privacy";
   platform?: SitePlatform;
   children: React.ReactNode;
 }) {
@@ -41,20 +39,6 @@ export function LegalShell({
           Last updated {LEGAL_UPDATED}
           <span className="mx-2 text-navy-500">·</span>
           {platformLabel(platform)} listing
-        </p>
-        <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[12px] text-navy-400">
-          <span>Also view:</span>
-          {(["WIX", "WEBFLOW", "SHOPIFY"] as const).map((p) =>
-            p === platform ? (
-              <span key={p} className="text-amber-300">
-                {platformLabel(p)}
-              </span>
-            ) : (
-              <Link key={p} href={legalHref(doc === "privacy" ? "/privacy" : "/terms", p)} className={legalLinkClass}>
-                {platformLabel(p)}
-              </Link>
-            ),
-          )}
         </p>
         <div className="legal-prose mt-10 space-y-8 text-[15px] leading-7 text-navy-200">{children}</div>
       </main>

@@ -32,7 +32,7 @@ export default async function PrivacyPage({
   const ownerLabel = platform === "SHOPIFY" ? "Store owners" : "Site owners";
 
   return (
-    <LegalShell eyebrow="Legal" title="Privacy Policy" doc="privacy" platform={platform}>
+    <LegalShell eyebrow="Legal" title="Privacy Policy" platform={platform}>
       <p>
         This Privacy Policy explains how tidyAgent (“we”, “us”) handles personal data when you install the app, use
         the dashboard at {LEGAL_SITE}, or when a visitor chats with the widget on a connected {name} {site}.

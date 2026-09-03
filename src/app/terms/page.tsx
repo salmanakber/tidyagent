@@ -35,7 +35,7 @@ export default async function TermsPage({
   const billing = legalBillingBlurb(platform);
 
   return (
-    <LegalShell eyebrow="Legal" title="Terms of Use" doc="terms" platform={platform}>
+    <LegalShell eyebrow="Legal" title="Terms of Use" platform={platform}>
       <p>
         These Terms of Use (“Terms”) govern access to and use of tidyAgent, including the {market} listing,
         the hosted dashboard at {LEGAL_SITE}, the {site} chat widget, and related services (together, the
