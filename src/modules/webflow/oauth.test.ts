@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readWebflowOAuthState, webflowAuthorizeUrl } from "@/modules/webflow/oauth";
 import { isEmbeddedWebflowRequest, isWebflowOpenRequest } from "@/modules/webflow/open";
-import { pickWebflowSite, sitePublicUrl, widgetInlineSource } from "@/modules/webflow/sites";
+import { pickWebflowSite, sitePublicUrl } from "@/modules/webflow/sites";
+import { webflowEmbedHostedLocation } from "@/modules/webflow/widget-script";
 import { syntheticInstanceId } from "@/modules/platforms/types";
 
 describe("webflow oauth helpers", () => {
@@ -42,13 +43,13 @@ describe("webflow oauth helpers", () => {
     expect(sitePublicUrl({ id: "c", shortName: "studio" })).toBe("https://studio.webflow.io");
   });
 
-  it("injects the widget with the synthetic Webflow instance id", () => {
+  it("registers the production embed executable as a hosted URL with instance query", () => {
     const instanceId = syntheticInstanceId("WEBFLOW", "site-99");
-    const source = widgetInlineSource("https://agent.tidyflowapp.com/widget.js", instanceId);
+    const hosted = webflowEmbedHostedLocation("https://agent.tidyflowapp.com", instanceId);
     expect(instanceId).toBe("wf:site-99");
-    expect(source).toContain("https://agent.tidyflowapp.com/widget.js");
-    expect(source).toContain("wf:site-99");
-    expect(source).not.toContain("<script");
+    expect(hosted).toContain("/widget/embed.js");
+    expect(hosted).toContain("instance=wf%3Asite-99");
+    expect(hosted).not.toContain("widget.js");
   });
 });
 

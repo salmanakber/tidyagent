@@ -47,7 +47,9 @@ export default async function SettingsPage() {
             </div>
           </dl>
           <form action={logout} className="mt-6">
-            <button className="btn-secondary">Disconnect this site</button>
+            <button className="btn-secondary">
+              {isWebflowPlatform(session.platform) ? "Uninstall & remove widget" : "Disconnect this site"}
+            </button>
           </form>
           <p className="mt-3 text-xs leading-5 text-navy-400">
             {wix
@@ -55,7 +57,7 @@ export default async function SettingsPage() {
               : isShopifyPlatform(session.platform)
                 ? "Clears this browser session. Reopen tidyAgent from Shopify Admin to authenticate again."
                 : isWebflowPlatform(session.platform)
-                  ? "Clears this browser session and removes tidyAgent’s Webflow Custom Code widget (other scripts are left alone). Reopen from Webflow to connect again, then publish if the live bubble should disappear."
+                  ? "Removes tidyAgent’s Webflow Custom Code via the API (other scripts stay), clears this session, then asks you to Publish the site so the live bubble disappears."
                   : `Clears this browser session for this ${name} site.`}
           </p>
         </div>

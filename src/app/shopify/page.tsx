@@ -11,8 +11,6 @@ import { ShopifyEmbeddedAuth } from "./ShopifyEmbeddedAuth";
 
 export const dynamic = "force-dynamic";
 
-
-
 export default async function ShopifyAppHome({
   searchParams,
 }: {

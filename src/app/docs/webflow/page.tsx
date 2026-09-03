@@ -20,7 +20,7 @@ const TOC = [
   { id: "handoff", label: "Human handoff" },
   { id: "behavior", label: "Support rules & behavior" },
   { id: "widget", label: "Chat widget (Custom Code)" },
-  { id: "disconnect", label: "Disconnect & remove" },
+  { id: "disconnect", label: "Uninstall & remove" },
   { id: "troubleshoot", label: "Troubleshoot" },
 ] as const;
 
@@ -47,12 +47,12 @@ export default function WebflowDocsPage() {
           tidyAgent user guide
         </h1>
         <p className="mt-4 text-[15px] leading-7 text-navy-200">
-          tidyAgent is a <strong className="text-white">Hybrid Webflow App</strong>: a Designer Extension{" "}
-          <strong className="text-white">Launch</strong> panel opens the hosted dashboard (it does not edit your
-          canvas), and a Data Client connects your site. The AI answers visitors from{" "}
-          <strong className="text-white">official Webflow Data APIs</strong> (pages, CMS, ecommerce when available)
-          plus owner notes you add. It does <strong className="text-white">not</strong> crawl or scrape your published
-          domain.
+          tidyAgent is a <strong className="text-white">Webflow Data Client</strong> app: you install it from the
+          Marketplace, approve OAuth permissions, and use the hosted dashboard at agent.tidyflowapp.com. The AI answers
+          visitors from <strong className="text-white">official Webflow Data APIs</strong> (site profile, page
+          metadata, CMS, ecommerce when available) plus owner notes you add. It does{" "}
+          <strong className="text-white">not</strong> crawl or scrape your published domain, and it does{" "}
+          <strong className="text-white">not</strong> call the Page Content (DOM) API.
         </p>
 
         <nav className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -71,8 +71,9 @@ export default function WebflowDocsPage() {
         <div className="mt-14 space-y-14 text-[15px] leading-7 text-navy-200">
           <Section id="install" title="1. Install">
             <ol className="list-decimal space-y-2 pl-5">
-              <li>Open tidyAgent from the Webflow Marketplace or the Designer Extension on your site.</li>
-              <li>Approve the Data Client permissions (see the permissions list on{" "}
+              <li>Install tidyAgent from the Webflow Marketplace.</li>
+              <li>
+                Approve the Data Client permissions (see the permissions list on{" "}
                 <Link href="/install/webflow" className={legalLinkClass}>
                   /install/webflow
                 </Link>
@@ -82,7 +83,7 @@ export default function WebflowDocsPage() {
               <li>Publish your Webflow site so the chat widget (Custom Code) is live for visitors.</li>
             </ol>
             <p className="mt-3">
-              Reopen anytime from the Designer Extension (Launch) or{" "}
+              Reopen anytime from the Webflow Marketplace app or{" "}
               <a href="https://agent.tidyflowapp.com/webflow" className={legalLinkClass}>
                 agent.tidyflowapp.com/webflow
               </a>
@@ -124,8 +125,10 @@ export default function WebflowDocsPage() {
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
-                <strong className="text-white">Webflow Data APIs</strong> — site profile, pages metadata, CMS
-                collections/items, and ecommerce products when your plan and site include them.
+                <strong className="text-white">Webflow Data APIs</strong> — site profile; page metadata (title, SEO
+                description, published path) from <code className="text-amber-300">GET /v2/sites/{"{site_id}"}/pages</code>
+                ; CMS collections and items; ecommerce products when your plan and site include them. Static page body
+                content via <code className="text-amber-300">GET /v2/pages/{"{page_id}"}/dom</code> is not used.
               </li>
               <li>
                 <strong className="text-white">Owner notes</strong> — prices, exceptions, or private instructions you
@@ -197,13 +200,28 @@ export default function WebflowDocsPage() {
 
           <Section id="widget" title="8. Chat widget (Custom Code)">
             <p>
-              On install / open, tidyAgent registers a <strong className="text-white">site-wide JavaScript widget</strong>{" "}
-              through Webflow’s Custom Code API and applies it at the site footer.
+              On install / open, tidyAgent registers the{" "}
+              <strong className="text-white">production chat widget executable</strong> as a versioned{" "}
+              <strong className="text-white">hosted script</strong> through Webflow’s Custom Code API, then applies it at
+              the site footer.
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
-                <strong className="text-white">What it does</strong> — shows the chat bubble and talks to tidyAgent’s
-                hosted APIs for replies, leads, and handoff.
+                <strong className="text-white">Exact production URL</strong> —{" "}
+                <code className="text-amber-300">https://agent.tidyflowapp.com/widget/embed.js</code> (SemVer query{" "}
+                <code className="text-amber-300">v=</code> plus site <code className="text-amber-300">instance</code>{" "}
+                query for workspace binding).
+              </li>
+              <li>
+                <strong className="text-white">How it is registered</strong> —{" "}
+                <code className="text-amber-300">POST /v2/sites/{"{site_id}"}/registered_scripts/hosted</code> with a{" "}
+                <code className="text-amber-300">sha384</code> integrity hash of that file, then{" "}
+                <code className="text-amber-300">PUT /v2/sites/{"{site_id}"}/custom_code</code> to apply it.
+              </li>
+              <li>
+                <strong className="text-white">No nested loaders</strong> — the App does not inject an inline loader and
+                does not chain <code className="text-amber-300">widget.js</code> → another remote executable. The hosted
+                file is the chat UI itself (it only calls tidyAgent JSON APIs for config and replies).
               </li>
               <li>
                 <strong className="text-white">Where it runs</strong> — on your published Webflow site for visitors
@@ -213,29 +231,39 @@ export default function WebflowDocsPage() {
                 <strong className="text-white">Why it is required</strong> — without it, visitors have no chat UI on the
                 live site.
               </li>
-              <li>
-                <strong className="text-white">Remote resources</strong> — the script loads hosted files from{" "}
-                <code className="text-amber-300">https://agent.tidyflowapp.com/widget.js</code> (and related embed
-                assets). It does not edit Designer canvas content.
-              </li>
             </ul>
           </Section>
 
-          <Section id="disconnect" title="9. Disconnecting the App and removing its widget">
-            <ol className="list-decimal space-y-2 pl-5">
+          <Section id="disconnect" title="9. Uninstalling tidyAgent and removing its widget">
+            <p>
+              Uninstalling from tidyAgent removes the Custom Code the App applied. Unrelated scripts are preserved. You
+              must publish the Webflow site for the live bubble to disappear.
+            </p>
+            <ol className="mt-3 list-decimal space-y-2 pl-5">
               <li>
-                In tidyAgent <strong className="text-white">Settings</strong>, use Disconnect. While your Webflow token
-                is still valid, tidyAgent removes <strong className="text-white">only</strong> its own site Custom Code
-                / registered script and leaves unrelated scripts alone.
+                In tidyAgent <strong className="text-white">Settings</strong>, click{" "}
+                <strong className="text-white">Uninstall &amp; remove widget</strong>.
               </li>
               <li>
-                In Webflow, uninstall tidyAgent from the site / Workspace apps so OAuth access is revoked.
+                While your OAuth token is still valid, tidyAgent calls Webflow’s Custom Code API (
+                <code className="text-amber-300">DELETE /v2/sites/{"{site_id}"}/custom_code</code> for App-applied
+                scripts, with a safe fallback) and removes <strong className="text-white">only</strong> tidyAgent’s
+                applied widget. Other Custom Code is left alone. tidyAgent does not apply page-level scripts.
               </li>
-              <li>Publish the Webflow site so visitors no longer load a cached bubble.</li>
+              <li>
+                On the confirmation screen, <strong className="text-white">publish your Webflow site</strong> so
+                visitors stop loading the chat bubble. Publishing is required for the removal to take effect on the live
+                site.
+              </li>
+              <li>
+                Optionally revoke the app under Webflow Site settings → Apps &amp; integrations after Custom Code has
+                been removed.
+              </li>
             </ol>
             <p className="mt-3 text-sm text-navy-400">
-              After uninstall we delete or anonymize associated workspace data after a reasonable retention period. If a
-              bubble remains, publish again or remove any leftover tidyAgent snippet under Site settings → Custom Code.
+              After uninstall we delete or anonymize associated workspace data after a reasonable retention period. You
+              do not need to manually hunt for leftover tidyAgent snippets when uninstall runs successfully through
+              Settings.
             </p>
           </Section>
 

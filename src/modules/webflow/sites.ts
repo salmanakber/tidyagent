@@ -29,7 +29,3 @@ export function pickWebflowSite(sites: WebflowSiteRecord[], preferredId?: string
   });
   return ranked.find((site) => site.customDomains?.length) ?? ranked[0] ?? null;
 }
-
-export function widgetInlineSource(widgetSrc: string, instanceId: string) {
-  return `(function(){if(window.__tidyAgentWebflow)return;window.__tidyAgentWebflow=1;var s=document.createElement("script");s.src=${JSON.stringify(widgetSrc)};s.async=true;s.setAttribute("data-instance",${JSON.stringify(instanceId)}); (document.body||document.documentElement).appendChild(s);})();`;
-}

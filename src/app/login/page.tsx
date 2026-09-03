@@ -75,11 +75,11 @@ export default async function LoginPage({
       <AuthShell
         eyebrow={disconnected ? "Disconnected" : "Webflow"}
         headline={disconnected ? "Reconnect tidyAgent to your Webflow site." : "Open tidyAgent from Webflow."}
-        body="tidyAgent signs you in through Webflow when you launch the app from the Designer or Marketplace. Wix sign-in is not used for Webflow sites."
+        body="tidyAgent signs you in through Webflow OAuth when you install or open the Data Client app from the Marketplace. Wix sign-in is not used for Webflow sites."
       >
         <AuthCard
           title={disconnected ? "Reconnect" : "Webflow sign-in"}
-          subtitle="Launch tidyAgent from Webflow to approve Data Client access again."
+          subtitle="Open tidyAgent from Webflow to approve Data Client access again."
           submitLabel="Sign in"
           error={params.error ? ERRORS[params.error] ?? "Could not sign in." : undefined}
           lead={
@@ -88,7 +88,7 @@ export default async function LoginPage({
                 Open tidyAgent for Webflow
               </a>
               <p className="text-xs leading-5 text-navy-400">
-                Or launch the Designer Extension on your site, then approve permissions. Guide:{" "}
+                Install or reopen from the Webflow Marketplace, then approve permissions. Guide:{" "}
                 <Link href="/docs/webflow" className="text-amber-300 hover:underline">
                   /docs/webflow
                 </Link>

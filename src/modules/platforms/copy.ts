@@ -28,10 +28,10 @@ export function copyForPlatform(platform: SitePlatform | string | null | undefin
       .replace(/\bFull website crawl,\b/gi, "Your Webflow pages, CMS, and")
       .replace(
         /Reads every public page we can find \(sitemap and on-site links\), plus/gi,
-        "Reads your pages, CMS, and store details from Webflow, plus",
+        "Reads page metadata, CMS, and store details from Webflow Data APIs, plus",
       )
-      .replace(/every public page we can find/gi, "your Webflow pages")
-      .replace(/sitemap and on-site links/gi, "your Webflow site")
+      .replace(/every public page we can find/gi, "your Webflow page metadata, CMS, and catalog")
+      .replace(/sitemap and on-site links/gi, "Webflow Data APIs")
       .replace(/\bWebflow Data APIs\b/gi, "your Webflow site")
       .replace(/\bData APIs\b/gi, "your site");
   }
@@ -113,25 +113,25 @@ export function wizardCopyForPlatform(platform?: string | null) {
   const name = platformLabel(platform);
   return {
     connected: (siteName: string, planLabel: string) =>
-      `${siteName} is connected through ${name}. Next, teach your AI employee this site — scoped to ${planLabel} — so answers match your real pages and products.`,
+      `${siteName} is connected through ${name}. Next, teach your AI employee this site — scoped to ${planLabel} — so answers match your real page metadata, CMS, and products.`,
     autoInstall: "Adds the widget site-wide. Publish the site so visitors can see it.",
     manualInstall: "We'll still add site-wide code. Choose this only if you will place the snippet yourself.",
     scanStages: [
       "Confirming your Webflow site",
-      "Reading pages and CMS content",
+      "Reading page metadata and CMS",
       "Loading products & ecommerce",
       "Writing a business understanding",
     ],
     noUrl: "No public URL yet — publish the Webflow site, then scan.",
     crawlHint:
-      "We load your pages, CMS, and ecommerce catalog from your Webflow site so the chat can answer accurately.",
+      "We load site profile, page metadata (title, SEO description, path), CMS items, and ecommerce from Webflow Data APIs — not page DOM content and not a domain crawl.",
     storeHint: "from your ecommerce catalog",
-    factsHint: "Prices, contact details, hours, and services pulled from your Webflow site.",
+    factsHint: "Contact details and business facts from CMS items, products, and owner notes.",
     knowledgeDescription: (nameLabel: string) =>
-      `We teach your AI employee from this ${nameLabel} site — pages, CMS, and ecommerce products on paid plans. Custom notes you add sit above that and are never overwritten.`,
+      `We teach your AI employee from this ${nameLabel} site — page metadata, CMS, and ecommerce products on paid plans. Full static page body text is not loaded. Custom notes you add sit above that and are never overwritten.`,
     scanButton: "Teach AI from this site",
     scanPending: "Learning your site…",
-    scanLiveNote: "This reads your real Webflow site content and products.",
+    scanLiveNote: "This reads Webflow Data APIs (page metadata, CMS, products). It does not scrape your live HTML.",
     hideDomainCrawlToggle: true,
   };
 }

@@ -1,8 +1,18 @@
 (() => {
   const script = document.currentScript;
-  const origin = script?.getAttribute("data-origin") || (script?.src ? new URL(script.src).origin : "");
-  const token = script?.getAttribute("data-token") || "";
-  const instanceRaw = script?.getAttribute("data-instance") || "";
+  const srcUrl = script?.src ? new URL(script.src) : null;
+  const origin =
+    script?.getAttribute("data-origin") ||
+    (srcUrl ? srcUrl.origin : "") ||
+    "";
+  const token =
+    script?.getAttribute("data-token") ||
+    srcUrl?.searchParams.get("token") ||
+    "";
+  const instanceRaw =
+    script?.getAttribute("data-instance") ||
+    srcUrl?.searchParams.get("instance") ||
+    "";
   const instance = instanceRaw.includes("{") ? "" : instanceRaw;
   const site = script?.getAttribute("data-site") || window.location.hostname;
   if (!origin || (!token && !instance && !site)) return;

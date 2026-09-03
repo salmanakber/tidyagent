@@ -3,7 +3,7 @@ export function isWebflowHost(hostname: string) {
   return host === "webflow.com" || host.endsWith(".webflow.com") || host.endsWith(".webflow.io");
 }
 
-/** Designer Extension unique hosts are often CloudFront / Webflow CDN, not *.webflow.com. */
+/** Embedded / Marketplace open hosts are often CloudFront / Webflow CDN, not *.webflow.com. */
 export function isWebflowExtensionHost(hostname: string) {
   const host = hostname.toLowerCase().replace(/\.$/, "");
   return (

@@ -63,7 +63,8 @@ async function getWebflowCreds(siteId: string) {
 }
 
 /**
- * Native Webflow Data API harvest (site, pages, CMS, ecommerce).
+ * Native Webflow Data API harvest (site, page metadata, CMS, ecommerce).
+ * Does not call GET /v2/pages/{page_id}/dom (Get Page Content).
  * Domain crawl is never used for Webflow (Marketplace Data access rules).
  */
 export async function harvestWebflowApis(input: {
@@ -163,18 +164,20 @@ export async function harvestWebflowApis(input: {
       }
       stages.push({
         key: "webflow-pages",
-        label: "Read Webflow pages",
+        label: "Read Webflow page metadata",
         status: apiPages.length ? "done" : "skipped",
-        detail: apiPages.length ? `${Math.min(apiPages.length, input.scope.maxPages)} pages from Webflow` : "No pages listed",
+        detail: apiPages.length
+          ? `${Math.min(apiPages.length, input.scope.maxPages)} pages (title, SEO description, path)`
+          : "No pages listed",
       });
     } catch (error) {
       stages.push({
         key: "webflow-pages",
-        label: "Read Webflow pages",
+        label: "Read Webflow page metadata",
         status: "failed",
         detail: error instanceof Error ? error.message : "Pages unavailable",
       });
-      warnings.push("Webflow pages API could not be read.");
+      warnings.push("Webflow pages list API could not be read (page metadata only; page DOM content is not requested).");
     }
 
     try {

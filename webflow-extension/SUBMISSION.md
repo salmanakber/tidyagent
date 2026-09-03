@@ -1,71 +1,53 @@
-# Webflow Marketplace submission — tidyAgent Designer Extension
+# Webflow Marketplace submission — tidyAgent (Data Client)
 
 Use this checklist when filling the Webflow app submission form.
 
-## Artifacts to upload
+## Architecture (must match everywhere)
 
-| Field | File | How to build |
-| --- | --- | --- |
-| Designer Extension bundle | `tidyagent-webflow-extension.zip` | `npm run webflow:extension` |
-| Source map artifact | `tidyagent-webflow-extension-sourcemaps.zip` | same command (writes both) |
-| App Review Preflight receipt | `wfpre_…` code | Run **App Review Preflight** in the Designer on the **same** zip + source maps, then paste the receipt |
+Architecture: Data Client only.
 
-Build command (from repo root):
+Do not enable a Designer Extension building block. Every submission field, production surface, and user-facing document must say Data Client — not Hybrid App, not Designer Extension.
 
-```bash
-npm run webflow:extension
-```
+## Permission mapping
 
-Outputs:
+Use the exact table in SCOPE_MAPPING.md.
 
-- `tidyagent-webflow-extension.zip` — `index.html`, `webflow.json`, minified `bundle.js`
-- `tidyagent-webflow-extension-sourcemaps.zip` — private `bundle.js.map` for App Review only
+## Custom Code (critical)
 
-Readable source lives in `webflow-extension/src/main.js`.
+Production registers and applies one versioned hosted executable:
 
-## App Review Preflight receipt (optional)
+- URL: https://agent.tidyflowapp.com/widget/embed.js
+- API: POST /v2/sites/{site_id}/registered_scripts/hosted with sha384 integrityHash
+- Apply: PUT /v2/sites/{site_id}/custom_code (footer)
+- No inline nested loader, no widget.js chain, no second remote executable
 
-Webflow marks this field as **optional**. You can submit with only the extension zip + source maps if you prefer.
+## Uninstall lifecycle
 
-### How to install Preflight (this is the missing step)
+1. Settings → Uninstall & remove widget
+2. DELETE /v2/sites/{site_id}/custom_code (App-applied scripts only; unrelated scripts preserved)
+3. Confirmation page prompts merchant to Publish the Webflow site
+4. Docs: https://agent.tidyflowapp.com/docs/webflow#disconnect
 
-It is **not** listed like a normal Marketplace search result. Install it with Webflow’s official OAuth link:
-
-1. Open this link while logged into the **same Webflow Workspace** that owns tidyAgent:  
-   https://webflow.com/oauth/authorize?response_type=code&client_id=0b5411e62233387925e082350666ef374377f81a9abba0dcc2542d6b5b1e4388&scope=authorized_user%3Aread
-2. Approve / install **App Review Preflight** into that Workspace.
-3. Open any site in the **Designer**.
-4. Open apps / extensions in Designer and launch **App Review Preflight**.
-5. In Preflight, choose:
-   - Bundle: `tidyagent-webflow-extension.zip`
-   - Source maps: `tidyagent-webflow-extension-sourcemaps.zip`
-6. Run Preflight → copy the receipt (`wfpre_` + 32 hex characters).
-7. Paste that receipt into the submission form.
-
-Official note: [Submitting your app → Submission artifacts](https://developers.webflow.com/apps/docs/marketplace/submitting-your-app#submission-artifacts).
-
-Do not rebuild between Preflight and submission — the receipt must match the attached artifacts.
+Do not instruct reviewers to manually delete leftover snippets after a successful Settings uninstall.
 
 ## Features overview (paste up to 5)
 
-Use these (or shorten as needed):
-
-1. **AI employee for the live site** — Learns from the published Webflow site (pages, CMS, ecommerce when available) and answers visitors in the site’s brand.
-2. **Designer Launch + hosted dashboard** — Opens tidyAgent from the Webflow Designer; onboarding, knowledge, and agent settings stay on the secure hosted app.
-3. **Chat widget via custom code** — Injects a branded chat bubble site-wide; publish once so visitors see it on the live site.
-4. **Evidence-based answers with human handoff** — Stays grounded in scanned site content; escalates to a human when needed (email / WhatsApp).
-5. **Plan-scoped knowledge & automations** — Starter / Business / Pro unlock scan depth, agents, and automations without leaving Webflow billing for card checkout on Webflow seats.
+1. AI employee for the live site — Learns from Webflow Data APIs (site profile, page metadata, CMS, ecommerce when available) plus owner notes. Does not crawl the published domain or read page DOM content.
+2. Hosted dashboard after Marketplace install — Opens tidyAgent from Webflow OAuth; onboarding, knowledge, and agent settings stay on the secure hosted app.
+3. Chat widget via hosted Custom Code — Registers versioned embed.js with integrity hash and applies it site-wide; publish once so visitors see it on the live site.
+4. Evidence-based answers with human handoff — Stays grounded in scanned API knowledge; escalates to a human when needed (email / WhatsApp).
+5. Plan-scoped knowledge and automations — Starter / Business / Pro unlock scan depth, agents, and automations via card checkout on Webflow seats.
 
 ## App home / URLs (reference)
 
-- App home: `https://agent.tidyflowapp.com/webflow`
-- OAuth callback: `https://agent.tidyflowapp.com/api/webflow/oauth/callback`
-- **Documentation URL (use this in the Marketplace form):** `https://agent.tidyflowapp.com/docs/webflow`
-- **Architecture + scope mapping (attach / paste):** see `webflow-extension/SCOPE_MAPPING.md`
-- Install & permissions: `https://agent.tidyflowapp.com/install/webflow`
-- Terms: `https://agent.tidyflowapp.com/terms?platform=webflow`
-- Privacy: `https://agent.tidyflowapp.com/privacy?platform=webflow`
+- App home: https://agent.tidyflowapp.com/webflow
+- OAuth callback: https://agent.tidyflowapp.com/api/webflow/oauth/callback
+- Documentation: https://agent.tidyflowapp.com/docs/webflow
+- Exact scope mapping: webflow-extension/SCOPE_MAPPING.md
+- Install and permissions: https://agent.tidyflowapp.com/install/webflow
+- Terms: https://agent.tidyflowapp.com/terms?platform=webflow
+- Privacy: https://agent.tidyflowapp.com/privacy?platform=webflow
 
-**Form:** Architecture = **Hybrid App**. Designer Extension = Launch only (hosted dashboard). Knowledge = Webflow Data APIs only (no domain crawl).
+Form: Architecture = Data Client. Knowledge = Webflow Data APIs only (page metadata + CMS + ecommerce; no domain crawl; no Get Page Content).
 
-See also: [Publishing your app](https://developers.webflow.com/apps/docs/publishing-your-app).
+See also: https://developers.webflow.com/apps/docs/marketplace/listing-your-app

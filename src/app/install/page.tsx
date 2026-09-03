@@ -50,7 +50,7 @@ export default async function InstallIndexPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Webflow</p>
             <p className="mt-3 font-display text-2xl text-white">Webflow install guide</p>
             <p className="mt-2 text-sm leading-6 text-navy-300">
-              Marketplace / Designer Extension, Data Client scopes, Custom Code widget, Data APIs only.
+              Marketplace Data Client, OAuth scopes, Custom Code widget, Data APIs only.
             </p>
             <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Webflow guide →</span>
           </Link>

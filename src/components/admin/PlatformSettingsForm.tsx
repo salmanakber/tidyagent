@@ -248,10 +248,9 @@ export function PlatformSettingsForm({
           <h3 className="text-sm font-medium text-white">Webflow setup</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-navy-300">
             <li>
-              In Webflow: Workspace settings → Apps &amp; Integrations → Register app. Building blocks:{" "}
-              <strong className="text-white">Data Client</strong> plus a{" "}
-              <strong className="text-white">Designer Extension</strong> so site owners get Launch inside the
-              Designer, not only Open app.
+              In Webflow: Workspace settings → Apps &amp; Integrations → Register app. Building block:{" "}
+              <strong className="text-white">Data Client only</strong> (do not enable a Designer Extension for Marketplace
+              listing — architecture must stay Data Client).
             </li>
             <li>
               Homepage / App home URL (Open app uses this — paste this, not the marketing site):
@@ -262,21 +261,11 @@ export function PlatformSettingsForm({
               <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.redirectUri}</code>
             </li>
             <li>
-              Designer Extension development URL (Launch in Designer):
-              <code className="mt-1 block break-all text-amber-200">{marketplace.webflow.appHomeUrl}</code>
-              Upload the zip from <code className="text-amber-200">npm run webflow:extension</code> (
-              <code className="text-amber-200">tidyagent-webflow-extension.zip</code>). For Marketplace
-              submission also upload{" "}
-              <code className="text-amber-200">tidyagent-webflow-extension-sourcemaps.zip</code> and the
-              App Review Preflight <code className="text-amber-200">wfpre_</code> receipt — see{" "}
-              <code className="text-amber-200">webflow-extension/SUBMISSION.md</code>.
-            </li>
-            <li>
-              Data Client permissions — turn <strong className="text-white">on</strong>: Sites (read + write), Pages
-              (read + write), Custom code (read + write), CMS (read), Ecommerce (read), Authorized user (read). Optional:
-              Forms (read), Assets (read). Leave Comments, Components, Site activity, and Workspace write{" "}
+              Data Client permissions — turn <strong className="text-white">on</strong> exactly: Authorized user (read),
+              Sites (read + write), Pages (read), Custom code (read + write), CMS (read), Ecommerce (read). Leave Pages
+              write, Forms, Assets, Comments, Components, Site activity, and Workspace write{" "}
               <strong className="text-white">off</strong>. After the app is published, new scopes need a Webflow app
-              update, so add CMS and Ecommerce now even if a site has no shop yet.
+              update, so keep CMS and Ecommerce on even if a site has no shop yet.
             </li>
             <li>Copy Client ID and Client Secret into the fields below, then save.</li>
             <li>

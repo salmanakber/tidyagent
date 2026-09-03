@@ -106,3 +106,21 @@ export async function webflowSend<T>(
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+/** DELETE with no body (e.g. remove App-applied site Custom Code). */
+export async function webflowDelete(accessToken: string, path: string): Promise<void> {
+  const response = await fetch(`${WEBFLOW_API}${path}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new WebflowApiError(
+      `Webflow DELETE ${path} failed (${response.status})${text ? `: ${text.slice(0, 200)}` : ""}`,
+      response.status,
+    );
+  }
+}

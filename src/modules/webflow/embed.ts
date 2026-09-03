@@ -1,20 +1,30 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/security/settings";
+import { getAppOrigin } from "@/lib/env";
 import { getWebflowOAuthConfig } from "@/modules/platforms/marketplace";
 import { isWebflowPlatform } from "@/modules/platforms/types";
-import { WebflowApiError, webflowGet, webflowSend } from "@/modules/webflow/client";
-import { widgetInlineSource } from "@/modules/webflow/sites";
+import { WebflowApiError, webflowDelete, webflowGet, webflowSend } from "@/modules/webflow/client";
+import {
+  WEBFLOW_EMBED_DISPLAY_NAME,
+  WEBFLOW_EMBED_VERSION,
+  webflowEmbedHostedLocation,
+  webflowEmbedIntegrityHash,
+} from "@/modules/webflow/widget-script";
 
-const SCRIPT_NAME = "tidyAgent";
-const SCRIPT_VERSION = "1.0.0";
-
-type RegisteredScript = { id?: string; displayName?: string; version?: string };
+type RegisteredScript = {
+  id?: string;
+  displayName?: string;
+  version?: string;
+  hostedLocation?: string;
+};
 type AppliedScript = { id: string; location?: string; version?: string };
 
 export type WebflowWidgetInjectResult = {
   ok: boolean;
   scriptId?: string;
   version?: string;
+  hostedLocation?: string;
+  integrityHash?: string;
   error?: string;
 };
 
@@ -22,12 +32,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? { ...(value as Record<string, unknown>) }
     : {};
-}
-
-function nextVersion(current?: string | null) {
-  if (!current || !/^\d+\.\d+\.\d+$/.test(current)) return SCRIPT_VERSION;
-  const [major, minor, patch] = current.split(".").map(Number);
-  return `${major}.${minor}.${(patch || 0) + 1}`;
 }
 
 function errorMessage(error: unknown) {
@@ -60,61 +64,50 @@ async function currentAppliedScripts(accessToken: string, webflowSiteId: string)
 }
 
 /**
- * Registers the widget loader and applies it at the site footer.
+ * Registers the production widget executable as a versioned hosted script with SRI,
+ * then applies it at the site footer. No inline nested loaders.
  * Does not publish the Webflow site — the owner must publish for visitors to see it.
  */
 export async function injectWebflowWidget(input: {
   accessToken: string;
   webflowSiteId: string;
-  widgetSrc: string;
   instanceId: string;
+  origin?: string;
 }): Promise<WebflowWidgetInjectResult> {
-  const sourceCode = widgetInlineSource(input.widgetSrc, input.instanceId);
-  const hostedLocation = `${input.widgetSrc}${input.widgetSrc.includes("?") ? "&" : "?"}instance=${encodeURIComponent(input.instanceId)}`;
+  const origin = (input.origin || getAppOrigin()).replace(/\/$/, "");
+  const hostedLocation = webflowEmbedHostedLocation(origin, input.instanceId);
+  const integrityHash = await webflowEmbedIntegrityHash();
   const listed = await listScripts(input.accessToken, input.webflowSiteId);
   const existing = listed.find(
     (row) =>
-      row.displayName?.toLowerCase() === SCRIPT_NAME.toLowerCase() ||
-      row.id === SCRIPT_NAME.toLowerCase(),
+      row.displayName?.toLowerCase() === WEBFLOW_EMBED_DISPLAY_NAME.toLowerCase() ||
+      row.id === WEBFLOW_EMBED_DISPLAY_NAME.toLowerCase(),
   );
-  const version = existing?.version ? nextVersion(existing.version) : SCRIPT_VERSION;
-  let scriptId = existing?.id || SCRIPT_NAME.toLowerCase();
-  let appliedVersion = existing?.version || version;
+
+  let scriptId = existing?.id || WEBFLOW_EMBED_DISPLAY_NAME.toLowerCase();
+  let appliedVersion = WEBFLOW_EMBED_VERSION;
 
   try {
     const registered = await webflowSend<RegisteredScript>(
       input.accessToken,
-      `/v2/sites/${input.webflowSiteId}/registered_scripts/inline`,
+      `/v2/sites/${input.webflowSiteId}/registered_scripts/hosted`,
       "POST",
       {
-        sourceCode,
-        version,
-        displayName: SCRIPT_NAME,
+        hostedLocation,
+        integrityHash,
+        version: WEBFLOW_EMBED_VERSION,
+        displayName: WEBFLOW_EMBED_DISPLAY_NAME,
         canCopy: false,
       },
     );
     if (registered.id) scriptId = registered.id;
     if (registered.version) appliedVersion = registered.version;
-  } catch (inlineError) {
-    try {
-      const hosted = await webflowSend<RegisteredScript>(
-        input.accessToken,
-        `/v2/sites/${input.webflowSiteId}/registered_scripts/hosted`,
-        "POST",
-        {
-          hostedLocation,
-          version,
-          displayName: SCRIPT_NAME,
-          canCopy: false,
-        },
-      );
-      if (hosted.id) scriptId = hosted.id;
-      if (hosted.version) appliedVersion = hosted.version;
-    } catch (hostedError) {
-      if (!existing?.id) {
-        throw inlineError instanceof Error ? inlineError : new Error(errorMessage(hostedError));
-      }
+  } catch (registerError) {
+    if (!existing?.id) {
+      throw registerError instanceof Error ? registerError : new Error(errorMessage(registerError));
     }
+    scriptId = existing.id;
+    appliedVersion = existing.version || WEBFLOW_EMBED_VERSION;
   }
 
   const existingScripts = await currentAppliedScripts(input.accessToken, input.webflowSiteId);
@@ -125,12 +118,19 @@ export async function injectWebflowWidget(input: {
     ],
   });
 
-  return { ok: true, scriptId, version: appliedVersion };
+  return {
+    ok: true,
+    scriptId,
+    version: appliedVersion,
+    hostedLocation,
+    integrityHash,
+  };
 }
 
 /**
- * Removes only tidyAgent’s applied site Custom Code. Leaves all other scripts untouched.
- * Call before logout / uninstall while the OAuth token is still valid.
+ * Removes tidyAgent’s applied site Custom Code during uninstall / disconnect.
+ * Uses DELETE (App-applied scripts only), then PUT remaining non-tidyAgent scripts if needed.
+ * Unrelated customer / other-app scripts are preserved. Does not publish — caller must prompt publish.
  */
 export async function removeWebflowWidget(input: {
   accessToken: string;
@@ -142,8 +142,8 @@ export async function removeWebflowWidget(input: {
     listed
       .filter(
         (row) =>
-          row.displayName?.toLowerCase() === SCRIPT_NAME.toLowerCase() ||
-          row.id?.toLowerCase() === SCRIPT_NAME.toLowerCase() ||
+          row.displayName?.toLowerCase() === WEBFLOW_EMBED_DISPLAY_NAME.toLowerCase() ||
+          row.id?.toLowerCase() === WEBFLOW_EMBED_DISPLAY_NAME.toLowerCase() ||
           (input.scriptId && row.id === input.scriptId),
       )
       .map((row) => row.id)
@@ -151,13 +151,99 @@ export async function removeWebflowWidget(input: {
   );
   if (input.scriptId) tidyIds.add(input.scriptId);
 
-  const existingScripts = await currentAppliedScripts(input.accessToken, input.webflowSiteId);
-  const remaining = existingScripts.filter((row) => !tidyIds.has(row.id));
-  await webflowSend(input.accessToken, `/v2/sites/${input.webflowSiteId}/custom_code`, "PUT", {
-    scripts: remaining,
-  });
+  // Official uninstall path: remove all site Custom Code applied by this App.
+  // Webflow scopes this to the calling App — other apps’ / merchant scripts stay.
+  try {
+    await webflowDelete(input.accessToken, `/v2/sites/${input.webflowSiteId}/custom_code`);
+  } catch (deleteError) {
+    // Fallback: rewrite applied list without tidyAgent only (preserve any shared entries).
+    const existingScripts = await currentAppliedScripts(input.accessToken, input.webflowSiteId);
+    const remaining = existingScripts.filter((row) => !tidyIds.has(row.id));
+    await webflowSend(input.accessToken, `/v2/sites/${input.webflowSiteId}/custom_code`, "PUT", {
+      scripts: remaining,
+    }).catch((putError) => {
+      throw deleteError instanceof Error ? deleteError : putError;
+    });
+  }
 
   return { ok: true, scriptId: input.scriptId ?? undefined };
+}
+
+/**
+ * Full uninstall cleanup for a tidyAgent Webflow site while the OAuth token is still valid.
+ * Removes Custom Code, marks the site disconnected, clears stored widget metadata.
+ */
+export async function uninstallWebflowSite(siteId: string): Promise<{
+  ok: boolean;
+  removed: boolean;
+  error?: string;
+  siteName?: string | null;
+  siteUrl?: string | null;
+}> {
+  const site = await prisma.wixSite.findUnique({
+    where: { id: siteId },
+    include: { credential: true },
+  });
+  if (!site || !isWebflowPlatform(site.platform) || !site.webflowSiteId) {
+    return { ok: false, removed: false, error: "not_webflow" };
+  }
+
+  const metadata = asRecord(site.credential?.metadata);
+  const accessToken = decryptSecret(String(metadata.accessToken ?? ""));
+  if (!accessToken) {
+    await prisma.wixSite.update({
+      where: { id: siteId },
+      data: { connectionStatus: "uninstalled", accessStatus: "revoked", lastSyncedAt: new Date() },
+    });
+    return {
+      ok: false,
+      removed: false,
+      error: "missing_token",
+      siteName: site.displayName,
+      siteUrl: site.url,
+    };
+  }
+
+  const result = await removeWebflowWidget({
+    accessToken,
+    webflowSiteId: site.webflowSiteId,
+    scriptId: typeof metadata.widgetScriptId === "string" ? metadata.widgetScriptId : null,
+  });
+
+  await prisma.wixCredential.updateMany({
+    where: { siteId },
+    data: {
+      metadata: {
+        ...metadata,
+        accessToken: metadata.accessToken,
+        widgetInjectedAt: null,
+        widgetInjectError: result.ok ? null : result.error ?? "remove_failed",
+        widgetRemovedAt: new Date().toISOString(),
+        widgetScriptId: null,
+        widgetScriptVersion: null,
+        widgetHostedLocation: null,
+        widgetIntegrityHash: null,
+        uninstallPublishRequired: true,
+      },
+    },
+  });
+
+  await prisma.wixSite.update({
+    where: { id: siteId },
+    data: {
+      connectionStatus: result.ok ? "uninstalled" : site.connectionStatus,
+      accessStatus: result.ok ? "revoked" : site.accessStatus,
+      lastSyncedAt: new Date(),
+    },
+  });
+
+  return {
+    ok: result.ok,
+    removed: result.ok,
+    error: result.error,
+    siteName: site.displayName,
+    siteUrl: site.url,
+  };
 }
 
 export async function removeWebflowWidgetForSite(siteId: string): Promise<WebflowWidgetInjectResult> {
@@ -191,6 +277,8 @@ export async function removeWebflowWidgetForSite(siteId: string): Promise<Webflo
           widgetRemovedAt: new Date().toISOString(),
           widgetScriptId: null,
           widgetScriptVersion: null,
+          widgetHostedLocation: null,
+          widgetIntegrityHash: null,
         },
       },
     });
@@ -226,8 +314,8 @@ export async function ensureWebflowWidgetForSite(
     const result = await injectWebflowWidget({
       accessToken,
       webflowSiteId: site.webflowSiteId,
-      widgetSrc: config.widgetSrc,
       instanceId: site.wixInstanceId,
+      origin: config.origin || getAppOrigin(),
     });
     await saveInjectResult(siteId, metadata, result);
     return result;
@@ -253,6 +341,8 @@ async function saveInjectResult(
         widgetInjectError: result.ok ? null : result.error ?? "inject_failed",
         widgetScriptId: result.scriptId ?? metadata.widgetScriptId ?? null,
         widgetScriptVersion: result.version ?? metadata.widgetScriptVersion ?? null,
+        widgetHostedLocation: result.hostedLocation ?? metadata.widgetHostedLocation ?? null,
+        widgetIntegrityHash: result.integrityHash ?? metadata.widgetIntegrityHash ?? null,
       },
     },
   });

@@ -1,53 +1,91 @@
-# Webflow resubmission — architecture & scope mapping
+# Webflow Marketplace — exact production scope mapping (Data Client)
 
-Paste / attach this with your Marketplace resubmission. Keep **Data Client permissions in the Webflow App dashboard identical** to the OAuth scopes below (no Forms, Assets, or extra Design data scopes).
+Architecture: Data Client only. No Designer Extension.
 
-## Architecture: Hybrid App (intentional)
+Documentation: https://agent.tidyflowapp.com/docs/webflow
+Permissions list: https://agent.tidyflowapp.com/install/webflow
 
-tidyAgent is a **Hybrid App**:
+This file lists every Webflow Data API endpoint the production App calls. No optional, fallback, or unused endpoints.
 
-| Building block | Production use |
-| --- | --- |
-| **Designer Extension** | Launch panel in the Webflow Designer. Bundle only opens the hosted dashboard (`https://agent.tidyflowapp.com/webflow?embed=1`). It does **not** edit canvas, styles, or design elements. |
-| **Data Client** | OAuth + Webflow Data APIs for site profile, pages, CMS, ecommerce, and Custom Code (chat widget). |
+## Knowledge sources (exact)
 
-**Why authorization shows “View your designs” / “Edit designs on your behalf”:**  
-Those strings come from enabling the **Designer Extension** building block (required to Launch from Designer). Production Designer functionality is **Launch → hosted app only**. We do not request additional Design/Assets/Forms Data Client scopes.
+| Source | What production reads | What production does not read |
+| --- | --- | --- |
+| Site profile | Site display name, short name, publish time, public URL fields | — |
+| Pages | Page list metadata only: title, SEO description, published path | Static page DOM / body text. Production does not call GET /v2/pages/{page_id}/dom (Get Page Content). |
+| CMS | Collection list and item fieldData | — |
+| Ecommerce | Product catalog fields when the site has a store | — |
+| Owner notes | Text the merchant types in the tidyAgent dashboard | — |
 
-**Artifacts:** Designer Extension zip + source maps + Preflight receipt (same build). Demo video should show Launch from Designer opening the dashboard.
+There is no domain crawl and no HTML scrape of the published site.
 
-Documentation: `https://agent.tidyflowapp.com/docs/webflow`  
-Permissions list: `https://agent.tidyflowapp.com/install/webflow`
+## Exact production endpoint mapping
 
-## Custom Code (disclose on listing)
+| Scope | Exact production endpoint | Method | When called | Customer-facing use |
+| --- | --- | --- | --- | --- |
+| authorized_user:read | /v2/token/authorized_by | GET | OAuth install and reconnect | Identify the installing Webflow user and bind the tidyAgent workspace |
+| sites:read | /v2/sites | GET | OAuth install and reconnect | List authorized sites and select the connected site |
+| sites:read | /v2/sites/{site_id} | GET | Knowledge scan | Read site profile (name, domains, publish metadata) for the workspace |
+| sites:write | Used together with PUT /v2/sites/{site_id}/custom_code below | — | Install widget; Disconnect | Webflow requires sites:write for site-level Custom Code apply and remove. tidyAgent does not call a separate sites update endpoint |
+| pages:read | /v2/sites/{site_id}/pages | GET | Knowledge scan | Read page metadata (title, SEO description, published path) for AI knowledge. Does not read page DOM content |
+| cms:read | /v2/sites/{site_id}/collections | GET | Knowledge scan (plan-scoped) | List CMS collections |
+| cms:read | /v2/collections/{collection_id}/items | GET | Knowledge scan (plan-scoped) | Read CMS item fields for AI knowledge |
+| ecommerce:read | /v2/sites/{site_id}/products | GET | Knowledge scan (plan-scoped, when store exists) | Read product catalog for AI product answers |
+| custom_code:read | /v2/sites/{site_id}/registered_scripts | GET | Install and open app | Detect whether the tidyAgent script is already registered |
+| custom_code:read | /v2/sites/{site_id}/custom_code | GET | Install, open app, Disconnect | Read applied site scripts before apply or remove |
+| custom_code:write | /v2/sites/{site_id}/registered_scripts/hosted | POST | Install and open app | Register the production executable https://agent.tidyflowapp.com/widget/embed.js as a versioned hosted script with sha384 integrityHash |
+| custom_code:write | /v2/sites/{site_id}/custom_code | PUT | Install and open app | Apply the hosted script at the site footer |
+| custom_code:write | /v2/sites/{site_id}/custom_code | DELETE | Uninstall / Settings → Uninstall & remove widget | Remove Custom Code applied by this App only; unrelated scripts preserved. Merchant is then prompted to Publish |
 
-- On install/open, tidyAgent registers a **site-wide JavaScript chat widget** via the Custom Code API and applies it at the site footer.
-- The script loads remote assets from `https://agent.tidyflowapp.com/widget.js` (and related embed JS).
-- Required so visitors see the chat bubble on the **published** site (publish still required).
-- On **Disconnect** in tidyAgent Settings, the app removes only its applied Custom Code while the token is valid. Unrelated customer scripts are preserved. After Webflow uninstall, publish again if a cached bubble remains.
+## Custom Code disclosure (exact)
 
-## Knowledge: Data APIs only (no domain crawl)
+Production applies one executable only:
 
-Webflow workspaces **never** run public-site crawl/scrape. Knowledge is loaded only through official Webflow Data APIs listed below.
+1. POST /v2/sites/{site_id}/registered_scripts/hosted
+   - hostedLocation: https://agent.tidyflowapp.com/widget/embed.js?v={SemVer}&instance={workspaceId}
+   - integrityHash: sha384-… computed from public/widget/embed.js
+   - version: SemVer of that executable (currently 1.1.0)
+   - displayName: tidyAgent
+2. PUT /v2/sites/{site_id}/custom_code — apply that registered script at location footer
 
-## Scope mapping (required)
+The hosted file is the full chat widget UI. It does not create further remote script elements. It only calls tidyAgent HTTPS JSON APIs (/api/widget/config, chat, lead, etc.) for data.
 
-| Scope | Customer-facing feature | API | Trigger | Why read/write | Where in app / demo |
-| --- | --- | --- | --- | --- | --- |
-| `authorized_user:read` | Tie workspace to installing user | `GET /v2/token/authorized_by` | OAuth install / reconnect | Read identity only | Install → dashboard |
-| `sites:read` | Site name, URL, locale for workspace | `GET /v2/sites`, `GET /v2/sites/{site_id}` | Install; Knowledge sync | Read site metadata | Onboarding, Knowledge, Settings |
-| `sites:write` | Apply/remove site-level Custom Code (Webflow lifecycle) | Used with Custom Code site endpoints | Install widget; Disconnect remove | Write required by Webflow for site-level script apply/remove | Install; Settings → Disconnect |
-| `pages:read` | Page titles/paths for AI knowledge | `GET /v2/sites/{site_id}/pages` | Knowledge “Read site via Webflow APIs” | Read page metadata (not HTML scrape) | Knowledge / onboarding scan |
-| `cms:read` | CMS items for answers | `GET /v2/sites/{site_id}/collections`, `GET …/collections/{id}/items` | Knowledge sync (plan-scoped) | Read CMS content | Knowledge |
-| `ecommerce:read` | Product catalog answers | `GET /v2/sites/{site_id}/products` | Knowledge sync on Business/Pro when store exists | Read products | Knowledge, chat product cards |
-| `custom_code:read` | Detect existing tidyAgent script | `GET /v2/sites/{site_id}/custom_code`, `GET …/registered_scripts` | Install / open app | Read applied scripts | Background on open |
-| `custom_code:write` | Install & remove chat widget | `POST …/registered_scripts/inline` (or hosted); `PUT …/custom_code` | Install/open; Disconnect | Write to register and apply/remove **only** tidyAgent script | Live bubble on published site |
+Not used for Webflow Custom Code:
 
-**Not requested:** `pages:write`, Forms, Assets, Design file APIs beyond Designer Extension Launch.
+- Inline loaders
+- https://agent.tidyflowapp.com/widget.js
+- Nested runtime loaders that fetch another remote .js executable
+- POST /v2/sites/{site_id}/registered_scripts/inline
 
-## Align your Webflow dashboard
+The merchant must publish the Webflow site for visitors to see the bubble.
 
-1. Data Client permissions = **exactly** the eight scopes in the table.  
-2. Turn off Forms, Assets, and any unused write scopes.  
-3. Architecture on form: **Hybrid**.  
-4. Documentation URL: `https://agent.tidyflowapp.com/docs/webflow`.
+## Uninstall lifecycle (exact)
+
+1. Merchant opens tidyAgent Settings and clicks Uninstall & remove widget.
+2. While the OAuth token is valid, tidyAgent calls DELETE /v2/sites/{site_id}/custom_code (removes Custom Code applied by this App only). If needed, falls back to PUT /v2/sites/{site_id}/custom_code with tidyAgent’s script omitted so unrelated scripts remain.
+3. tidyAgent does not apply page-level Custom Code, so site-level removal is sufficient.
+4. Merchant is redirected to /webflow/uninstalled and prompted to Publish the Webflow site so the live bubble disappears.
+5. Merchant may then revoke the app in Webflow Site settings if desired.
+
+Publishing is required for removal to take effect on the live site. tidyAgent does not publish automatically.
+
+## Endpoints not used in production
+
+- GET /v2/pages/{page_id}/dom (Get Page Content)
+- POST /v2/sites/{site_id}/registered_scripts/inline
+- pages:write, Forms, Assets, Designer Extension APIs
+
+## Align Webflow App dashboard permissions
+
+Enable only:
+
+1. authorized_user:read
+2. sites:read
+3. sites:write
+4. pages:read
+5. cms:read
+6. ecommerce:read
+7. custom_code:read
+8. custom_code:write
+
+Turn off pages:write, Forms, Assets, and any Designer Extension building block.

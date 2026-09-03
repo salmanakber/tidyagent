@@ -6,7 +6,7 @@ import { setSessionCookie, clearSessionCookie, getSession } from "@/lib/security
 import { prisma } from "@/lib/prisma";
 import { completeWixLogin } from "@/modules/auth/wix-open";
 import { isShopifyPlatform, isWebflowPlatform } from "@/modules/platforms/types";
-import { removeWebflowWidgetForSite } from "@/modules/webflow/embed";
+import { uninstallWebflowSite } from "@/modules/webflow/embed";
 import { shopifyReconnectPath } from "@/modules/shopify/open";
 
 export async function openFromWix(instance: string) {
@@ -56,10 +56,15 @@ export async function logout() {
     const site = await prisma.wixSite.findUnique({ where: { id: session.siteId } });
 
     if (isWebflowPlatform(session.platform)) {
-      await removeWebflowWidgetForSite(session.siteId).catch((error) => {
-        console.error("Webflow widget cleanup on disconnect failed", error);
+      const result = await uninstallWebflowSite(session.siteId).catch((error) => {
+        console.error("Webflow uninstall cleanup failed", error);
+        return { ok: false, removed: false, error: "cleanup_failed" as string | undefined };
       });
-      redirectTo = "/login?disconnected=1&platform=webflow";
+      const params = new URLSearchParams({
+        removed: result.removed ? "1" : "0",
+      });
+      if (result.error) params.set("error", result.error);
+      redirectTo = `/webflow/uninstalled?${params.toString()}`;
     } else if (isShopifyPlatform(session.platform) && site?.shopifyShopDomain) {
       redirectTo = shopifyReconnectPath(site.shopifyShopDomain);
     } else {
