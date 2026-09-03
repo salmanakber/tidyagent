@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/security/settings";
 import { getAppOrigin } from "@/lib/env";
@@ -32,6 +33,10 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? { ...(value as Record<string, unknown>) }
     : {};
+}
+
+function asJson(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
 }
 
 function errorMessage(error: unknown) {
@@ -213,7 +218,7 @@ export async function uninstallWebflowSite(siteId: string): Promise<{
   await prisma.wixCredential.updateMany({
     where: { siteId },
     data: {
-      metadata: {
+      metadata: asJson({
         ...metadata,
         accessToken: metadata.accessToken,
         widgetInjectedAt: null,
@@ -224,7 +229,7 @@ export async function uninstallWebflowSite(siteId: string): Promise<{
         widgetHostedLocation: null,
         widgetIntegrityHash: null,
         uninstallPublishRequired: true,
-      },
+      }),
     },
   });
 
@@ -270,7 +275,7 @@ export async function removeWebflowWidgetForSite(siteId: string): Promise<Webflo
     await prisma.wixCredential.updateMany({
       where: { siteId },
       data: {
-        metadata: {
+        metadata: asJson({
           ...metadata,
           widgetInjectedAt: null,
           widgetInjectError: null,
@@ -279,7 +284,7 @@ export async function removeWebflowWidgetForSite(siteId: string): Promise<Webflo
           widgetScriptVersion: null,
           widgetHostedLocation: null,
           widgetIntegrityHash: null,
-        },
+        }),
       },
     });
     return result;
@@ -335,7 +340,7 @@ async function saveInjectResult(
   await prisma.wixCredential.updateMany({
     where: { siteId },
     data: {
-      metadata: {
+      metadata: asJson({
         ...metadata,
         widgetInjectedAt: result.ok ? new Date().toISOString() : metadata.widgetInjectedAt ?? null,
         widgetInjectError: result.ok ? null : result.error ?? "inject_failed",
@@ -343,7 +348,7 @@ async function saveInjectResult(
         widgetScriptVersion: result.version ?? metadata.widgetScriptVersion ?? null,
         widgetHostedLocation: result.hostedLocation ?? metadata.widgetHostedLocation ?? null,
         widgetIntegrityHash: result.integrityHash ?? metadata.widgetIntegrityHash ?? null,
-      },
+      }),
     },
   });
 }
