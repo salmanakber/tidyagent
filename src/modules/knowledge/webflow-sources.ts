@@ -92,7 +92,7 @@ export async function harvestWebflowApis(input: {
     try {
       const site = await webflowGet<WebflowSiteRecord>(creds.accessToken, `/v2/sites/${creds.webflowSiteId}`);
       displayName = site.displayName || site.shortName || null;
-      siteUrl = sitePublicUrl(site) || (coerceWebflowPublicUrl(input.siteUrl) ?? undefined);
+      siteUrl = sitePublicUrl(site) || coerceWebflowPublicUrl(input.siteUrl) || siteUrl;
       const text = [
         displayName,
         siteUrl,
