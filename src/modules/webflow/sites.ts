@@ -2,15 +2,42 @@ export type WebflowSiteRecord = {
   id: string;
   displayName?: string;
   shortName?: string;
+  /** Screenshot image URL from Webflow — not a live site URL. */
   previewUrl?: string;
   lastPublished?: string | null;
   customDomains?: { url?: string; id?: string }[];
 };
 
+function asHttpsUrl(value?: string | null) {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      const parsed = new URL(raw);
+      const host = parsed.hostname.toLowerCase();
+      if (host === "screenshots.webflow.com" || host.endsWith(".png") || parsed.pathname.toLowerCase().endsWith(".png")) {
+        return undefined;
+      }
+      return raw;
+    } catch {
+      return undefined;
+    }
+  }
+  if (raw.includes("screenshots.webflow.com") || raw.toLowerCase().endsWith(".png")) return undefined;
+  return `https://${raw}`;
+}
+
+/** Drop stored screenshot URLs from older installs. */
+export function coerceWebflowPublicUrl(value?: string | null) {
+  return asHttpsUrl(value) ?? null;
+}
+
+/** Live site URL for onboarding / knowledge. Never uses Webflow screenshot previewUrl. */
 export function sitePublicUrl(site: WebflowSiteRecord) {
-  const custom = site.customDomains?.[0]?.url?.trim();
-  if (custom) return custom.includes("://") ? custom : `https://${custom}`;
-  if (site.previewUrl) return site.previewUrl;
+  for (const domain of site.customDomains ?? []) {
+    const url = asHttpsUrl(domain.url);
+    if (url) return url;
+  }
   if (site.shortName) return `https://${site.shortName}.webflow.io`;
   return undefined;
 }

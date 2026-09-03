@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readWebflowOAuthState, webflowAuthorizeUrl } from "@/modules/webflow/oauth";
 import { isEmbeddedWebflowRequest, isWebflowOpenRequest } from "@/modules/webflow/open";
-import { pickWebflowSite, sitePublicUrl } from "@/modules/webflow/sites";
+import { pickWebflowSite, sitePublicUrl, coerceWebflowPublicUrl } from "@/modules/webflow/sites";
 import { webflowEmbedHostedLocation } from "@/modules/webflow/widget-script";
 import { syntheticInstanceId } from "@/modules/platforms/types";
 
@@ -41,6 +41,19 @@ describe("webflow oauth helpers", () => {
     expect(pickWebflowSite(sites)?.id).toBe("b");
     expect(sitePublicUrl(sites[1]!)).toBe("https://shop.example.com");
     expect(sitePublicUrl({ id: "c", shortName: "studio" })).toBe("https://studio.webflow.io");
+    expect(
+      sitePublicUrl({
+        id: "d",
+        shortName: "tidy-demo",
+        previewUrl:
+          "https://screenshots.webflow.com/sites/6a9289ecd2602b9436d70a6b/20260829073731_9baae8d65c3c4e1ecb9d1f521b2dd8af.png",
+      }),
+    ).toBe("https://tidy-demo.webflow.io");
+    expect(
+      coerceWebflowPublicUrl(
+        "https://screenshots.webflow.com/sites/6a9289ecd2602b9436d70a6b/20260829073731_9baae8d65c3c4e1ecb9d1f521b2dd8af.png",
+      ),
+    ).toBeNull();
   });
 
   it("registers the production embed executable as a hosted URL with instance query", () => {

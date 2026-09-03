@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/security/session";
+import { isWebflowPlatform } from "@/modules/platforms/types";
+import { coerceWebflowPublicUrl } from "@/modules/webflow/sites";
 
 /**
  * Every tenant-owned query must go through a helper that binds organizationId
@@ -43,6 +45,14 @@ export async function getWorkspace(session: AppSession) {
   const site = organization.sites[0];
   if (!site || site.id !== session.siteId) {
     throw new TenantAccessError();
+  }
+
+  if (isWebflowPlatform(site.platform) && site.url && !coerceWebflowPublicUrl(site.url)) {
+    await prisma.wixSite.update({
+      where: { id: site.id },
+      data: { url: null },
+    });
+    site.url = null;
   }
 
   const agents = organization.agents;

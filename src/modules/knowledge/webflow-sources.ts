@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/security/settings";
 import { firstImageUrl } from "@/modules/knowledge/media";
 import { webflowGet } from "@/modules/webflow/client";
-import { sitePublicUrl, type WebflowSiteRecord } from "@/modules/webflow/sites";
+import { sitePublicUrl, coerceWebflowPublicUrl, type WebflowSiteRecord } from "@/modules/webflow/sites";
 import { isWebflowPlatform } from "@/modules/platforms/types";
 import type { ScanScope } from "@/modules/knowledge/scan-scope";
 import { classifyPage, type ExtractedPage } from "@/modules/knowledge/extract";
@@ -92,7 +92,7 @@ export async function harvestWebflowApis(input: {
     try {
       const site = await webflowGet<WebflowSiteRecord>(creds.accessToken, `/v2/sites/${creds.webflowSiteId}`);
       displayName = site.displayName || site.shortName || null;
-      siteUrl = sitePublicUrl(site) || siteUrl;
+      siteUrl = sitePublicUrl(site) || (coerceWebflowPublicUrl(input.siteUrl) ?? undefined);
       const text = [
         displayName,
         siteUrl,

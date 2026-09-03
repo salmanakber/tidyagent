@@ -29,7 +29,8 @@ export async function provisionTenantFromWebflow(input: {
 }): Promise<AppSession> {
   const webflowSiteId = input.site.id;
   const instanceId = syntheticInstanceId("WEBFLOW", webflowSiteId);
-  const url = sitePublicUrl(input.site);
+  // Never persist Webflow screenshot previewUrl — only custom domain or *.webflow.io.
+  const url = sitePublicUrl(input.site) ?? null;
   const displayName = input.site.displayName || input.site.shortName || url || "Webflow site";
   const ownerEmail = input.user?.email?.trim().toLowerCase() || undefined;
   const ownerName =
@@ -102,7 +103,7 @@ async function connectExistingWebflowSite(input: {
     wixInstanceId: string;
   };
   displayName: string;
-  url?: string;
+  url: string | null;
   ownerEmail?: string;
   instanceId: string;
   tokenMetadata: TokenMetadata;
@@ -164,7 +165,7 @@ async function createWebflowTenant(input: {
   webflowSiteId: string;
   instanceId: string;
   displayName: string;
-  url?: string;
+  url: string | null;
   ownerEmail?: string;
   user: { id: string; wixUserId: string | null };
   tokenMetadata: TokenMetadata;
