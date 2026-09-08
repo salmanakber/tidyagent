@@ -39,9 +39,21 @@ export async function GET(request: Request) {
       siteId: session.siteId,
       planKey,
     });
-    return NextResponse.redirect(result.confirmationUrl);
+    // Absolute Shopify Admin confirmation URL (RecurringApplicationCharge approve screen).
+    // Callers should open this with target="_top" so it is not trapped in the app iframe.
+    const confirm = new URL(result.confirmationUrl);
+    if (url.searchParams.get("format") === "json") {
+      return NextResponse.json({ confirmationUrl: confirm.toString() });
+    }
+    return NextResponse.redirect(confirm, 303);
   } catch (error) {
     console.error("Shopify billing start failed", error);
+    if (url.searchParams.get("format") === "json") {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "checkout_failed" },
+        { status: 502 },
+      );
+    }
     return NextResponse.redirect(new URL("/billing?error=checkout", getAppOrigin()));
   }
 }
