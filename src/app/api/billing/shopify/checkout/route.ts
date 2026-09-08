@@ -19,17 +19,21 @@ const PLANS: Record<string, Extract<PlanKey, "STARTER" | "GROWTH" | "PRO">> = {
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const wantJson = url.searchParams.get("format") === "json";
   const planKey = PLANS[(url.searchParams.get("plan") ?? "").toUpperCase()];
   if (!planKey) {
+    if (wantJson) return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     return NextResponse.redirect(new URL("/billing?error=plan", getAppOrigin()));
   }
 
   const session = await getSession();
   if (!session) {
+    if (wantJson) return NextResponse.json({ error: "Session expired. Reopen tidyAgent from Shopify Admin." }, { status: 401 });
     return NextResponse.redirect(new URL("/", getAppOrigin()));
   }
 
   if (!isShopifyPlatform(resolveSitePlatform(session.platform))) {
+    if (wantJson) return NextResponse.json({ error: "Shopify billing only" }, { status: 403 });
     return NextResponse.redirect(new URL("/billing", getAppOrigin()));
   }
 
@@ -40,15 +44,14 @@ export async function GET(request: Request) {
       planKey,
     });
     // Absolute Shopify Admin confirmation URL (RecurringApplicationCharge approve screen).
-    // Callers should open this with target="_top" so it is not trapped in the app iframe.
     const confirm = new URL(result.confirmationUrl);
-    if (url.searchParams.get("format") === "json") {
+    if (wantJson) {
       return NextResponse.json({ confirmationUrl: confirm.toString() });
     }
     return NextResponse.redirect(confirm, 303);
   } catch (error) {
     console.error("Shopify billing start failed", error);
-    if (url.searchParams.get("format") === "json") {
+    if (wantJson) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "checkout_failed" },
         { status: 502 },

@@ -5,12 +5,13 @@ import type { PlanKey } from "@prisma/client";
 import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
+import { ShopifyPlanCheckoutButton } from "@/components/shopify/ShopifyPlanCheckoutButton";
 
 const PAID_PLANS = ["STARTER", "GROWTH", "PRO"] as const;
 
 /**
- * Shopify-only plan picker. Links use target="_top" so the charge confirmation
- * page opens in Shopify Admin (not stuck inside the embedded app iframe).
+ * Shopify-only plan picker. Checkout fetches confirmationUrl inside the iframe
+ * (session cookie stays valid), then opens Shopify Admin billing with target=_top.
  */
 export function ShopifyBillingPlans({
   currentPlanKey,
@@ -40,7 +41,6 @@ export function ShopifyBillingPlans({
           const bullets = bulletsForPlatform("SHOPIFY", bulletsForPlanScope(key, scopes[key]));
           const planParam = key === "GROWTH" ? "BUSINESS" : key;
           const canCheckout = Boolean(monthly);
-          const checkoutHref = canCheckout ? `/api/billing/shopify/checkout?plan=${planParam}` : null;
 
           return (
             <div
@@ -92,19 +92,18 @@ export function ShopifyBillingPlans({
                   ))}
               </ul>
 
-              {checkoutHref ? (
-                <a
-                  href={checkoutHref}
-                  target="_top"
-                  rel="noopener"
-                  className={`mt-6 inline-flex w-full items-center justify-center ${
+              {canCheckout ? (
+                <ShopifyPlanCheckoutButton
+                  planParam={planParam}
+                  label={current ? "Change plan in Shopify" : `Start ${planLabel(key)} in Shopify`}
+                  className={`inline-flex w-full items-center justify-center disabled:opacity-60 ${
                     current || featured ? "btn-primary" : "btn-secondary"
                   }`}
-                >
-                  {current ? "Change plan in Shopify" : `Start ${planLabel(key)} in Shopify`}
-                </a>
+                />
               ) : (
-                <p className="mt-6 text-xs text-navy-400">Shopify price not set yet. Ask the app owner to publish list prices.</p>
+                <p className="mt-6 text-xs text-navy-400">
+                  Shopify price not set yet. Ask the app owner to publish list prices.
+                </p>
               )}
             </div>
           );
