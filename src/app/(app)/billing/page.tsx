@@ -110,6 +110,14 @@ export default async function BillingPage({
           Could not start Shopify billing. Confirm Shopify plan prices are set in Admin → Settings, then try again.
         </div>
       ) : null}
+      {shopify && params.error === "app_pricing" ? (
+        <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
+          Shopify blocked charge creation because this app is on <strong>Shopify App Pricing</strong>. tidySync opens
+          a RecurringApplicationCharge confirm link because that app uses <strong>Manual / Billing API</strong> pricing.
+          In Partner Dashboard → tidyAgent → Distribution → Pricing: switch to Manual pricing, remove App Pricing plans,
+          wait a few minutes, then click a plan again.
+        </div>
+      ) : null}
       {shopify && params.error === "plan" ? (
         <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
           That plan is not available. Choose Starter, Business, or Pro.
@@ -252,13 +260,16 @@ export default async function BillingPage({
           <h2 className="font-display text-xl text-white">How billing works for Shopify</h2>
           <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
             <li>1. Pick Starter, Business, or Pro on this page.</li>
-            <li>2. Shopify Admin opens the charge approval screen (Billing API), or Shopify’s hosted plan page if this app is on App Pricing.</li>
+            <li>
+              2. Shopify returns a Billing API confirmation URL (same shape as tidySync:
+              …/RecurringApplicationCharge/confirm_recurring_application_charge?…).
+            </li>
             <li>3. After you approve, Shopify notifies this app and the matching plan unlocks.</li>
             <li>4. Charges and invoices stay inside Shopify Admin.</li>
           </ol>
           <p className="mt-4 text-xs leading-5 text-navy-400">
-            To match tidySync-style Billing API charges, the Partner app must use Manual pricing — not Shopify App
-            Pricing. If App Pricing stays on, plan buttons open Shopify’s hosted plan selection page instead.
+            Partner requirement: tidyAgent must use Manual / Billing API pricing (like tidySync). Shopify App Pricing
+            blocks charge creation and cannot produce that confirm link.
           </p>
         </div>
       ) : (

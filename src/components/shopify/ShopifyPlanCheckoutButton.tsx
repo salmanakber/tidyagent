@@ -3,11 +3,11 @@
 import { useState } from "react";
 
 /**
- * Fetches Shopify billing URL while still inside the embedded iframe
- * (where the app session cookie works), then navigates the top Admin frame.
+ * Fetches Shopify Billing API confirmationUrl inside the iframe, then opens it
+ * in the top Admin frame — same pattern as tidySync
+ * (…/RecurringApplicationCharge/confirm_recurring_application_charge?…).
  *
- * - Billing API apps: confirmationUrl (RecurringApplicationCharge approve)
- * - Shopify App Pricing apps: pricingPlansUrl (hosted plan selection page)
+ * Never opens the empty App Pricing /pricing_plans page.
  */
 export function ShopifyPlanCheckoutButton({
   planParam,
@@ -35,12 +35,12 @@ export function ShopifyPlanCheckoutButton({
         },
       );
       const payload = (await response.json().catch(() => null)) as
-        | { confirmationUrl?: string; pricingPlansUrl?: string; error?: string; code?: string }
+        | { confirmationUrl?: string; error?: string; code?: string }
         | null;
 
-      const openUrl = payload?.confirmationUrl || payload?.pricingPlansUrl;
-      if (openUrl) {
-        window.open(openUrl, "_top");
+      if (payload?.confirmationUrl) {
+        // Must be the Billing API confirm URL from appSubscriptionCreate.
+        window.open(payload.confirmationUrl, "_top");
         return;
       }
 
@@ -56,7 +56,7 @@ export function ShopifyPlanCheckoutButton({
       <button type="button" disabled={busy} onClick={() => void startCheckout()} className={className}>
         {busy ? "Opening Shopify…" : label}
       </button>
-      {error ? <p className="text-xs text-rose-300">{error}</p> : null}
+      {error ? <p className="text-xs leading-5 text-rose-300">{error}</p> : null}
     </div>
   );
 }

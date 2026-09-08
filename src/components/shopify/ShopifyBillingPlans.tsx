@@ -27,8 +27,8 @@ export function ShopifyBillingPlans({
   return (
     <div className="space-y-5">
       <div className="rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 via-white/[0.03] to-transparent px-5 py-4 text-sm text-navy-200">
-        Checkout opens Shopify’s native charge approval screen. Approve there to unlock the plan — invoices stay in
-        Shopify Admin.
+        Each plan opens Shopify’s charge approval screen (Billing API), the same confirm link style tidySync uses. If
+        Shopify says App Pricing is blocking charges, switch this app to Manual pricing in Partner Dashboard first.
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

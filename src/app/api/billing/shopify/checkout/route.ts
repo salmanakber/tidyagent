@@ -15,8 +15,9 @@ const PLANS: Record<string, Extract<PlanKey, "STARTER" | "GROWTH" | "PRO">> = {
 };
 
 /**
- * Native Shopify Billing API. Does not touch Wix or Webflow card checkout.
- * When the Partner app is on Shopify App Pricing, returns pricingPlansUrl instead.
+ * Native Shopify Billing API only (same as tidySync).
+ * Returns confirmationUrl for RecurringApplicationCharge approve screen.
+ * Does not redirect to empty App Pricing plan pages.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -56,20 +57,17 @@ export async function GET(request: Request) {
     return NextResponse.redirect(confirm, 303);
   } catch (error) {
     console.error("Shopify billing start failed", error);
-    const err = error as Error & { code?: string; pricingPlansUrl?: string | null };
+    const err = error as Error & { code?: string };
     if (wantJson) {
       return NextResponse.json(
         {
           error: err.message || "checkout_failed",
           code: err.code || "CHECKOUT_FAILED",
-          pricingPlansUrl: err.pricingPlansUrl || null,
         },
         { status: err.code === "SHOPIFY_APP_PRICING" ? 409 : 502 },
       );
     }
-    if (err.code === "SHOPIFY_APP_PRICING" && err.pricingPlansUrl) {
-      return NextResponse.redirect(err.pricingPlansUrl, 303);
-    }
-    return NextResponse.redirect(new URL("/billing?error=checkout", getAppOrigin()));
+    const q = err.code === "SHOPIFY_APP_PRICING" ? "error=app_pricing" : "error=checkout";
+    return NextResponse.redirect(new URL(`/billing?${q}`, getAppOrigin()));
   }
 }

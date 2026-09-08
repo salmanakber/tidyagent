@@ -200,7 +200,8 @@ export async function createShopifyBillingConfirmation(input: {
       {
         plan: {
           appRecurringPricingDetails: {
-            price: { amount, currencyCode: (prices.currency || "USD").toUpperCase() },
+            // Match tidySync: numeric amount (not a string) for MoneyInput.
+            price: { amount: Number(amount), currencyCode: (prices.currency || "USD").toUpperCase() },
             interval: "EVERY_30_DAYS",
           },
         },
@@ -213,15 +214,10 @@ export async function createShopifyBillingConfirmation(input: {
   if (errors.length || !payload?.confirmationUrl) {
     const joined = errors.join("; ") || "Shopify did not return a billing confirmation URL.";
     if (errors.some((message) => isShopifyAppPricingBlockedError(message))) {
-      const appHandle = await getShopifyAppHandle();
-      const pricingPlansUrl = shopifyManagedPricingPlansUrl(shop, appHandle);
       const err = new Error(
-        pricingPlansUrl
-          ? "This Shopify app is on Shopify App Pricing, so Billing API charges are blocked. Opening Shopify’s plan page instead. To match tidySync (Billing API), switch the Partner app to Manual pricing and remove App Pricing plans."
-          : "This Shopify app is on Shopify App Pricing. Billing API charges are blocked. In Partner Dashboard switch to Manual pricing (like tidySync), or set shopify_app_handle so we can open Shopify’s plan page.",
-      ) as Error & { code?: string; pricingPlansUrl?: string | null };
+        "Shopify blocked charge creation: this tidyAgent app is still on Shopify App Pricing. tidySync works because it uses Manual / Billing API pricing. In Partner Dashboard → tidyAgent → Distribution → Pricing, switch to Manual pricing, delete any App Pricing plans, wait a few minutes, then try again. Only then will Shopify return a RecurringApplicationCharge confirm link.",
+      ) as Error & { code?: string };
       err.code = "SHOPIFY_APP_PRICING";
-      err.pricingPlansUrl = pricingPlansUrl;
       throw err;
     }
     throw new Error(joined);
