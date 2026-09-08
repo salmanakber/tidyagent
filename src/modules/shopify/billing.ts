@@ -74,6 +74,30 @@ export function listedAmountToShopifyDecimal(amount: string | null | undefined):
   return (cents / 100).toFixed(2);
 }
 
+export function isShopifyAppPricingBlockedError(message?: string | null) {
+  const text = (message || "").toLowerCase();
+  return (
+    text.includes("billing api") &&
+    (text.includes("app pricing") || text.includes("managed pricing"))
+  );
+}
+
+/** Shopify-hosted plan page used when the Partner app is on App Pricing (not Billing API). */
+export function shopifyManagedPricingPlansUrl(shop: string, appHandle: string) {
+  const storeHandle = shop.replace(/\.myshopify\.com$/i, "").toLowerCase().trim();
+  const handle = appHandle.trim().replace(/^\/+|\/+$/g, "");
+  if (!storeHandle || !handle) return null;
+  return `https://admin.shopify.com/store/${storeHandle}/charges/${encodeURIComponent(handle)}/pricing_plans`;
+}
+
+export async function getShopifyAppHandle() {
+  const fromSettings = (await getSetting("shopify_app_handle", "")).trim();
+  if (fromSettings) return fromSettings;
+  const fromEnv = (process.env.SHOPIFY_APP_HANDLE || "").trim();
+  if (fromEnv) return fromEnv;
+  return "tidyagent";
+}
+
 export function mapShopifySubscriptionStatus(status?: string | null): {
   status: SubscriptionStatus;
   isFree: boolean;
@@ -156,7 +180,8 @@ export async function createShopifyBillingConfirmation(input: {
 
   const trialDays = Math.max(0, Number(trialDaysRaw) || 0);
   const origin = getAppOrigin();
-  const returnUrl = `${origin}/api/billing/shopify/callback?plan=${input.planKey}&siteId=${encodeURIComponent(input.siteId)}`;
+  const shop = creds.shop;
+  const returnUrl = `${origin}/api/billing/shopify/callback?plan=${input.planKey}&siteId=${encodeURIComponent(input.siteId)}&shop=${encodeURIComponent(shop)}`;
   const name = `tidyAgent ${planLabel(input.planKey)}`;
   const test = await useTestCharges();
 
@@ -186,7 +211,20 @@ export async function createShopifyBillingConfirmation(input: {
   const payload = data.appSubscriptionCreate;
   const errors = payload?.userErrors?.map((e) => e.message).filter(Boolean) ?? [];
   if (errors.length || !payload?.confirmationUrl) {
-    throw new Error(errors.join("; ") || "Shopify did not return a billing confirmation URL.");
+    const joined = errors.join("; ") || "Shopify did not return a billing confirmation URL.";
+    if (errors.some((message) => isShopifyAppPricingBlockedError(message))) {
+      const appHandle = await getShopifyAppHandle();
+      const pricingPlansUrl = shopifyManagedPricingPlansUrl(shop, appHandle);
+      const err = new Error(
+        pricingPlansUrl
+          ? "This Shopify app is on Shopify App Pricing, so Billing API charges are blocked. Opening Shopify’s plan page instead. To match tidySync (Billing API), switch the Partner app to Manual pricing and remove App Pricing plans."
+          : "This Shopify app is on Shopify App Pricing. Billing API charges are blocked. In Partner Dashboard switch to Manual pricing (like tidySync), or set shopify_app_handle so we can open Shopify’s plan page.",
+      ) as Error & { code?: string; pricingPlansUrl?: string | null };
+      err.code = "SHOPIFY_APP_PRICING";
+      err.pricingPlansUrl = pricingPlansUrl;
+      throw err;
+    }
+    throw new Error(joined);
   }
 
   if (payload.appSubscription?.id) {

@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 /**
- * Fetches Shopify's charge confirmation URL while still inside the embedded iframe
- * (where the app session cookie works), then navigates the top Admin frame to that URL.
- * Do not navigate top to /api/billing/shopify/checkout — that drops the partitioned session
- * and lands on the marketing homepage.
+ * Fetches Shopify billing URL while still inside the embedded iframe
+ * (where the app session cookie works), then navigates the top Admin frame.
+ *
+ * - Billing API apps: confirmationUrl (RecurringApplicationCharge approve)
+ * - Shopify App Pricing apps: pricingPlansUrl (hosted plan selection page)
  */
 export function ShopifyPlanCheckoutButton({
   planParam,
@@ -34,13 +35,16 @@ export function ShopifyPlanCheckoutButton({
         },
       );
       const payload = (await response.json().catch(() => null)) as
-        | { confirmationUrl?: string; error?: string }
+        | { confirmationUrl?: string; pricingPlansUrl?: string; error?: string; code?: string }
         | null;
-      if (!response.ok || !payload?.confirmationUrl) {
-        throw new Error(payload?.error || "Could not start Shopify billing. Try again.");
+
+      const openUrl = payload?.confirmationUrl || payload?.pricingPlansUrl;
+      if (openUrl) {
+        window.open(openUrl, "_top");
+        return;
       }
-      // Must open Shopify Admin confirm URL in the top frame (not our app origin).
-      window.open(payload.confirmationUrl, "_top");
+
+      throw new Error(payload?.error || "Could not start Shopify billing. Try again.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start Shopify billing.");
       setBusy(false);

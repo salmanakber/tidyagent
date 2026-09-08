@@ -16,6 +16,7 @@ const PLANS: Record<string, Extract<PlanKey, "STARTER" | "GROWTH" | "PRO">> = {
 
 /**
  * Native Shopify Billing API. Does not touch Wix or Webflow card checkout.
+ * When the Partner app is on Shopify App Pricing, returns pricingPlansUrl instead.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -28,7 +29,12 @@ export async function GET(request: Request) {
 
   const session = await getSession();
   if (!session) {
-    if (wantJson) return NextResponse.json({ error: "Session expired. Reopen tidyAgent from Shopify Admin." }, { status: 401 });
+    if (wantJson) {
+      return NextResponse.json(
+        { error: "Session expired. Reopen tidyAgent from Shopify Admin." },
+        { status: 401 },
+      );
+    }
     return NextResponse.redirect(new URL("/", getAppOrigin()));
   }
 
@@ -43,7 +49,6 @@ export async function GET(request: Request) {
       siteId: session.siteId,
       planKey,
     });
-    // Absolute Shopify Admin confirmation URL (RecurringApplicationCharge approve screen).
     const confirm = new URL(result.confirmationUrl);
     if (wantJson) {
       return NextResponse.json({ confirmationUrl: confirm.toString() });
@@ -51,11 +56,19 @@ export async function GET(request: Request) {
     return NextResponse.redirect(confirm, 303);
   } catch (error) {
     console.error("Shopify billing start failed", error);
+    const err = error as Error & { code?: string; pricingPlansUrl?: string | null };
     if (wantJson) {
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "checkout_failed" },
-        { status: 502 },
+        {
+          error: err.message || "checkout_failed",
+          code: err.code || "CHECKOUT_FAILED",
+          pricingPlansUrl: err.pricingPlansUrl || null,
+        },
+        { status: err.code === "SHOPIFY_APP_PRICING" ? 409 : 502 },
       );
+    }
+    if (err.code === "SHOPIFY_APP_PRICING" && err.pricingPlansUrl) {
+      return NextResponse.redirect(err.pricingPlansUrl, 303);
     }
     return NextResponse.redirect(new URL("/billing?error=checkout", getAppOrigin()));
   }

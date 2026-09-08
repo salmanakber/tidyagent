@@ -252,10 +252,14 @@ export default async function BillingPage({
           <h2 className="font-display text-xl text-white">How billing works for Shopify</h2>
           <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
             <li>1. Pick Starter, Business, or Pro on this page.</li>
-            <li>2. Shopify Admin opens the charge approval screen (same flow as RecurringApplicationCharge confirm).</li>
+            <li>2. Shopify Admin opens the charge approval screen (Billing API), or Shopify’s hosted plan page if this app is on App Pricing.</li>
             <li>3. After you approve, Shopify notifies this app and the matching plan unlocks.</li>
             <li>4. Charges and invoices stay inside Shopify Admin.</li>
           </ol>
+          <p className="mt-4 text-xs leading-5 text-navy-400">
+            To match tidySync-style Billing API charges, the Partner app must use Manual pricing — not Shopify App
+            Pricing. If App Pricing stays on, plan buttons open Shopify’s hosted plan selection page instead.
+          </p>
         </div>
       ) : (
         <div className="panel p-6">

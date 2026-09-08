@@ -11,6 +11,11 @@
 
 client_id = "cf0756196113f78ef60ca45598d8b344"
 
+# Used for Shopify App Pricing hosted plan URLs:
+# https://admin.shopify.com/store/{store}/charges/{handle}/pricing_plans
+# Must match Partner Dashboard app handle. Override with Admin setting shopify_app_handle if different.
+handle = "tidyagent"
+
 name = "tidyAgent"
 application_url = "https://agent.tidyflowapp.com/shopify"
 embedded = true
@@ -25,5 +30,6 @@ redirect_urls = [ "https://agent.tidyflowapp.com/api/shopify/oauth/callback" ]
 api_version = "2025-01"
 
 [[webhooks.subscriptions]]
+topics = [ "app_subscriptions/update" ]
 compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"

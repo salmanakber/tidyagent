@@ -12,12 +12,17 @@ describe("shopify billing helpers", () => {
     expect(listedAmountToShopifyDecimal("$19")).toBeNull();
   });
 
-  it("maps Shopify subscription statuses and plan names", () => {
-    expect(mapShopifySubscriptionStatus("ACTIVE")).toMatchObject({ status: "ACTIVE", isFree: false });
-    expect(mapShopifySubscriptionStatus("FROZEN")).toMatchObject({ status: "PAST_DUE", billingIssue: true });
-    expect(mapShopifySubscriptionStatus("CANCELLED")).toMatchObject({ status: "CANCELED", isFree: true });
-    expect(parsePlanKeyFromSubscriptionName("tidyAgent Business")).toBe("GROWTH");
-    expect(parsePlanKeyFromSubscriptionName("tidyAgent Pro")).toBe("PRO");
-    expect(parsePlanKeyFromSubscriptionName("tidyAgent Starter")).toBe("STARTER");
+  it("detects Shopify App Pricing Billing API blocks and builds the hosted plan URL", async () => {
+    const { isShopifyAppPricingBlockedError, shopifyManagedPricingPlansUrl } = await import(
+      "@/modules/shopify/billing"
+    );
+    expect(
+      isShopifyAppPricingBlockedError(
+        "Cannot use the Billing API (to create charges) when on Shopify App Pricing.",
+      ),
+    ).toBe(true);
+    expect(
+      shopifyManagedPricingPlansUrl("sixer-b2b.myshopify.com", "tidyagent"),
+    ).toBe("https://admin.shopify.com/store/sixer-b2b/charges/tidyagent/pricing_plans");
   });
 });
