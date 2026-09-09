@@ -26,6 +26,7 @@ import {
   textMatchesTerms,
 } from "@/modules/knowledge/match";
 import { rewriteChatLinks } from "@/modules/widget/chat-links";
+import { normalizeAgentReplyText } from "@/modules/widget/format-reply";
 import { answerTidyAgentQuestion, isTidyAgentQuestion } from "@/modules/product/about";
 
 const OPENER =
@@ -975,12 +976,14 @@ function priceLinesFrom(content: string) {
 }
 
 function sanitizeReply(text: string) {
-  return rewriteChatLinks(
-    text
-      .replace(/PRICES AND ITEMS FROM THIS PAGE:\s*/gi, "")
-      .replace(/Verified prices and named items from the live site and catalog\.?/gi, "")
-      .replace(/^Prices and offerings\s*/i, "")
-      .replace(/\s*Anything else I can help with\??/gi, ""),
+  return normalizeAgentReplyText(
+    rewriteChatLinks(
+      text
+        .replace(/PRICES AND ITEMS FROM THIS PAGE:\s*/gi, "")
+        .replace(/Verified prices and named items from the live site and catalog\.?/gi, "")
+        .replace(/^Prices and offerings\s*/i, "")
+        .replace(/\s*Anything else I can help with\??/gi, ""),
+    ),
   ).trim();
 }
 

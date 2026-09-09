@@ -12,6 +12,14 @@ describe("normalizeAgentReplyText", () => {
     expect(next).toContain("\n\nLet me know which method works best for you!");
   });
 
+  it("splits contact labels without leading dashes", () => {
+    const raw =
+      "I can help with that. Phone: (406) 261-5921. Email: info@example.com. Let me know which works.";
+    const next = normalizeAgentReplyText(raw);
+    expect(next).toContain("\n- Phone:");
+    expect(next).toContain("\n- Email:");
+  });
+
   it("keeps already-formatted multiline replies stable", () => {
     const raw = "Here are options:\n\n- **Morning** — $99\n- **Afternoon** — $120\n\nWhich works?";
     expect(normalizeAgentReplyText(raw)).toBe(raw);

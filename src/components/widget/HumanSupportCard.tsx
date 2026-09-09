@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronRight, Loader2, Mail, MessageSquareText } from "lucide-react";
+import { Check, ChevronRight, Loader2, Mail, MessageSquareText, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function WhatsAppMark({ className }: { className?: string }) {
@@ -12,54 +12,91 @@ export function WhatsAppMark({ className }: { className?: string }) {
   );
 }
 
-export function WhatsAppStrip({
-  busy,
-  onClick,
+/** Compact header actions: talk with teammate + WhatsApp (only when a number exists). */
+export function TeamActionsBar({
+  humanName,
+  whatsappDigits,
+  busyHuman,
+  busyWhatsApp,
+  onTalkWithHuman,
+  onWhatsApp,
 }: {
-  busy?: boolean;
-  onClick: () => void;
+  humanName?: string | null;
+  whatsappDigits?: string | null;
+  busyHuman?: boolean;
+  busyWhatsApp?: boolean;
+  onTalkWithHuman?: () => void;
+  onWhatsApp?: () => void;
 }) {
+  const showHuman = Boolean(humanName?.trim() && onTalkWithHuman);
+  const showWhatsApp = Boolean(whatsappDigits?.trim() && onWhatsApp);
+  if (!showHuman && !showWhatsApp) return null;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className="flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-[#25D366] to-[#1EBE57] px-3 py-2 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,.2)] transition hover:from-[#22c55e] hover:to-[#16a34a] disabled:opacity-70"
-      aria-label="Chat on WhatsApp"
-    >
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-[#25D366] shadow-sm">
-        <WhatsAppMark className="h-[18px] w-[18px]" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[12px] font-semibold leading-4">Chat on WhatsApp</span>
-        <span className="mt-0.5 block text-[10px] leading-3 text-white/90">Message the team directly</span>
-      </span>
-      <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-semibold tracking-wide">
-        {busy ? "Opening…" : "Open"}
-      </span>
-    </button>
+    <div className="flex shrink-0 gap-2 border-b border-black/5 bg-white/70 px-2.5 py-2 backdrop-blur">
+      {showHuman ? (
+        <button
+          type="button"
+          disabled={busyHuman}
+          onClick={onTalkWithHuman}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl bg-slate-900 px-2.5 py-2 text-left text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-70"
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/15">
+            {busyHuman ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserRound className="h-3.5 w-3.5" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[11px] font-semibold leading-4">Talk with {humanName}</span>
+            <span className="block truncate text-[10px] leading-3 text-white/70">A real teammate</span>
+          </span>
+        </button>
+      ) : null}
+      {showWhatsApp ? (
+        <button
+          type="button"
+          disabled={busyWhatsApp}
+          onClick={onWhatsApp}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#1EBE57] px-2.5 py-2 text-left text-white shadow-sm transition hover:brightness-105 disabled:opacity-70"
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[#25D366]">
+            {busyWhatsApp ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#25D366]" /> : <WhatsAppMark className="h-3.5 w-3.5" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[11px] font-semibold leading-4">WhatsApp chat</span>
+            <span className="block truncate text-[10px] leading-3 text-white/85">Message on WhatsApp</span>
+          </span>
+        </button>
+      ) : null}
+    </div>
   );
 }
 
 export function SupportChoiceCard({
   onChooseForm,
   onChooseWhatsApp,
+  showWhatsApp,
   busy,
   error,
+  title,
+  subtitle,
 }: {
   brandStyle?: React.CSSProperties;
   onChooseForm: () => void;
-  onChooseWhatsApp: () => void;
+  onChooseWhatsApp?: () => void;
+  showWhatsApp?: boolean;
   busy?: boolean;
   error?: string | null;
+  title?: string;
+  subtitle?: string;
 }) {
+  const wa = Boolean(showWhatsApp && onChooseWhatsApp);
   return (
     <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
       <div className="px-3.5 pb-3.5 pt-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Human support</p>
-        <h3 className="mt-1 text-[15px] font-semibold leading-5 text-slate-900">How would you like to get help from our team?</h3>
+        <h3 className="text-[15px] font-semibold leading-5 text-slate-900">
+          {title || "How would you like to continue?"}
+        </h3>
         <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
-          Choose how you’d like a teammate to pick this up. Your chat here stays saved.
+          {subtitle || "Leave a message for the team, or keep this chat going."}
         </p>
         <div className="mt-3 grid gap-2.5">
           <button
@@ -72,28 +109,32 @@ export function SupportChoiceCard({
               <Mail className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold text-slate-900">Submit a support request</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">Leave your details. The team will follow up by email.</span>
+              <span className="block text-[13px] font-semibold text-slate-900">Leave a message</span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
+                Share your details and the team will follow up by email.
+              </span>
             </span>
             <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onChooseWhatsApp}
-            className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] px-3 py-3 text-left text-white shadow-[0_8px_20px_rgba(37,211,102,.28)] transition hover:brightness-105 disabled:opacity-60"
-          >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#25D366] shadow-sm">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <WhatsAppMark className="h-5 w-5" />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold">Continue on WhatsApp</span>
-              <span className="mt-0.5 block text-[11px] leading-4 text-white/85">
-                Opens WhatsApp with a short summary. You review and send it.
+          {wa ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onChooseWhatsApp}
+              className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#128C7E] px-3 py-3 text-left text-white shadow-[0_8px_20px_rgba(37,211,102,.28)] transition hover:brightness-105 disabled:opacity-60"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-[#25D366] shadow-sm">
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <WhatsAppMark className="h-5 w-5" />}
               </span>
-            </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-white/80" />
-          </button>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-semibold">Continue on WhatsApp</span>
+                <span className="mt-0.5 block text-[11px] leading-4 text-white/85">
+                  Opens WhatsApp with a short summary ready to send.
+                </span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-white/80" />
+            </button>
+          ) : null}
         </div>
         {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
       </div>
@@ -134,9 +175,9 @@ export function LeadCaptureCard({
         <span className="mx-auto grid h-12 w-12 place-items-center rounded-full text-white" style={brandStyle}>
           <Check className="h-6 w-6" strokeWidth={2.5} />
         </span>
-        <h3 className="mt-3 text-[15px] font-semibold text-slate-900">Request received</h3>
+        <h3 className="mt-3 text-[15px] font-semibold text-slate-900">Message sent</h3>
         <p className="mt-1.5 text-[13px] leading-5 text-slate-600">
-          Your support request was submitted. The team has your details and will follow up by email.
+          Thanks — the team has your note and will follow up by email.
         </p>
         <p className="mt-2 text-[12px] leading-5 text-slate-500">You can keep chatting here if you have more to add.</p>
         <button
@@ -186,91 +227,57 @@ export function LeadCaptureCard({
           <MessageSquareText className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Support request</p>
-          <h3 className="mt-0.5 text-[14px] font-semibold text-slate-900">Send a note to the team</h3>
+          <h3 className="text-[14px] font-semibold text-slate-900">Leave a message</h3>
           <p className="mt-0.5 text-[12px] leading-4 text-slate-500">We’ll follow up using the details you leave here.</p>
         </div>
       </div>
       <div className="grid gap-3 px-4 py-3.5">
-        <Field
-          label="Name"
-          error={errors.name}
-          className={fieldClass}
-          value={name}
-          onChange={setName}
-          placeholder="Your name"
-          disabled={busy}
-        />
-        <Field
-          label="Email"
-          error={errors.email}
-          className={fieldClass}
-          value={email}
-          onChange={setEmail}
-          placeholder="you@email.com"
-          type="email"
-          disabled={busy}
-        />
-        <Field
-          label="Phone (optional)"
-          error={errors.phone}
-          className={fieldClass}
-          value={phone}
-          onChange={setPhone}
-          placeholder="Mobile number"
-          disabled={busy}
-        />
-        <label className="block text-left">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            How can we help?
-          </span>
+        <Field label="Name" error={errors.name} className={fieldClass} value={name} onChange={setName} placeholder="Your name" />
+        <Field label="Email" error={errors.email} className={fieldClass} value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
+        <Field label="Phone" error={errors.phone} className={fieldClass} value={phone} onChange={setPhone} placeholder="Optional" />
+        <label className="grid gap-1.5 text-[12px] font-medium text-slate-600">
+          Message
           <textarea
-            className={cn(fieldClass, "min-h-[4.5rem] resize-none", errors.note ? "border-rose-300 bg-rose-50" : "")}
-            placeholder="A short note about what you need"
+            className={cn(fieldClass, "min-h-[88px] resize-none")}
             value={note}
-            rows={3}
-            maxLength={800}
-            disabled={busy}
             onChange={(event) => setNote(event.target.value)}
+            placeholder="What can the team help with?"
+            maxLength={800}
           />
-          {errors.note ? <span className="mt-1 block text-[11px] text-rose-600">{errors.note}</span> : null}
+          {errors.note ? <span className="text-[11px] text-rose-600">{errors.note}</span> : null}
         </label>
         {formError ? <p className="text-[12px] text-rose-600">{formError}</p> : null}
-        <button
-          type="submit"
-          className="w-full rounded-full py-2.5 text-[13px] font-semibold disabled:opacity-60"
-          style={brandStyle}
-          disabled={busy || !conversationId}
-        >
-          {busy ? (
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Sending…
-            </span>
-          ) : (
-            "Send to the team"
-          )}
-        </button>
-        {onBack ? (
-          <button type="button" className="text-[12px] font-medium text-slate-500" onClick={onBack} disabled={busy}>
-            ← Back to options
+        <div className="flex gap-2 pt-1">
+          {onBack ? (
+            <button type="button" className="rounded-full px-4 py-2.5 text-[13px] font-semibold text-slate-600" onClick={onBack}>
+              Back
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            disabled={busy || !conversationId}
+            className="flex-1 rounded-full py-2.5 text-[13px] font-semibold text-white disabled:opacity-60"
+            style={brandStyle}
+          >
+            {busy ? "Sending…" : "Send message"}
           </button>
-        ) : null}
+        </div>
       </div>
     </form>
   );
 }
 
-export function WhatsAppOpenedCard({ onDismiss }: { brandStyle?: React.CSSProperties; onDismiss: () => void }) {
+export function WhatsAppOpenedCard({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="overflow-hidden rounded-3xl bg-white px-4 py-5 text-center shadow-sm ring-1 ring-black/5">
-      <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white shadow-[0_8px_20px_rgba(37,211,102,.28)]">
+      <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#25D366] text-white">
         <WhatsAppMark className="h-6 w-6" />
       </span>
       <h3 className="mt-3 text-[15px] font-semibold text-slate-900">WhatsApp is ready</h3>
       <p className="mt-1.5 text-[13px] leading-5 text-slate-600">
         A short summary of this chat is pre-filled. Review it, then send it yourself. This website conversation stays here.
       </p>
-      <button type="button" className="mt-4 w-full rounded-full bg-gradient-to-r from-[#25D366] to-[#1EBE57] py-2.5 text-[13px] font-semibold text-white" onClick={onDismiss}>
+      <button type="button" className="mt-4 w-full rounded-full bg-slate-900 py-2.5 text-[13px] font-semibold text-white" onClick={onDismiss}>
         Back to chat
       </button>
     </div>
@@ -279,50 +286,41 @@ export function WhatsAppOpenedCard({ onDismiss }: { brandStyle?: React.CSSProper
 
 function Field({
   label,
+  error,
+  className,
   value,
   onChange,
   placeholder,
   type = "text",
-  required,
-  disabled,
-  error,
-  className,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  type?: string;
-  required?: boolean;
-  disabled?: boolean;
   error?: string;
   className: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
 }) {
   return (
-    <label className="block text-left">
-      <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</span>
+    <label className="grid gap-1.5 text-[12px] font-medium text-slate-600">
+      {label}
       <input
-        className={cn(className, error ? "border-rose-300 bg-rose-50" : "")}
+        className={className}
         value={value}
         type={type}
         placeholder={placeholder}
-        required={required}
-        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
+        autoComplete="on"
       />
-      {error ? <span className="mt-1 block text-[11px] text-rose-600">{error}</span> : null}
+      {error ? <span className="text-[11px] text-rose-600">{error}</span> : null}
     </label>
   );
 }
 
 function validateLead(input: { name: string; email: string; phone: string; note: string }) {
   const errors: Record<string, string> = {};
-  if (input.name.trim().length < 2) errors.name = "Please enter your name.";
-  if (input.name.trim().length > 80) errors.name = "Name is too long.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim()) || input.email.trim().length > 120) {
-    errors.email = "Enter a valid email address.";
-  }
-  if (input.phone.trim().length > 40) errors.phone = "Phone number is too long.";
-  if (input.note.trim().length > 800) errors.note = "Please keep this under 800 characters.";
+  if (!input.name.trim() || input.name.trim().length < 2) errors.name = "Please enter your name.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) errors.email = "Please enter a valid email.";
+  if (input.note.trim().length < 4) errors.note = "Please add a short message.";
   return errors;
 }

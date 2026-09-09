@@ -47,6 +47,8 @@
     const startAvatar = absoluteUrl(config.avatarUrl, origin);
     const startInitials = initialsOf(startName);
     let whatsappDigits = String(config.channels?.whatsapp?.digits || "").replace(/\D/g, "");
+    let humanName = String(config.human?.name || "").trim();
+    let humanBusy = false;
     const host = document.documentElement || document.body;
     const storageKey = `tidyagent:${instance || site || "local"}`;
     let open = false;
@@ -75,11 +77,16 @@
             <button type="button" class="icon-btn voice-stop" hidden title="Stop listening">${iconStop()}</button>` : ""}
             <button type="button" class="icon-btn x" aria-label="Close chat">${iconClose()}</button>
           </div>
-          <button type="button" class="wa-strip"${whatsappDigits ? "" : " hidden"} aria-label="Chat on WhatsApp">
-            <span class="wa-mark">${iconWhatsApp()}</span>
-            <span class="wa-copy"><strong>Chat on WhatsApp</strong><em>Message the team directly</em></span>
-            <span class="wa-go">Open</span>
-          </button>
+          <div class="team-actions" hidden>
+            <button type="button" class="team-btn human" hidden>
+              <span class="team-ico">👤</span>
+              <span class="team-copy"><strong class="team-human-label">Talk with teammate</strong><em>A real teammate</em></span>
+            </button>
+            <button type="button" class="team-btn wa" hidden>
+              <span class="team-ico wa-mark">${iconWhatsApp()}</span>
+              <span class="team-copy"><strong>WhatsApp chat</strong><em>Message on WhatsApp</em></span>
+            </button>
+          </div>
           <div class="inbox" hidden>
             <div class="inbox-bar">
               <p>Your chats</p>
@@ -141,8 +148,10 @@
     const nameEl = shadow.querySelector(".nm");
     const statusEl = shadow.querySelector(".st-label");
     const headAva = shadow.querySelector(".head-ava");
-    const waStrip = shadow.querySelector(".wa-strip");
-    const waStripGo = shadow.querySelector(".wa-strip .wa-go");
+    const teamActions = shadow.querySelector(".team-actions");
+    const teamHumanBtn = shadow.querySelector(".team-btn.human");
+    const teamWaBtn = shadow.querySelector(".team-btn.wa");
+    const teamHumanLabel = shadow.querySelector(".team-human-label");
 
     let typed = false;
     let teaserDismissed = false;
@@ -217,7 +226,9 @@
       growBtn.innerHTML = maximized ? iconShrink() : iconGrow();
       placeRoot();
     });
-    waStrip?.addEventListener("click", () => void openWhatsApp(waStrip));
+    teamHumanBtn?.addEventListener("click", () => void requestHuman());
+    teamWaBtn?.addEventListener("click", () => void openWhatsApp(teamWaBtn));
+    refreshTeamActions();
     let typingTimer = 0;
     box.addEventListener("input", () => {
       emitTyping(true);
@@ -388,13 +399,13 @@
           watchLive();
         }
         if (data.support?.whatsapp?.digits) {
-          whatsappDigits = data.support.whatsapp.digits;
-          showWhatsAppStrip(true);
+          whatsappDigits = String(data.support.whatsapp.digits).replace(/\D/g, "");
+          refreshTeamActions();
         }
         if (data.wait && !data.wait.expired) {
           const to = data.wait.human ? personFrom(data.wait.human) : data.handoff?.to ? personFrom(data.handoff.to) : currentAgent;
           await playHandoff(data.handoff || { from: currentAgent, to });
-          renderWait(to, data.wait.seconds || 75);
+          renderWait(to, data.wait.seconds || 60);
           watchLive();
         } else if (data.live && !data.text) {
           /* stored for the human */
@@ -852,15 +863,23 @@
       thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
       const card = document.createElement("div");
       card.className = "wait-card";
-      card.innerHTML = `<div class="wait-ring"><span>${seconds}s</span></div><p class="wait-title">Finding ${escapeHtml(person.name)}</p><p class="wait-sub">A real teammate is being notified. Stay here — they’ll join this chat.</p>`;
+      card.innerHTML = `<div class="wait-ring"><span>${seconds}s</span></div><p class="wait-title">Finding ${escapeHtml(person.name)}</p><p class="wait-sub">Please stay here — a teammate will join this chat shortly.</p>`;
       thread.appendChild(card);
       thread.scrollTop = thread.scrollHeight;
+      let expired = false;
       const started = Date.now();
       const tick = window.setInterval(() => {
         const left = Math.max(0, seconds - Math.floor((Date.now() - started) / 1000));
         const label = card.querySelector(".wait-ring span");
         if (label) label.textContent = `${left}s`;
-        if (left <= 0) window.clearInterval(tick);
+        if (left <= 0) {
+          window.clearInterval(tick);
+          if (!expired && card.isConnected) {
+            expired = true;
+            card.remove();
+            offerHumanSupport(undefined, person.name || humanName);
+          }
+        }
       }, 250);
     }
     function watchLive() {
@@ -919,7 +938,7 @@
           if (data.type === "expired") {
             liveClosed = true;
             thread.querySelectorAll(".wait-card").forEach((el) => el.remove());
-            offerHumanSupport();
+            offerHumanSupport(undefined, humanName);
             socket.close();
           }
         };
@@ -930,21 +949,37 @@
       connect();
     }
 
-    function offerHumanSupport(support) {
-      const digits = (support && support.whatsapp && support.whatsapp.digits) || whatsappDigits;
-      if (digits) {
-        whatsappDigits = digits;
-        showWhatsAppStrip(true);
-        renderSupportChoice();
+    function refreshTeamActions() {
+      const showHuman = Boolean(humanName);
+      const showWa = Boolean(whatsappDigits);
+      if (!teamActions) return;
+      if (!showHuman && !showWa) {
+        teamActions.setAttribute("hidden", "");
         return;
       }
-      renderLeadForm();
+      teamActions.removeAttribute("hidden");
+      if (teamHumanBtn) {
+        if (showHuman) {
+          teamHumanBtn.removeAttribute("hidden");
+          if (teamHumanLabel) teamHumanLabel.textContent = `Talk with ${humanName}`;
+        } else teamHumanBtn.setAttribute("hidden", "");
+      }
+      if (teamWaBtn) {
+        if (showWa) teamWaBtn.removeAttribute("hidden");
+        else teamWaBtn.setAttribute("hidden", "");
+      }
     }
 
-    function showWhatsAppStrip(on) {
-      if (!waStrip) return;
-      if (on && whatsappDigits) waStrip.removeAttribute("hidden");
-      else waStrip.setAttribute("hidden", "");
+    function offerHumanSupport(support, teammateName) {
+      const digits = (support && support.whatsapp && support.whatsapp.digits) || whatsappDigits;
+      if (digits) whatsappDigits = String(digits).replace(/\D/g, "");
+      refreshTeamActions();
+      const name = teammateName || humanName || "";
+      const notice = name
+        ? `${name} couldn’t join right now. You can leave a message for the team, or keep chatting with me here.`
+        : "No one from the team could join right now. You can leave a message, or keep chatting with me here.";
+      addMsg("agent", notice, { agent: currentAgent });
+      renderSupportChoice();
     }
 
     function directWhatsAppUrl() {
@@ -959,24 +994,26 @@
       if (supportCardOpen()) return;
       const wrap = document.createElement("div");
       wrap.className = "support-choice";
-      wrap.innerHTML = `
-        <p class="lead-kicker">Human support</p>
-        <p class="lead-heading">How would you like to get help from our team?</p>
-        <p class="lead-copy">Choose how a teammate should pick this up. Your chat here stays saved.</p>
-        <button type="button" class="support-opt" data-opt="form">
-          <span class="opt-mark mail">✉</span>
-          <span class="opt-copy">
-            <strong>Submit a support request</strong>
-            <span>Leave your details. The team will follow up by email.</span>
-          </span>
-        </button>
-        <button type="button" class="support-opt wa" data-opt="whatsapp">
+      const waBtn = whatsappDigits
+        ? `<button type="button" class="support-opt wa" data-opt="whatsapp">
           <span class="opt-mark wa-mark">${iconWhatsApp()}</span>
           <span class="opt-copy">
             <strong>Continue on WhatsApp</strong>
-            <span>Opens WhatsApp with a short summary. You review and send it.</span>
+            <span>Opens WhatsApp with a short summary ready to send.</span>
+          </span>
+        </button>`
+        : "";
+      wrap.innerHTML = `
+        <p class="lead-heading">How would you like to continue?</p>
+        <p class="lead-copy">Leave a message for the team, or keep this chat going.</p>
+        <button type="button" class="support-opt" data-opt="form">
+          <span class="opt-mark mail">✉</span>
+          <span class="opt-copy">
+            <strong>Leave a message</strong>
+            <span>Share your details and the team will follow up by email.</span>
           </span>
         </button>
+        ${waBtn}
         <p class="lead-error" hidden></p>`;
       wrap.querySelectorAll("[data-opt]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -993,12 +1030,59 @@
       thread.scrollTop = thread.scrollHeight;
     }
 
+    async function requestHuman() {
+      if (humanBusy || !humanName) return;
+      humanBusy = true;
+      if (teamHumanBtn) teamHumanBtn.disabled = true;
+      try {
+        const response = await fetch(`${origin}/api/widget/request-human`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId: conversationId || undefined,
+            visitorId,
+            token,
+            instanceId: instance,
+            site,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          addNotice(data.error || "Could not reach the team just then.");
+          return;
+        }
+        if (data.conversationId) {
+          conversationId = data.conversationId;
+          writeStore("conv", conversationId);
+          writeStore("lastAt", String(Date.now()));
+        }
+        if (data.support?.whatsapp?.digits) {
+          whatsappDigits = String(data.support.whatsapp.digits).replace(/\D/g, "");
+          refreshTeamActions();
+        }
+        if (data.text) addMsg("agent", data.text, { agent: data.agent ? personFrom(data.agent) : currentAgent });
+        if (data.wait && !data.wait.expired) {
+          const to = personFrom(data.wait.human || data.handoff?.to || { name: humanName, human: true });
+          if (data.handoff) await playHandoff(data.handoff);
+          renderWait(to, data.wait.seconds || 60);
+          watchLive(conversationId);
+          return;
+        }
+        if (data.options) offerHumanSupport(data.support, humanName);
+      } catch {
+        addNotice("Could not reach the team just then.");
+      } finally {
+        humanBusy = false;
+        if (teamHumanBtn) teamHumanBtn.disabled = false;
+      }
+    }
+
     async function openWhatsApp(host) {
-      const fromStrip = host && host.classList.contains("wa-strip");
+      const fromStrip = host && (host.classList.contains("team-btn") || host.classList.contains("wa-strip"));
       if (host && host.dataset.busy === "1") return;
       if (!whatsappDigits) return;
       if (host) host.dataset.busy = "1";
-      if (fromStrip && waStripGo) waStripGo.textContent = "Opening…";
+      if (fromStrip && teamWaBtn) teamWaBtn.classList.add("busy");
       const errorEl = host && !fromStrip ? host.querySelector(".lead-error") : null;
       const waBtn = host && !fromStrip ? host.querySelector('[data-opt="whatsapp"]') : null;
       if (waBtn) waBtn.disabled = true;
@@ -1052,7 +1136,7 @@
         }
       } finally {
         if (host) host.dataset.busy = "";
-        if (fromStrip && waStripGo) waStripGo.textContent = "Open";
+        if (fromStrip && teamWaBtn) teamWaBtn.classList.remove("busy");
         if (waBtn) waBtn.disabled = false;
       }
     }
@@ -1066,8 +1150,7 @@
         <div class="lead-head">
           <span class="lead-icon">✉</span>
           <div>
-            <p class="lead-kicker">Support request</p>
-            <p class="lead-heading">Send a note to the team</p>
+            <p class="lead-heading">Leave a message</p>
             <p class="lead-copy">We’ll follow up using the details you leave here.</p>
           </div>
         </div>
@@ -1140,7 +1223,7 @@
             wrap.innerHTML = `
               <div class="lead-check">✓</div>
               <p class="lead-heading">Request received</p>
-              <p class="lead-copy">Your support request was submitted. The team has your details and will follow up by email.</p>
+              <p class="lead-copy">Thanks — the team has your note and will follow up by email.</p>
               <p class="lead-copy muted">You can keep chatting here if you have more to add.</p>
               <button type="button" class="lead-submit">Continue chatting</button>`;
             wrap.querySelector("button").addEventListener("click", () => {
@@ -1412,26 +1495,43 @@
     let text = String(value || "")
       .replace(/\r\n?/g, "\n")
       .replace(/[\u00A0\u202F\u2007\u2009]/g, " ")
+      .replace(/[•●▪◦]/g, "-")
       .trim();
     if (!text) return "";
-    text = text.replace(/:[ \t]*[-•*][ \t]+/g, ":\n- ");
+    text = text.replace(/:[ \t]*[-–—][ \t]+/g, ":\n- ");
     text = text.replace(
-      /(?<![-*\n])\s+[-•*]\s+(?=(?:\*\*)?[A-Za-z][A-Za-z0-9 /&'’-]{0,40}:)/g,
+      /(?<![-*\n])[ \t]+[-–—*][ \t]+(?=(?:\*\*)?[A-Za-z][A-Za-z0-9 /&'’-]{0,40}:)/g,
+      "\n- ",
+    );
+    text = text.replace(
+      /(?<=[.?!:])[ \t]+(?=(?:Phone|Email|Online|Call|Text|WhatsApp|Website|Address|Hours|Location)\s*:)/gi,
+      "\n- ",
+    );
+    text = text.replace(
+      /(?<![-*\n])[ \t]+(?=(?:Phone|Email|Online|WhatsApp|Website|Address|Hours)\s*:[ \t]*\S)/gi,
       "\n- ",
     );
     text = text.replace(/:[ \t]*(?=\d+[.)][ \t]+\S)/g, ":\n");
-    text = text.replace(/(?<![\n\d])\s+(\d+)[.)]\s+(?=\S)/g, "\n$1. ");
+    text = text.replace(/(?<![\n\d])[ \t]+(\d+)[.)][ \t]+(?=\S)/g, "\n$1. ");
     text = text.replace(
-      /(\n[-•*] [^\n]+|\n\d+\. [^\n]+)(\s+)(?=(?:Let me know|Which option|If you(?:'|’)d like|Happy to|I can also|Feel free)\b)/gi,
+      /(\n[-–—*•] [^\n]+|\n\d+\. [^\n]+)([ \t]+)(?=(?:Let me know|Which option|If you(?:'|’)d like|Happy to|I can also|Feel free|Tell me which)\b)/gi,
+      "$1\n\n",
+    );
+    text = text.replace(
+      /([.!?])[ \t]+(?=(?:Let me know|Which (?:option|method)|Would you like|Shall I)\b)/gi,
       "$1\n\n",
     );
     return text
       .split("\n")
-      .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+      .map((line) => {
+        const trimmed = line.replace(/[ \t]{2,}/g, " ").trimEnd();
+        return trimmed.replace(/^[–—•]\s+/, "- ").replace(/^[-*]\s+/, "- ");
+      })
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
   }
+
   function gradientCss(from, to, angle) {
     if (angle === "radial") return `radial-gradient(circle at 18% 18%, ${from} 0%, ${to} 82%)`;
     const deg = angle === "to-right" ? "90deg" : angle === "to-bottom" ? "180deg" : angle === "to-bottom-left" ? "225deg" : "135deg";
@@ -1531,10 +1631,20 @@
       .tpl-bar .panel { align-self: stretch; }
       .head { display:flex; align-items:center; gap:8px; padding:10px; background:${headBg}; color:${textColor}; backdrop-filter: blur(16px); flex:none; }
       .tpl-soft .head { padding:14px 12px 16px; }
-      .wa-strip { display:flex; align-items:center; gap:10px; width:100%; border:0; flex:none; padding:8px 12px; background:linear-gradient(135deg,#25D366,#1EBE57); color:#fff; cursor:pointer; text-align:left; box-shadow:inset 0 1px 0 rgba(255,255,255,.2); }
-      .wa-strip[hidden] { display:none !important; }
-      .wa-strip:hover { filter:brightness(1.04); }
-      .wa-strip:disabled { opacity:.75; }
+      .team-actions { display:flex; gap:8px; width:100%; flex:none; padding:8px 10px; background:rgba(255,255,255,.72); border-bottom:1px solid rgba(15,23,42,.06); }
+      .team-actions[hidden] { display:none !important; }
+      .team-btn { flex:1; min-width:0; display:flex; align-items:center; gap:8px; border:0; border-radius:16px; padding:8px 10px; cursor:pointer; text-align:left; color:#fff; }
+      .team-btn[hidden] { display:none !important; }
+      .team-btn.human { background:#0f172a; }
+      .team-btn.wa { background:linear-gradient(135deg,#25D366,#1EBE57); }
+      .team-btn:hover { filter:brightness(1.05); }
+      .team-btn:disabled, .team-btn.busy { opacity:.7; }
+      .team-ico { height:28px; width:28px; border-radius:999px; display:grid; place-items:center; background:rgba(255,255,255,.16); flex:none; font-size:13px; }
+      .team-btn.wa .team-ico { background:#fff; color:#25D366; }
+      .team-btn.wa .team-ico svg { width:14px; height:14px; }
+      .team-copy { min-width:0; }
+      .team-copy strong { display:block; font:650 11px/1.2 ui-sans-serif,system-ui; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .team-copy em { display:block; margin-top:2px; font:500 10px/1.2 ui-sans-serif,system-ui; opacity:.85; font-style:normal; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .wa-mark { height:32px; width:32px; border-radius:999px; display:grid; place-items:center; background:#fff; color:#25D366; flex:none; box-shadow:0 4px 10px rgba(16,24,40,.08); }
       .wa-mark svg { width:18px; height:18px; display:block; }
       .wa-copy { min-width:0; flex:1; }
@@ -1669,7 +1779,7 @@
       .listen-x svg, .listen-go svg { width:15px; height:15px; }
       .go svg, .mic svg { width:16px; height:16px; }
       .inbox { position:absolute; inset:52px 0 0; background:${paper}; z-index:3; display:flex; flex-direction:column; }
-      .panel:has(.wa-strip:not([hidden])) .inbox { top: 96px; }
+      .panel:has(.team-actions:not([hidden])) .inbox { top: 104px; }
       .inbox-bar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font:650 13px/1 ui-sans-serif,system-ui; }
       .new-chat { border:0; background:${fill}; color:${textColor}; border-radius:999px; padding:8px 12px; font:650 11px/1 ui-sans-serif,system-ui; cursor:pointer; }
       .inbox-list { list-style:none; margin:0; padding:0 10px 16px; overflow:auto; }

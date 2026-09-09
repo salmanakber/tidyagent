@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getAppOrigin } from "@/lib/env";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { publicSupportChannels } from "@/modules/support/channels";
+import { absoluteAvatar } from "@/modules/widget/avatar";
 
 function corsHeaders() {
   return {
@@ -47,6 +48,15 @@ export async function GET(request: Request) {
       : agent.widgetAvatarUrl.replace(/^http:\/\//, "https://")
     : null;
 
+  const humanName = agent.organization.humanAgentName?.trim() || "";
+  const human = humanName
+    ? {
+        name: humanName,
+        role: agent.organization.humanAgentRole?.trim() || "Team",
+        avatarUrl: absoluteAvatar(agent.organization.humanAgentAvatarUrl),
+      }
+    : null;
+
   return NextResponse.json(
     {
       name: agent.name,
@@ -64,6 +74,7 @@ export async function GET(request: Request) {
       voiceEnabled: Boolean(live && entitlements.voiceEnabled && agent.voiceEnabled),
       voiceId: agent.voiceId || "en-US-Neural2-F",
       id: agent.id,
+      human,
       channels: publicSupportChannels(agent.organization.humanAgentWhatsapp),
     },
     { headers: { ...corsHeaders(), "Cache-Control": "no-store" } },

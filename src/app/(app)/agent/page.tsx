@@ -67,6 +67,7 @@ export default async function AgentPage() {
         presentCapabilities={facts.toolsPresent.map((tool) => tool.key)}
         platformLabel={platformLabel(session.platform)}
         whatsappDigits={publicSupportChannels(workspace.organization.humanAgentWhatsapp).whatsapp?.digits}
+        humanName={workspace.organization.humanAgentName}
       />
     </div>
   );

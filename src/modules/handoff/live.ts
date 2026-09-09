@@ -1,4 +1,4 @@
-export const HANDOFF_WAIT_SECONDS = 75;
+export const HANDOFF_WAIT_SECONDS = 60;
 
 export function handoffState(metadata: unknown, now = Date.now()) {
   const meta = metadata && typeof metadata === "object" && !Array.isArray(metadata)

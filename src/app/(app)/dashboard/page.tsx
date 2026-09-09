@@ -86,6 +86,7 @@ export default async function DashboardPage() {
             template={data.agent.widgetTemplate}
             voiceEnabled={data.entitlements.voiceEnabled && data.agent.voiceEnabled}
             whatsappDigits={publicSupportChannels(data.organization.humanAgentWhatsapp).whatsapp?.digits}
+            humanName={data.organization.humanAgentName}
           />
         </div>
       ) : null}

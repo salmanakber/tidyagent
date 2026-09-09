@@ -8,7 +8,7 @@ import path from "node:path";
  * Bump version whenever public/widget/embed.js content changes.
  */
 export const WEBFLOW_EMBED_DISPLAY_NAME = "tidyAgent";
-export const WEBFLOW_EMBED_VERSION = "1.1.2";
+export const WEBFLOW_EMBED_VERSION = "1.2.0";
 export const WEBFLOW_EMBED_PATH = "/widget/embed.js";
 
 export function webflowEmbedCanonicalUrl(origin: string) {

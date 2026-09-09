@@ -52,6 +52,7 @@ export function AgentStudio({
   presentCapabilities,
   platformLabel = "Wix",
   whatsappDigits,
+  humanName,
 }: {
   agent: AgentView;
   agents?: AgentView[];
@@ -67,6 +68,7 @@ export function AgentStudio({
   presentCapabilities?: string[];
   platformLabel?: string;
   whatsappDigits?: string | null;
+  humanName?: string | null;
 }) {
   const [name, setName] = useState(agent.name);
   const [role, setRole] = useState(agent.role);
@@ -333,6 +335,7 @@ export function AgentStudio({
             voiceEnabled={voiceOnPlan && voiceOn}
             voiceId={voiceId}
             whatsappDigits={whatsappDigits}
+            humanName={humanName}
           />
         </div>
       </div>

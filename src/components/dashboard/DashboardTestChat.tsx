@@ -18,6 +18,7 @@ export function DashboardTestChat({
   voiceEnabled,
   voiceId,
   whatsappDigits,
+  humanName,
 }: {
   name: string;
   greeting: string;
@@ -33,6 +34,7 @@ export function DashboardTestChat({
   voiceEnabled?: boolean;
   voiceId?: string | null;
   whatsappDigits?: string | null;
+  humanName?: string | null;
 }) {
   return (
     <section className="panel overflow-hidden p-6">
@@ -61,6 +63,7 @@ export function DashboardTestChat({
           voiceEnabled={Boolean(voiceEnabled)}
           voiceId={voiceId}
           whatsappDigits={whatsappDigits}
+          humanName={humanName}
         />
       </div>
     </section>

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AudioLines, History, Maximize2, Mic, Minimize2, Plus, Send, Square, X } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
-import { LeadCaptureCard, SupportChoiceCard, WhatsAppOpenedCard, WhatsAppStrip } from "@/components/widget/HumanSupportCard";
+import { LeadCaptureCard, SupportChoiceCard, TeamActionsBar, WhatsAppOpenedCard } from "@/components/widget/HumanSupportCard";
+import { humanUnavailableText } from "@/modules/handoff/copy";
 import { widgetGradientCss } from "@/modules/widget/gradient";
 import { realtimeSocketUrl } from "@/modules/realtime/publish";
 import { safeHttpUrl, safeWhatsAppUrl } from "@/modules/widget/safe-url";
@@ -26,6 +27,7 @@ export type WidgetProps = {
   voiceEnabled?: boolean;
   voiceId?: string | null;
   whatsappDigits?: string | null;
+  humanName?: string | null;
 };
 
 type Person = { name: string; avatarUrl?: string | null; role?: string; voiceId?: string | null; human?: boolean };
@@ -79,6 +81,7 @@ export function ChatWidget({
   voiceEnabled = false,
   voiceId,
   whatsappDigits: whatsappDigitsProp,
+  humanName: humanNameProp,
 }: WidgetProps) {
   const left = position === "BOTTOM_LEFT";
   const [open, setOpen] = useState(Boolean(startOpen));
@@ -96,7 +99,9 @@ export function ChatWidget({
   const [listening, setListening] = useState(false);
   const [listenCaption, setListenCaption] = useState("Listening…");
   const [whatsappDigits, setWhatsappDigits] = useState(whatsappDigitsProp || "");
+  const [humanName, setHumanName] = useState(humanNameProp || "");
   const [supportBusy, setSupportBusy] = useState(false);
+  const [humanBusy, setHumanBusy] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const voiceDraftRef = useRef("");
@@ -152,6 +157,9 @@ export function ChatWidget({
   useEffect(() => {
     setWhatsappDigits(whatsappDigitsProp || "");
   }, [whatsappDigitsProp]);
+  useEffect(() => {
+    setHumanName(humanNameProp || "");
+  }, [humanNameProp]);
 
   function unlock() {
     const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -270,11 +278,80 @@ export function ChatWidget({
     return items.some((item) => item.kind === "lead" || item.kind === "support" || item.kind === "whatsapp");
   }
 
-  function offerHumanSupport(digits = whatsappDigits) {
+  function offerHumanSupport(digits = whatsappDigits, teammateName = humanName) {
+    if (digits) setWhatsappDigits(digits);
     setLines((current) => {
-      if (hasSupportCard(current)) return current.filter((item) => item.kind !== "wait");
-      return [...current.filter((item) => item.kind !== "wait"), { kind: digits ? "support" : "lead" }];
+      const cleaned = current.filter((item) => item.kind !== "wait" && item.kind !== "support" && item.kind !== "lead" && item.kind !== "whatsapp");
+      const notice = {
+        kind: "msg" as const,
+        role: "agent" as const,
+        text: humanUnavailableText(teammateName),
+        at: new Date().toISOString(),
+        agent,
+      };
+      if (hasSupportCard(cleaned)) return [...cleaned, notice];
+      return [...cleaned, notice, { kind: "support" as const }];
     });
+  }
+
+  async function requestHuman() {
+    if (humanBusy || thinking || !humanName) return;
+    setHumanBusy(true);
+    setSupportError(null);
+    try {
+      const response = await fetch("/api/widget/request-human", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, preview: true }),
+      });
+      const data = (await response.json()) as {
+        text?: string;
+        conversationId?: string;
+        error?: string;
+        options?: boolean;
+        wait?: { seconds: number; human?: Person };
+        handoff?: { from: Person; to: Person };
+        support?: { whatsapp?: { digits?: string } | null };
+        agent?: Person;
+        createdAt?: string;
+      };
+      if (!response.ok) {
+        setSupportError(data.error || "Could not reach the team just then.");
+        return;
+      }
+      if (data.conversationId) setConversationId(data.conversationId);
+      if (data.support?.whatsapp?.digits) setWhatsappDigits(data.support.whatsapp.digits);
+      if (data.wait?.human || data.handoff?.to) {
+        const to = data.wait?.human || data.handoff?.to || { name: humanName, human: true };
+        const from = data.handoff?.from || agent;
+        setLines((current) => [
+          ...current,
+          ...(data.text
+            ? [{ kind: "msg" as const, role: "agent" as const, text: data.text, at: data.createdAt || new Date().toISOString(), agent: data.agent || agent }]
+            : []),
+          { kind: "xfer", from, to },
+        ]);
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        setAgent(to);
+        setLines((current) => [
+          ...current.filter((item) => item.kind !== "xfer"),
+          { kind: "wait", person: to, seconds: data.wait?.seconds || 60 },
+        ]);
+        if (data.conversationId) watchLive(data.conversationId);
+        return;
+      }
+      if (data.text) {
+        setLines((current) => [
+          ...current,
+          { kind: "msg", role: "agent", text: data.text!, at: data.createdAt || new Date().toISOString(), agent: data.agent || agent },
+        ]);
+      }
+      if (data.options) offerHumanSupport(data.support?.whatsapp?.digits || whatsappDigits, humanName);
+    } catch {
+      setSupportError("Could not reach the team just then.");
+    } finally {
+      setHumanBusy(false);
+    }
   }
 
   async function openWhatsApp() {
@@ -612,11 +689,16 @@ export function ChatWidget({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {whatsappDigits ? (
-              <WhatsAppStrip busy={supportBusy} onClick={() => void openWhatsApp()} />
-            ) : null}
+            <TeamActionsBar
+              humanName={humanName}
+              whatsappDigits={whatsappDigits}
+              busyHuman={humanBusy}
+              busyWhatsApp={supportBusy}
+              onTalkWithHuman={() => void requestHuman()}
+              onWhatsApp={() => void openWhatsApp()}
+            />
             {inboxOpen ? (
-              <div className={cn("absolute inset-x-0 bottom-0 z-10 bg-white p-4 text-sm text-slate-600", whatsappDigits ? "top-[5.75rem]" : "top-12")}>
+              <div className={cn("absolute inset-x-0 bottom-0 z-10 bg-white p-4 text-sm text-slate-600", humanName || whatsappDigits ? "top-[6.25rem]" : "top-12")}>
                 <div className="mb-3 flex items-center justify-between">
                   <p className="font-semibold text-slate-900">Your chats</p>
                   <button
@@ -650,20 +732,26 @@ export function ChatWidget({
                     </div>
                   </div>
                 ) : line.kind === "wait" ? (
-                  <WaitRing key="wait" person={line.person} seconds={line.seconds} brandStyle={brandStyle} />
+                  <WaitRing
+                    key="wait"
+                    person={line.person}
+                    seconds={line.seconds}
+                    brandStyle={brandStyle}
+                    onExpire={() => offerHumanSupport(whatsappDigits, line.person.name)}
+                  />
                 ) : line.kind === "support" ? (
                   <SupportChoiceCard
                     key="support"
                     brandStyle={visitorStyle}
                     busy={supportBusy}
                     error={supportError}
+                    showWhatsApp={Boolean(whatsappDigits)}
                     onChooseForm={() => setLines((current) => [...current.filter((item) => item.kind !== "support"), { kind: "lead" }])}
-                    onChooseWhatsApp={() => void openWhatsApp()}
+                    onChooseWhatsApp={whatsappDigits ? () => void openWhatsApp() : undefined}
                   />
                 ) : line.kind === "whatsapp" ? (
                   <WhatsAppOpenedCard
                     key="whatsapp"
-                    brandStyle={visitorStyle}
                     onDismiss={() => resumeAgentChat()}
                   />
                 ) : line.kind === "lead" ? (
@@ -672,7 +760,7 @@ export function ChatWidget({
                     conversationId={conversationId}
                     preview={preview}
                     brandStyle={visitorStyle}
-                    onBack={whatsappDigits ? () => setLines((current) => [...current.filter((item) => item.kind !== "lead"), { kind: "support" }]) : undefined}
+                    onBack={whatsappDigits || humanName ? () => setLines((current) => [...current.filter((item) => item.kind !== "lead"), { kind: "support" }]) : undefined}
                     onDismiss={() => resumeAgentChat()}
                   />
                 ) : line.kind === "joined" ? (
@@ -828,21 +916,31 @@ function WaitRing({
   person,
   seconds,
   brandStyle,
+  onExpire,
 }: {
   person: Person;
   seconds: number;
   brandStyle: React.CSSProperties;
+  onExpire?: () => void;
 }) {
   const [left, setLeft] = useState(seconds);
+  const expiredRef = useRef(false);
   useEffect(() => {
+    expiredRef.current = false;
     const started = Date.now();
     const id = window.setInterval(() => {
       const next = Math.max(0, seconds - Math.floor((Date.now() - started) / 1000));
       setLeft(next);
-      if (next <= 0) window.clearInterval(id);
+      if (next <= 0) {
+        window.clearInterval(id);
+        if (!expiredRef.current) {
+          expiredRef.current = true;
+          onExpire?.();
+        }
+      }
     }, 250);
     return () => window.clearInterval(id);
-  }, [seconds]);
+  }, [seconds, onExpire]);
   const pct = Math.max(0, Math.min(100, (left / Math.max(seconds, 1)) * 100));
   return (
     <div className="mx-auto w-[min(280px,100%)] rounded-3xl bg-white px-4 py-5 text-center shadow-sm">
@@ -850,7 +948,7 @@ function WaitRing({
         <div className="grid h-[4.6rem] w-[4.6rem] place-items-center rounded-full bg-white text-xl font-semibold text-slate-800">{left}s</div>
       </div>
       <p className="mt-4 text-sm font-semibold text-slate-800">Finding {person.name}</p>
-      <p className="mt-1 text-xs text-slate-500">A real teammate is being notified. Stay here — they’ll join this chat.</p>
+      <p className="mt-1 text-xs text-slate-500">Please stay here — a teammate will join this chat shortly.</p>
     </div>
   );
 }
