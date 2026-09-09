@@ -115,7 +115,7 @@ export default async function KnowledgePage() {
 
   return (
     <div className="space-y-7">
-      <div className="relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 sm:p-7">
+      <div className="workspace-hero relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 sm:p-7">
         <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-amber-500/15 blur-3xl" />
         <PageHeader
           eyebrow={`${platformLabel(session.platform)} knowledge`}

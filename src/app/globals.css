@@ -256,6 +256,33 @@ html.theme-light .bg-brand-gradient {
   background-image: none !important;
 }
 
+/* Dashboard / Knowledge workspace hero — force light surface (gradient utilities stay dark otherwise) */
+html.theme-light .workspace-hero {
+  background: #ffffff !important;
+  background-image:
+    radial-gradient(ellipse 70% 55% at 100% -10%, rgba(201, 100, 66, 0.14), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 0% 100%, rgba(26, 22, 19, 0.04), transparent 50%) !important;
+  border-color: rgba(26, 22, 19, 0.1) !important;
+  box-shadow: 0 14px 40px -28px rgba(26, 22, 19, 0.2);
+}
+
+html.theme-light .workspace-hero .bg-navy-950\/40,
+html.theme-light .workspace-hero .bg-navy-950\/35 {
+  background-color: rgba(26, 22, 19, 0.04) !important;
+}
+
+html.theme-light .workspace-hero a.btn-secondary,
+html.theme-light .workspace-hero .btn-secondary {
+  border-color: rgba(26, 22, 19, 0.12);
+  background: rgba(26, 22, 19, 0.04);
+  color: #1a1613;
+}
+
+html.theme-light .workspace-hero a.btn-secondary:hover,
+html.theme-light .workspace-hero .btn-secondary:hover {
+  background: rgba(26, 22, 19, 0.08);
+}
+
 html.theme-light .bg-noise {
   background-image: none !important;
 }
