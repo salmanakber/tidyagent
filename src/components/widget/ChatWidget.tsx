@@ -7,6 +7,7 @@ import { AgentRichText, stripForVoice } from "@/components/widget/RichText";
 import { LeadCaptureCard, SupportChoiceCard, WhatsAppOpenedCard, WhatsAppStrip } from "@/components/widget/HumanSupportCard";
 import { widgetGradientCss } from "@/modules/widget/gradient";
 import { realtimeSocketUrl } from "@/modules/realtime/publish";
+import { safeHttpUrl, safeWhatsAppUrl } from "@/modules/widget/safe-url";
 
 export type WidgetProps = {
   name: string;
@@ -99,7 +100,10 @@ export function ChatWidget({
   const [supportError, setSupportError] = useState<string | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const voiceDraftRef = useRef("");
+  const voicePriorTextRef = useRef("");
+  const inputRef = useRef("");
   const listeningRef = useRef(false);
+  inputRef.current = input;
   const ctxRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speakGenRef = useRef(0);
@@ -276,8 +280,10 @@ export function ChatWidget({
   async function openWhatsApp() {
     if (supportBusy) return;
     const fallback = whatsappDigits
-      ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent("Hi, I was on the website and would like to chat.")}`
-      : "";
+      ? safeWhatsAppUrl(
+          `https://wa.me/${String(whatsappDigits).replace(/\D/g, "")}?text=${encodeURIComponent("Hi, I was on the website and would like to chat.")}`,
+        )
+      : null;
     if (!conversationId) {
       if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
       return;
@@ -291,7 +297,7 @@ export function ChatWidget({
         body: JSON.stringify({ conversationId, preview }),
       });
       const data = (await response.json()) as { url?: string; error?: string };
-      const url = data.url || fallback;
+      const url = safeWhatsAppUrl(data.url) || fallback;
       if (!url) {
         setSupportError(data.error || "Could not open WhatsApp just then.");
         return;
@@ -368,9 +374,17 @@ export function ChatWidget({
       /* ignore */
     }
     recognitionRef.current = null;
-    const text = (voiceDraftRef.current || input).replace(/\s+/g, " ").trim();
+    // Spoken-only: composer was cleared at listen start and only filled with transcripts.
+    const spoken = (voiceDraftRef.current || inputRef.current).replace(/\s+/g, " ").trim();
     voiceDraftRef.current = "";
-    if (sendIt && text) void send(text);
+    if (sendIt && spoken) {
+      setInput("");
+      voicePriorTextRef.current = "";
+      void send(spoken);
+    } else {
+      setInput(voicePriorTextRef.current);
+      voicePriorTextRef.current = "";
+    }
   }
 
   function startListen() {
@@ -383,7 +397,9 @@ export function ChatWidget({
     } catch {
       /* ignore */
     }
+    voicePriorTextRef.current = inputRef.current;
     voiceDraftRef.current = "";
+    setInput("");
     const recognition = new Rec();
     recognition.lang = String(voiceId || "en-US").match(/^[a-z]{2}-[A-Z]{2}/)?.[0] || "en-US";
     recognition.continuous = true;
@@ -401,13 +417,16 @@ export function ChatWidget({
       setListenCaption(shown || "Listening…");
       if (shown) setInput(shown);
     };
-    recognition.onerror = () => finishListen(Boolean(voiceDraftRef.current));
+    recognition.onerror = () => finishListen(Boolean(voiceDraftRef.current.trim()));
     recognition.onend = () => {
-      if (listeningRef.current) finishListen(Boolean(voiceDraftRef.current || input.trim()));
+      // Never auto-send pre-typed composer text — only spoken content from this listen session.
+      if (listeningRef.current) finishListen(Boolean(voiceDraftRef.current.trim() || inputRef.current.trim()));
     };
     try {
       recognition.start();
     } catch {
+      setInput(voicePriorTextRef.current);
+      voicePriorTextRef.current = "";
       return;
     }
     recognitionRef.current = recognition;
@@ -838,7 +857,8 @@ function WaitRing({
 
 function Face({ name, url, small }: { name: string; url?: string | null; small?: boolean }) {
   const size = small ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-xs";
-  if (url) return <img src={url} alt="" className={cn(size, "rounded-full object-cover bg-transparent")} />;
+  const safe = safeHttpUrl(url);
+  if (safe) return <img src={safe} alt="" className={cn(size, "rounded-full object-cover bg-transparent")} />;
   return <span className={cn(size, "flex items-center justify-center rounded-full bg-black/20 font-semibold")}>{initials(name)}</span>;
 }
 
@@ -846,6 +866,8 @@ function ProductCards({ cards }: { cards: CatalogCard[] }) {
   return (
     <div className="grid max-w-[min(96%,24rem)] grid-cols-1 gap-2.5 pt-1">
       {cards.slice(0, 4).map((card) => {
+        const href = safeHttpUrl(card.url);
+        const image = safeHttpUrl(card.imageUrl);
         const variantHint = card.variants?.length
           ? card.variants
               .slice(0, 3)
@@ -855,8 +877,8 @@ function ProductCards({ cards }: { cards: CatalogCard[] }) {
           : "";
         const inner = (
           <>
-            {card.imageUrl ? (
-              <img src={card.imageUrl} alt="" className="h-36 w-full object-cover" />
+            {image ? (
+              <img src={image} alt="" className="h-36 w-full object-cover" />
             ) : (
               <div className="flex items-center gap-3 bg-gradient-to-br from-slate-50 to-slate-100 px-3 py-3">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-sm font-semibold text-slate-700 shadow-sm">
@@ -886,18 +908,18 @@ function ProductCards({ cards }: { cards: CatalogCard[] }) {
                 <p className="line-clamp-3 text-[12px] leading-4 text-slate-600">{card.description}</p>
               ) : null}
               {variantHint ? <p className="text-[11px] leading-4 text-slate-500">Options: {variantHint}</p> : null}
-              {card.url ? (
+              {href ? (
                 <p className="pt-0.5 text-[11px] font-semibold text-slate-700">View product →</p>
               ) : null}
             </div>
           </>
         );
-        return card.url ? (
+        return href ? (
           <a
-            key={`${card.name}-${card.url}`}
-            href={card.url}
+            key={`${card.name}-${href}`}
+            href={href}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-black/5 transition hover:ring-black/15"
           >
             {inner}

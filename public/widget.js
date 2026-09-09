@@ -19,7 +19,7 @@
     }
     if (document.getElementById("tidyagent-widget-root")) return;
     const loader = document.createElement("script");
-    loader.src = `${origin}/widget/embed.js?v=20260824c`;
+    loader.src = `${origin}/widget/embed.js?v=20260909a`;
     loader.async = true;
     if (token) loader.dataset.token = token;
     if (instance) loader.dataset.instance = instance;

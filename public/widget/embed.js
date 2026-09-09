@@ -33,20 +33,20 @@
 
   function mountWidget(config) {
     const left = config.position === "BOTTOM_LEFT";
-    const color = config.primaryColor || "#1F3A5F";
+    const template = sanitizeTemplate(config.template);
+    const color = sanitizeCssColor(config.primaryColor, "#1F3A5F");
     const useGradient = Boolean(config.useGradient);
-    const gradientTo = String(config.gradientTo || "#4F8CFF");
-    const gradientAngle = String(config.gradientAngle || "to-bottom-right");
-    const textColor = String(config.textColor || "#FFFFFF");
-    const messageColor = String(config.messageColor || "#1E293B");
+    const gradientTo = sanitizeCssColor(config.gradientTo, "#4F8CFF");
+    const gradientAngle = sanitizeGradientAngle(config.gradientAngle);
+    const textColor = sanitizeCssColor(config.textColor, "#FFFFFF");
+    const messageColor = sanitizeCssColor(config.messageColor, "#1E293B");
     const greeting = String(config.greeting || "Hi! How can I help you today?");
     const startName = String(config.name || "Assistant");
-    const template = String(config.template || "CLASSIC").toUpperCase();
     const voiceOffered = Boolean(config.voiceEnabled);
     const voiceId = String(config.voiceId || "en-US-Neural2-F");
     const startAvatar = absoluteUrl(config.avatarUrl, origin);
     const startInitials = initialsOf(startName);
-    let whatsappDigits = String(config.channels?.whatsapp?.digits || "");
+    let whatsappDigits = String(config.channels?.whatsapp?.digits || "").replace(/\D/g, "");
     const host = document.documentElement || document.body;
     const storageKey = `tidyagent:${instance || site || "local"}`;
     let open = false;
@@ -633,6 +633,7 @@
     }
 
     let voiceDraft = "";
+    let voicePriorText = "";
     const voiceLang = String(config.voiceId || "en-US").match(/^[a-z]{2}-[A-Z]{2}/)?.[0] || "en-US";
 
     function setListenUi(on) {
@@ -661,7 +662,9 @@
       } catch {
         /* ignore */
       }
+      voicePriorText = String(box.value || "");
       voiceDraft = "";
+      box.value = "";
       recognition = new Rec();
       recognition.lang = voiceLang;
       recognition.continuous = true;
@@ -679,13 +682,16 @@
         if (listenCaption) listenCaption.textContent = shown || "Listening…";
         if (shown) box.value = shown;
       };
-      recognition.onerror = () => finishListen(Boolean(voiceDraft));
+      recognition.onerror = () => finishListen(Boolean(voiceDraft.trim()));
       recognition.onend = () => {
-        if (listening) finishListen(Boolean(voiceDraft || box.value.trim()));
+        // Never auto-send pre-typed composer text — only spoken content from this listen session.
+        if (listening) finishListen(Boolean(voiceDraft.trim() || box.value.trim()));
       };
       try {
         recognition.start();
       } catch {
+        box.value = voicePriorText;
+        voicePriorText = "";
         addNotice("Could not start the microphone. Check browser permission.");
         return;
       }
@@ -702,9 +708,17 @@
       }
       recognition = null;
       setListenUi(false);
-      const text = (voiceDraft || String(box.value || "")).replace(/\s+/g, " ").trim();
+      // Spoken-only: box was cleared at listen start and only filled with transcripts.
+      const spoken = (voiceDraft || String(box.value || "")).replace(/\s+/g, " ").trim();
       voiceDraft = "";
-      if (sendIt && text) void sendChat(text);
+      if (sendIt && spoken) {
+        box.value = "";
+        voicePriorText = "";
+        void sendChat(spoken);
+      } else {
+        box.value = voicePriorText;
+        voicePriorText = "";
+      }
     }
 
     function stopListen() {
@@ -820,12 +834,14 @@
       return `<div class="cards">${cards
         .slice(0, 4)
         .map((card) => {
-          const photo = card.imageUrl
-            ? `<div class="card-photo"><img src="${escapeAttr(card.imageUrl)}" alt=""></div>`
+          const href = safeHttpUrl(card.url);
+          const image = safeHttpUrl(card.imageUrl);
+          const photo = image
+            ? `<div class="card-photo"><img src="${escapeAttr(image)}" alt=""></div>`
             : `<div class="card-mark"><span>${escapeHtml((card.name || "•").trim().charAt(0).toUpperCase())}</span><em>From the site</em></div>`;
           const body = `${photo}<div class="card-copy"><p class="card-name">${escapeHtml(card.name || "")}</p>${card.price ? `<p class="card-price">${escapeHtml(card.price)}</p>` : ""}</div>`;
-          return card.url
-            ? `<a class="card" href="${escapeAttr(card.url)}" target="_blank" rel="noreferrer">${body}</a>`
+          return href
+            ? `<a class="card" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${body}</a>`
             : `<div class="card">${body}</div>`;
         })
         .join("")}</div>`;
@@ -987,10 +1003,10 @@
       const waBtn = host && !fromStrip ? host.querySelector('[data-opt="whatsapp"]') : null;
       if (waBtn) waBtn.disabled = true;
       if (errorEl) errorEl.hidden = true;
-      const fallback = directWhatsAppUrl();
+      const fallback = safeWhatsAppUrl(directWhatsAppUrl());
       try {
         if (!conversationId) {
-          window.open(fallback, "_blank", "noopener,noreferrer");
+          if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
           return;
         }
         const response = await fetch(`${origin}/api/widget/whatsapp-handoff`, {
@@ -1004,7 +1020,14 @@
           }),
         });
         const data = await response.json().catch(() => ({}));
-        const url = data.url || fallback;
+        const url = safeWhatsAppUrl(data.url) || fallback;
+        if (!url) {
+          if (errorEl) {
+            errorEl.hidden = false;
+            errorEl.textContent = data.error || "Could not open WhatsApp just then.";
+          }
+          return;
+        }
         window.open(url, "_blank", "noopener,noreferrer");
         if (fromStrip) return;
         if (host) {
@@ -1020,10 +1043,12 @@
           });
         }
       } catch {
-        window.open(fallback, "_blank", "noopener,noreferrer");
+        if (fallback) window.open(fallback, "_blank", "noopener,noreferrer");
         if (errorEl) {
           errorEl.hidden = false;
-          errorEl.textContent = "Opened WhatsApp. You can send the message from there.";
+          errorEl.textContent = fallback
+            ? "Opened WhatsApp. You can send the message from there."
+            : "Could not open WhatsApp just then.";
         }
       } finally {
         if (host) host.dataset.busy = "";
@@ -1253,10 +1278,64 @@
 
   function absoluteUrl(value, appOrigin) {
     if (!value || typeof value !== "string") return "";
-    if (value.startsWith("//")) return `https:${value}`;
-    if (value.startsWith("/")) return `${appOrigin}${value}`;
-    if (value.startsWith("http://")) return `https://${value.slice(7)}`;
-    return value;
+    let next = value.trim();
+    if (!next) return "";
+    if (next.startsWith("//")) next = `https:${next}`;
+    else if (next.startsWith("/")) next = `${appOrigin}${next}`;
+    else if (next.startsWith("http://")) next = `https://${next.slice(7)}`;
+    return safeHttpUrl(next) || "";
+  }
+
+  function safeHttpUrl(value) {
+    try {
+      const raw = String(value ?? "").trim();
+      if (!raw) return null;
+      const url = new URL(raw);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+      return url.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  function safeWhatsAppUrl(value) {
+    const url = safeHttpUrl(value);
+    if (!url) return null;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      if (
+        host === "wa.me" ||
+        host === "api.whatsapp.com" ||
+        host === "www.whatsapp.com" ||
+        host === "whatsapp.com"
+      ) {
+        return url;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  function sanitizeCssColor(value, fallback) {
+    const raw = String(value ?? "").trim();
+    if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return raw;
+    if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(raw)) {
+      return raw;
+    }
+    return fallback;
+  }
+
+  function sanitizeTemplate(value) {
+    const next = String(value || "CLASSIC").trim().toUpperCase();
+    return ["CLASSIC", "SOFT", "BAR", "MINIMAL"].includes(next) ? next : "CLASSIC";
+  }
+
+  function sanitizeGradientAngle(value) {
+    const next = String(value || "to-bottom-right").trim();
+    return ["to-bottom-right", "to-right", "to-bottom", "to-bottom-left", "radial"].includes(next)
+      ? next
+      : "to-bottom-right";
   }
 
   function escapeHtml(value) {
@@ -1308,7 +1387,9 @@
       .replace(/%%LINK(\d+)%%/g, (_, index) => {
         const item = rewritten.placeholders[Number(index)];
         if (!item) return "";
-        return `<a href="${escapeAttr(item.href)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`;
+        const href = safeHttpUrl(item.href);
+        if (!href) return escapeHtml(item.label);
+        return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.label)}</a>`;
       });
   }
   function formatAgentHtml(value) {

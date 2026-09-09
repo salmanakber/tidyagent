@@ -2,19 +2,14 @@
 
 import { Fragment } from "react";
 import { rewriteChatLinks } from "@/modules/widget/chat-links";
+import { safeHttpUrl } from "@/modules/widget/safe-url";
 
 function escapeText(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function safeHref(value: string) {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
+  return safeHttpUrl(value);
 }
 
 function Inline({ text }: { text: string }) {
