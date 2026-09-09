@@ -33,31 +33,30 @@ There is no domain crawl and no HTML scrape of the published site.
 | ecommerce:read | /v2/sites/{site_id}/products | GET | Knowledge scan (plan-scoped, when store exists) | Read product catalog for AI product answers |
 | custom_code:read | /v2/sites/{site_id}/registered_scripts | GET | Install and open app | Detect whether the tidyAgent script is already registered |
 | custom_code:read | /v2/sites/{site_id}/custom_code | GET | Install, open app, Disconnect | Read applied site scripts before apply or remove |
-| custom_code:write | /v2/sites/{site_id}/registered_scripts/hosted | POST | Install and open app | Register the production executable https://agent.tidyflowapp.com/widget/embed.js as a versioned hosted script with sha384 integrityHash |
-| custom_code:write | /v2/sites/{site_id}/custom_code | PUT | Install and open app | Apply the hosted script at the site footer |
+| custom_code:write | /v2/sites/{site_id}/registered_scripts/inline | POST | Install and open app | Register the production tidyAgent inline loader, which loads https://agent.tidyflowapp.com/widget.js |
+| custom_code:write | /v2/sites/{site_id}/custom_code | PUT | Install and open app | Apply the tidyAgent script at the site footer |
 | custom_code:write | /v2/sites/{site_id}/custom_code | DELETE | Uninstall / Settings → Uninstall & remove widget | Remove Custom Code applied by this App only; unrelated scripts preserved. Merchant is then prompted to Publish |
 
 ## Custom Code disclosure (exact)
 
-Production applies one executable only:
+Production applies one code-delivery path only:
 
-1. POST /v2/sites/{site_id}/registered_scripts/hosted
-   - hostedLocation: https://agent.tidyflowapp.com/widget/embed.js?v={SemVer}&instance={workspaceId}
-   - integrityHash: sha384-… computed from public/widget/embed.js
-   - version: SemVer of that executable (currently 1.2.0)
+1. POST /v2/sites/{site_id}/registered_scripts/inline
+   - sourceCode: compact inline loader (under 2000 characters)
+   - The loader loads: https://agent.tidyflowapp.com/widget.js?v={SemVer}&instance={workspaceId}
+   - version: SemVer of that loader (currently 1.3.0)
    - displayName: tidyAgent
 2. PUT /v2/sites/{site_id}/custom_code — apply that registered script at location footer
 
-The hosted file is the full chat widget UI. It does not create further remote script elements. It only calls tidyAgent HTTPS JSON APIs (/api/widget/config, chat, lead, etc.) for data.
+Production executable:
 
-Not used for Webflow Custom Code:
-
-- Inline loaders
 - https://agent.tidyflowapp.com/widget.js
-- Nested runtime loaders that fetch another remote .js executable
-- POST /v2/sites/{site_id}/registered_scripts/inline
+- Delivered through inline script registration
+- No hosted script registration
+- No embed.js registration
+- No alternative production code-delivery path
 
-The merchant must publish the Webflow site for visitors to see the bubble.
+On disconnect, remove only tidyAgent code. The merchant must publish the Webflow site for visitors to see or lose the bubble.
 
 ## Uninstall lifecycle (exact)
 
@@ -72,7 +71,7 @@ Publishing is required for removal to take effect on the live site. tidyAgent do
 ## Endpoints not used in production
 
 - GET /v2/pages/{page_id}/dom (Get Page Content)
-- POST /v2/sites/{site_id}/registered_scripts/inline
+- POST /v2/sites/{site_id}/registered_scripts/hosted
 - pages:write, Forms, Assets, Designer Extension APIs
 
 ## Align Webflow App dashboard permissions

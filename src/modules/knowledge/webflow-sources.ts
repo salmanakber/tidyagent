@@ -152,20 +152,12 @@ export async function harvestWebflowApis(input: {
           ? `${siteUrl.replace(/\/$/, "")}${publishedPath.startsWith("/") ? publishedPath : `/${publishedPath}`}`
           : `webflow://page/${page.id}`;
         const seoDesc = String(page.seoDescription || page.description || "");
-        const ogTitle = String(page.openGraphTitle || page.ogTitle || "");
-        const ogDesc = String(page.openGraphDescription || page.ogDescription || "");
-        const ogImage = String(
-          page.openGraphImageUrl ||
-            asRecord(page.openGraphImage).url ||
-            page.ogImage ||
-            "",
-        );
-        const body = [title, seoDesc, ogTitle, ogDesc, publishedPath].filter(Boolean).join("\n\n");
+        const body = [title, seoDesc, publishedPath].filter(Boolean).join("\n\n");
         if (body.length < 8) continue;
         pages.push({
           url,
           title,
-          description: seoDesc || ogDesc,
+          description: seoDesc,
           headings: [title],
           text: body,
           emails: [],
@@ -173,7 +165,7 @@ export async function harvestWebflowApis(input: {
           links: [],
           contentType: classifyPage(url, title, body),
           jsonLd: [],
-          imageUrl: ogImage.startsWith("http") ? ogImage : undefined,
+          imageUrl: undefined,
         });
       }
       stages.push({
@@ -181,7 +173,7 @@ export async function harvestWebflowApis(input: {
         label: "Read Webflow page metadata",
         status: apiPages.length ? "done" : "skipped",
         detail: apiPages.length
-          ? `${Math.min(apiPages.length, input.scope.maxPages)} pages (title, SEO description, path)`
+          ? `${Math.min(apiPages.length, input.scope.maxPages)} pages (title, SEO description, published path only)`
           : "No pages listed",
       });
     } catch (error) {

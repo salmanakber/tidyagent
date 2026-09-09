@@ -200,28 +200,29 @@ export default function WebflowDocsPage() {
 
           <Section id="widget" title="8. Chat widget (Custom Code)">
             <p>
-              On install / open, tidyAgent registers the{" "}
-              <strong className="text-white">production chat widget executable</strong> as a versioned{" "}
-              <strong className="text-white">hosted script</strong> through Webflow’s Custom Code API, then applies it at
+              On install / open, tidyAgent registers a compact{" "}
+              <strong className="text-white">inline loader</strong> through Webflow’s Custom Code API. That loader loads
+              the production executable <strong className="text-white">widget.js</strong>, then the script is applied at
               the site footer.
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
                 <strong className="text-white">Exact production URL</strong> —{" "}
-                <code className="text-amber-300">https://agent.tidyflowapp.com/widget/embed.js</code> (SemVer query{" "}
+                <code className="text-amber-300">https://agent.tidyflowapp.com/widget.js</code> (SemVer query{" "}
                 <code className="text-amber-300">v=</code> plus site <code className="text-amber-300">instance</code>{" "}
                 query for workspace binding).
               </li>
               <li>
                 <strong className="text-white">How it is registered</strong> —{" "}
-                <code className="text-amber-300">POST /v2/sites/{"{site_id}"}/registered_scripts/hosted</code> with a{" "}
-                <code className="text-amber-300">sha384</code> integrity hash of that file, then{" "}
-                <code className="text-amber-300">PUT /v2/sites/{"{site_id}"}/custom_code</code> to apply it.
+                <code className="text-amber-300">POST /v2/sites/{"{site_id}"}/registered_scripts/inline</code> with
+                sourceCode that loads widget.js, then{" "}
+                <code className="text-amber-300">PUT /v2/sites/{"{site_id}"}/custom_code</code> to apply it at the
+                footer.
               </li>
               <li>
-                <strong className="text-white">No nested loaders</strong> — the App does not inject an inline loader and
-                does not chain <code className="text-amber-300">widget.js</code> → another remote executable. The hosted
-                file is the chat UI itself (it only calls tidyAgent JSON APIs for config and replies).
+                <strong className="text-white">One production path</strong> — no hosted script registration, no{" "}
+                <code className="text-amber-300">embed.js</code> registration, and no alternate Custom Code delivery
+                path.
               </li>
               <li>
                 <strong className="text-white">Where it runs</strong> — on your published Webflow site for visitors

@@ -25,7 +25,7 @@ const WEBFLOW_WHY: Record<(typeof WEBFLOW_OAUTH_SCOPES)[number], string> = {
   "sites:write": "Required by Webflow for site-level Custom Code apply/remove during install and disconnect.",
   "pages:read": "Read page metadata (title, SEO description, published path) from GET /v2/sites/{site_id}/pages. tidyAgent does not call GET /v2/pages/{page_id}/dom.",
   "custom_code:read": "GET /v2/sites/{site_id}/registered_scripts and GET /v2/sites/{site_id}/custom_code to see whether the chat widget script is already registered or applied.",
-  "custom_code:write": "POST /v2/sites/{site_id}/registered_scripts/hosted (versioned embed.js with integrityHash) and PUT /v2/sites/{site_id}/custom_code to apply or remove the chat widget.",
+  "custom_code:write": "POST /v2/sites/{site_id}/registered_scripts/inline (loader that loads https://agent.tidyflowapp.com/widget.js) and PUT /v2/sites/{site_id}/custom_code to apply or remove the chat widget. Does not use hosted script registration.",
   "cms:read": "Read CMS collections and items for knowledge (plan-scoped).",
   "ecommerce:read": "Read ecommerce catalog data when your site has a store (plan-scoped).",
 };
@@ -69,7 +69,7 @@ export const WEBFLOW_INSTALL_GUIDE: InstallGuide = {
   notes: [
     "tidyAgent is hosted at agent.tidyflowapp.com — Webflow is not the operator of the dashboard or AI.",
     "Knowledge uses Webflow Data APIs only: site profile, page metadata (not page DOM), CMS, and ecommerce when available. tidyAgent does not crawl or scrape the published domain.",
-    "Custom code registers the production executable https://agent.tidyflowapp.com/widget/embed.js as a versioned hosted script with a sha384 integrity hash (no nested remote loaders). Publish is required for visitors to see the bubble.",
+    "Custom code registers an inline loader that loads https://agent.tidyflowapp.com/widget.js (no hosted script registration, no embed.js registration). Publish is required for visitors to see the bubble.",
     "Exact scope mapping: https://agent.tidyflowapp.com/docs/webflow and webflow-extension/SCOPE_MAPPING.md",
     "User guide: /docs/webflow — Terms: /terms?platform=webflow — Privacy: /privacy?platform=webflow.",
   ],

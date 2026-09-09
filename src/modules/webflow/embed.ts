@@ -8,8 +8,8 @@ import { WebflowApiError, webflowDelete, webflowGet, webflowSend } from "@/modul
 import {
   WEBFLOW_EMBED_DISPLAY_NAME,
   WEBFLOW_EMBED_VERSION,
-  webflowEmbedHostedLocation,
-  webflowEmbedIntegrityHash,
+  webflowInlineLoaderSource,
+  webflowWidgetExecutableLocation,
 } from "@/modules/webflow/widget-script";
 
 type RegisteredScript = {
@@ -24,8 +24,10 @@ export type WebflowWidgetInjectResult = {
   ok: boolean;
   scriptId?: string;
   version?: string;
+  /** Production executable loaded by the inline loader (widget.js). */
   hostedLocation?: string;
   integrityHash?: string;
+  delivery?: "inline";
   error?: string;
 };
 
@@ -69,8 +71,8 @@ async function currentAppliedScripts(accessToken: string, webflowSiteId: string)
 }
 
 /**
- * Registers the production widget executable as a versioned hosted script with SRI,
- * then applies it at the site footer. No inline nested loaders.
+ * Registers the production widget as an inline loader that loads widget.js,
+ * then applies it at the site footer. Does not use hosted script registration.
  * Does not publish the Webflow site — the owner must publish for visitors to see it.
  */
 export async function injectWebflowWidget(input: {
@@ -80,8 +82,8 @@ export async function injectWebflowWidget(input: {
   origin?: string;
 }): Promise<WebflowWidgetInjectResult> {
   const origin = (input.origin || getAppOrigin()).replace(/\/$/, "");
-  const hostedLocation = webflowEmbedHostedLocation(origin, input.instanceId);
-  const integrityHash = await webflowEmbedIntegrityHash();
+  const executableLocation = webflowWidgetExecutableLocation(origin, input.instanceId);
+  const sourceCode = webflowInlineLoaderSource(origin, input.instanceId);
   const listed = await listScripts(input.accessToken, input.webflowSiteId);
   const existing = listed.find(
     (row) =>
@@ -95,11 +97,10 @@ export async function injectWebflowWidget(input: {
   try {
     const registered = await webflowSend<RegisteredScript>(
       input.accessToken,
-      `/v2/sites/${input.webflowSiteId}/registered_scripts/hosted`,
+      `/v2/sites/${input.webflowSiteId}/registered_scripts/inline`,
       "POST",
       {
-        hostedLocation,
-        integrityHash,
+        sourceCode,
         version: WEBFLOW_EMBED_VERSION,
         displayName: WEBFLOW_EMBED_DISPLAY_NAME,
         canCopy: false,
@@ -127,8 +128,8 @@ export async function injectWebflowWidget(input: {
     ok: true,
     scriptId,
     version: appliedVersion,
-    hostedLocation,
-    integrityHash,
+    hostedLocation: executableLocation,
+    delivery: "inline",
   };
 }
 
