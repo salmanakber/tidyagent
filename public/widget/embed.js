@@ -1393,7 +1393,7 @@
       });
   }
   function formatAgentHtml(value) {
-    const raw = String(value || "").replace(/\r/g, "").trim();
+    const raw = normalizeAgentReplyText(value);
     if (!raw) return "";
     return raw.split(/\n{2,}/).map((block) => {
       const lines = block.split("\n");
@@ -1406,6 +1406,31 @@
         .filter(Boolean);
       return `${intro ? `<p>${inlineMd(intro)}</p>` : ""}<ul>${items.map((item) => `<li>${inlineMd(item)}</li>`).join("")}</ul>`;
     }).join("");
+  }
+
+  function normalizeAgentReplyText(value) {
+    let text = String(value || "")
+      .replace(/\r\n?/g, "\n")
+      .replace(/[\u00A0\u202F\u2007\u2009]/g, " ")
+      .trim();
+    if (!text) return "";
+    text = text.replace(/:[ \t]*[-•*][ \t]+/g, ":\n- ");
+    text = text.replace(
+      /(?<![-*\n])\s+[-•*]\s+(?=(?:\*\*)?[A-Za-z][A-Za-z0-9 /&'’-]{0,40}:)/g,
+      "\n- ",
+    );
+    text = text.replace(/:[ \t]*(?=\d+[.)][ \t]+\S)/g, ":\n");
+    text = text.replace(/(?<![\n\d])\s+(\d+)[.)]\s+(?=\S)/g, "\n$1. ");
+    text = text.replace(
+      /(\n[-•*] [^\n]+|\n\d+\. [^\n]+)(\s+)(?=(?:Let me know|Which option|If you(?:'|’)d like|Happy to|I can also|Feel free)\b)/gi,
+      "$1\n\n",
+    );
+    return text
+      .split("\n")
+      .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
   function gradientCss(from, to, angle) {
     if (angle === "radial") return `radial-gradient(circle at 18% 18%, ${from} 0%, ${to} 82%)`;
@@ -1536,7 +1561,14 @@
       .stack { display:flex; flex-direction:column; gap:4px; min-width:0; }
       .row.visitor .stack { align-items:flex-end; }
       .who { font:650 9px/1 ui-sans-serif,system-ui; letter-spacing:.08em; text-transform:uppercase; opacity:.55; }
-      .msg { border-radius:16px; padding:8px 10px; font:500 12px/1.45 ui-sans-serif,system-ui; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow-wrap:anywhere; word-break:break-word; }
+      .msg { border-radius:16px; padding:10px 12px; font:500 13px/1.5 ui-sans-serif,system-ui; box-shadow:0 1px 2px rgba(16,24,40,.05); overflow-wrap:anywhere; word-break:break-word; }
+      .msg p { margin:0; }
+      .msg p + p, .msg p + ul, .msg ul + p { margin-top:0.65em; }
+      .msg ul { margin:0.35em 0 0; padding:0 0 0 1.15em; list-style:disc; }
+      .msg li { margin:0.35em 0; padding-left:0.15em; }
+      .msg li::marker { color: currentColor; opacity:.55; }
+      .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+      .msg strong { font-weight:700; }
       .msg p { margin:0; }
       .msg p + ul, .msg p + p { margin-top:8px; }
       .msg ul { margin:6px 0 0; padding-left:1.15rem; }

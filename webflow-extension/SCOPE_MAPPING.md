@@ -44,7 +44,7 @@ Production applies one executable only:
 1. POST /v2/sites/{site_id}/registered_scripts/hosted
    - hostedLocation: https://agent.tidyflowapp.com/widget/embed.js?v={SemVer}&instance={workspaceId}
    - integrityHash: sha384-… computed from public/widget/embed.js
-   - version: SemVer of that executable (currently 1.1.1)
+   - version: SemVer of that executable (currently 1.1.2)
    - displayName: tidyAgent
 2. PUT /v2/sites/{site_id}/custom_code — apply that registered script at location footer
 

@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { rewriteChatLinks } from "@/modules/widget/chat-links";
+import { normalizeAgentReplyText } from "@/modules/widget/format-reply";
 import { safeHttpUrl } from "@/modules/widget/safe-url";
 
 function escapeText(value: string) {
@@ -42,11 +43,12 @@ function Inline({ text }: { text: string }) {
 }
 
 export function AgentRichText({ text }: { text: string }) {
-  const blocks = text.replace(/\r/g, "").trim() ? text.replace(/\r/g, "").split(/\n{2,}/) : [text];
+  const normalized = normalizeAgentReplyText(text);
+  const blocks = normalized ? normalized.split(/\n{2,}/) : [text];
   return (
-    <div className="space-y-2 text-left">
+    <div className="space-y-2.5 text-left leading-relaxed">
       {blocks.map((block, index) => {
-        const lines = block.split("\n");
+        const lines = block.split("\n").map((line) => line.trimEnd());
         const listStart = lines.findIndex((line) => /^\s*[-*•]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line));
         if (listStart >= 0) {
           const intro = lines.slice(0, listStart).join("\n").trim();
@@ -57,13 +59,13 @@ export function AgentRichText({ text }: { text: string }) {
           return (
             <div key={index} className="space-y-2">
               {intro ? (
-                <p>
+                <p className="whitespace-pre-wrap">
                   <Inline text={intro} />
                 </p>
               ) : null}
-              <ul className="list-disc space-y-1.5 pl-4">
+              <ul className="list-disc space-y-2 pl-4 marker:text-current/55">
                 {items.map((line, item) => (
-                  <li key={item}>
+                  <li key={item} className="pl-0.5">
                     <Inline text={line} />
                   </li>
                 ))}
@@ -82,7 +84,7 @@ export function AgentRichText({ text }: { text: string }) {
 }
 
 export function stripForVoice(text: string) {
-  return rewriteChatLinks(text)
+  return rewriteChatLinks(normalizeAgentReplyText(text))
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1")
     .replace(/\*\*/g, "")
     .replace(/^\s*[-*•]\s+/gm, "")

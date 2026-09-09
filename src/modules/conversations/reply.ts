@@ -837,6 +837,7 @@ Never say you are connecting the visitor to a person unless the system already d
 Never add "Anything else I can help with?"
 When catalog items are listed above, highlight the best matches in plain language (name, price, key options). The chat UI already shows rich product cards — do not invent extra products beyond that list.
 When prices are in evidence: one short sentence, then bullets with **name** and **price**.
+Chat formatting (required): put a short intro first. Put each option on its own line starting with "- " (never jam several "- Phone / - Email / - Online" items into one paragraph). Use a blank line before a closing question. Keep replies scannable on a phone.
 Do not dump marketing copy.
 ${sensitiveRule}
 ${intro}
@@ -866,7 +867,7 @@ ${historyBlock || "(this is the first visitor message)"}
 
 Visitor just said: ${input.question}
 
-Read the thread, owner notes, and evidence before answering. Prefer a short professional intro sentence, then formatted bullets for prices or specific items when those facts are in the evidence. Do not repeat source titles. Answer the question that was asked — including general questions — using chat context.`,
+Read the thread, owner notes, and evidence before answering. Prefer a short professional intro sentence, then a newline and formatted "- " bullets for options, contact paths, or prices when those facts are in the evidence. Do not jam multiple bullets into one paragraph. Do not repeat source titles. Answer the question that was asked — including general questions — using chat context.`,
     });
     const text = sanitizeReply(result.text.trim());
     if (text && !looksLikeDump(text)) return text.slice(0, 2800);
