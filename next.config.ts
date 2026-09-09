@@ -67,6 +67,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  /**
+   * Production Webflow/Wix/Shopify entry URL is /widget.js.
+   * That URL serves the single chat UI executable (same bytes as /widget/embed.js).
+   * No nested remote script loader.
+   */
+  async rewrites() {
+    return [{ source: "/widget.js", destination: "/widget/embed.js" }];
+  },
 };
 
 export default nextConfig;

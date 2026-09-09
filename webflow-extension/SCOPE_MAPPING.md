@@ -37,26 +37,30 @@ There is no domain crawl and no HTML scrape of the published site.
 | custom_code:write | /v2/sites/{site_id}/custom_code | PUT | Install and open app | Apply the tidyAgent script at the site footer |
 | custom_code:write | /v2/sites/{site_id}/custom_code | DELETE | Uninstall / Settings → Uninstall & remove widget | Remove Custom Code applied by this App only; unrelated scripts preserved. Merchant is then prompted to Publish |
 
-## Custom Code disclosure (exact)
+## Custom Code disclosure (exact — paste this section only)
 
-Production applies one code-delivery path only:
+**Do not paste any older text that mentions hosted registration, embed.js, or SemVer 1.1.0.** That older path is retired and must not appear anywhere in the submission.
 
-1. POST /v2/sites/{site_id}/registered_scripts/inline
-   - sourceCode: compact inline loader (under 2000 characters)
-   - The loader loads: https://agent.tidyflowapp.com/widget.js?v={SemVer}&instance={workspaceId}
-   - version: SemVer of that loader (currently 1.3.0)
-   - displayName: tidyAgent
-2. PUT /v2/sites/{site_id}/custom_code — apply that registered script at location footer
+Production uses **one** code-delivery path:
+
+1. `POST /v2/sites/{site_id}/registered_scripts/inline`
+   - `sourceCode`: compact inline loader (under 2000 characters)
+   - The loader loads **only**: `https://agent.tidyflowapp.com/widget.js?v=1.3.1&instance={workspaceId}`
+   - `version`: `1.3.1`
+   - `displayName`: `tidyAgent`
+2. `PUT /v2/sites/{site_id}/custom_code` — apply that registered script at location `footer`
+3. On disconnect: `DELETE /v2/sites/{site_id}/custom_code` (App-applied scripts only), or PUT remaining non-tidyAgent scripts
 
 Production executable:
 
-- https://agent.tidyflowapp.com/widget.js
-- Delivered through inline script registration
-- No hosted script registration
-- No embed.js registration
-- No alternative production code-delivery path
+- URL: `https://agent.tidyflowapp.com/widget.js`
+- Delivered through **inline** script registration only
+- `widget.js` **is** the chat UI. It calls tidyAgent HTTPS JSON APIs for config/chat. It does **not** create another remote `<script>` element.
+- **Not used:** `POST /v2/sites/{site_id}/registered_scripts/hosted`
+- **Not used:** registering or documenting `embed.js` as a production Custom Code path
+- **No** alternative production code-delivery path
 
-On disconnect, remove only tidyAgent code. The merchant must publish the Webflow site for visitors to see or lose the bubble.
+Merchant must publish the Webflow site for visitors to see or lose the bubble.
 
 ## Uninstall lifecycle (exact)
 

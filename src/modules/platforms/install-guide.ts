@@ -69,7 +69,7 @@ export const WEBFLOW_INSTALL_GUIDE: InstallGuide = {
   notes: [
     "tidyAgent is hosted at agent.tidyflowapp.com — Webflow is not the operator of the dashboard or AI.",
     "Knowledge uses Webflow Data APIs only: site profile, page metadata (not page DOM), CMS, and ecommerce when available. tidyAgent does not crawl or scrape the published domain.",
-    "Custom code registers an inline loader that loads https://agent.tidyflowapp.com/widget.js (no hosted script registration, no embed.js registration). Publish is required for visitors to see the bubble.",
+    "Custom code uses one path only: POST …/registered_scripts/inline (loader → https://agent.tidyflowapp.com/widget.js) then PUT …/custom_code at the footer. Hosted registration is not used. Publish is required for visitors to see the bubble.",
     "Exact scope mapping: https://agent.tidyflowapp.com/docs/webflow and webflow-extension/SCOPE_MAPPING.md",
     "User guide: /docs/webflow — Terms: /terms?platform=webflow — Privacy: /privacy?platform=webflow.",
   ],

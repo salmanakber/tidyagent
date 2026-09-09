@@ -3,24 +3,30 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Production Webflow Custom Code (Data Client).
- * Registers an inline loader that loads https://{origin}/widget.js — not hosted embed.js.
- * Inline sourceCode must stay under Webflow’s 2000-character limit.
- * Bump version whenever the inline loader or widget.js bootstrap contract changes.
+ * Production Webflow Custom Code (Data Client) — ONE path only:
+ * 1) POST …/registered_scripts/inline — compact loader (≤2000 chars)
+ * 2) That loader loads https://{origin}/widget.js?v=&instance=
+ * 3) PUT …/custom_code — apply at footer
+ *
+ * /widget.js is the chat UI executable (rewritten to the same bytes as
+ * /widget/embed.js). It does NOT create another remote <script> tag.
+ * Hosted registration is never used.
+ *
+ * Bump WEBFLOW_EMBED_VERSION when the inline loader or chat UI contract changes.
  */
 export const WEBFLOW_EMBED_DISPLAY_NAME = "tidyAgent";
-export const WEBFLOW_EMBED_VERSION = "1.3.0";
+export const WEBFLOW_EMBED_VERSION = "1.3.1";
 export const WEBFLOW_WIDGET_PATH = "/widget.js";
 
-/** @deprecated Use WEBFLOW_WIDGET_PATH — kept for any remaining hosted-path references. */
-export const WEBFLOW_EMBED_PATH = "/widget/embed.js";
+/** On-disk chat UI file (served at /widget.js via Next rewrite). */
+export const WEBFLOW_CHAT_UI_FILE = path.join("public", "widget", "embed.js");
 
 export function webflowWidgetCanonicalUrl(origin: string) {
   const base = origin.replace(/\/$/, "");
   return `${base}${WEBFLOW_WIDGET_PATH}`;
 }
 
-/** Production executable URL applied via the inline loader (instance is config). */
+/** Production executable URL loaded by the inline loader (instance is config). */
 export function webflowWidgetExecutableLocation(origin: string, instanceId: string) {
   const url = new URL(webflowWidgetCanonicalUrl(origin));
   url.searchParams.set("instance", instanceId);
@@ -29,8 +35,8 @@ export function webflowWidgetExecutableLocation(origin: string, instanceId: stri
 }
 
 /**
- * Inline sourceCode registered with POST …/registered_scripts/inline.
- * Loads the production executable widget.js (under 2000 chars).
+ * Inline sourceCode for POST …/registered_scripts/inline.
+ * Must stay under Webflow’s 2000-character limit.
  */
 export function webflowInlineLoaderSource(origin: string, instanceId: string) {
   const base = origin.replace(/\/$/, "");
@@ -45,19 +51,22 @@ export function webflowInlineLoaderSource(origin: string, instanceId: string) {
   return source;
 }
 
-/** @deprecated Hosted path is not used in production. Prefer webflowWidgetExecutableLocation. */
+/** sha384 of the chat UI bytes served at /widget.js */
+export async function webflowWidgetIntegrityHash(): Promise<string> {
+  const filePath = path.join(process.cwd(), WEBFLOW_CHAT_UI_FILE);
+  const bytes = await readFile(filePath);
+  return `sha384-${createHash("sha384").update(bytes).digest("base64")}`;
+}
+
+/** @deprecated Use webflowWidgetIntegrityHash */
+export const webflowEmbedIntegrityHash = webflowWidgetIntegrityHash;
+
+/** @deprecated Use webflowWidgetCanonicalUrl */
 export function webflowEmbedCanonicalUrl(origin: string) {
   return webflowWidgetCanonicalUrl(origin);
 }
 
-/** @deprecated Hosted path is not used in production. */
+/** @deprecated Use webflowWidgetExecutableLocation */
 export function webflowEmbedHostedLocation(origin: string, instanceId: string) {
   return webflowWidgetExecutableLocation(origin, instanceId);
-}
-
-/** Optional integrity for audits — not required for inline registration. */
-export async function webflowEmbedIntegrityHash(): Promise<string> {
-  const filePath = path.join(process.cwd(), "public", "widget.js");
-  const bytes = await readFile(filePath);
-  return `sha384-${createHash("sha384").update(bytes).digest("base64")}`;
 }

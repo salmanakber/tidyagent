@@ -202,8 +202,8 @@ export default function WebflowDocsPage() {
             <p>
               On install / open, tidyAgent registers a compact{" "}
               <strong className="text-white">inline loader</strong> through Webflow’s Custom Code API. That loader loads
-              the production executable <strong className="text-white">widget.js</strong>, then the script is applied at
-              the site footer.
+              the production executable <strong className="text-white">widget.js</strong> (the chat UI itself), then the
+              script is applied at the site footer.
             </p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
@@ -220,9 +220,12 @@ export default function WebflowDocsPage() {
                 footer.
               </li>
               <li>
-                <strong className="text-white">One production path</strong> — no hosted script registration, no{" "}
-                <code className="text-amber-300">embed.js</code> registration, and no alternate Custom Code delivery
-                path.
+                <strong className="text-white">One production path</strong> — inline registration only. Hosted script
+                registration is not used. There is no alternate Custom Code delivery path.
+              </li>
+              <li>
+                <strong className="text-white">What widget.js does</strong> — renders the chat UI and calls tidyAgent
+                HTTPS JSON APIs for config and replies. It does not inject another remote script element.
               </li>
               <li>
                 <strong className="text-white">Where it runs</strong> — on your published Webflow site for visitors

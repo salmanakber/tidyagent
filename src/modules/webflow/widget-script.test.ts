@@ -3,26 +3,27 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  WEBFLOW_CHAT_UI_FILE,
   WEBFLOW_EMBED_VERSION,
   webflowInlineLoaderSource,
   webflowWidgetCanonicalUrl,
   webflowWidgetExecutableLocation,
-  webflowEmbedIntegrityHash,
+  webflowWidgetIntegrityHash,
 } from "@/modules/webflow/widget-script";
 
-describe("webflow inline widget script", () => {
+describe("webflow inline → widget.js production path", () => {
   it("builds the production widget.js URL with instance config", () => {
     const url = webflowWidgetExecutableLocation("https://agent.tidyflowapp.com", "wf:site-99");
     expect(url).toContain("https://agent.tidyflowapp.com/widget.js");
     expect(url).toContain(`v=${WEBFLOW_EMBED_VERSION}`);
     expect(url).toContain("instance=wf%3Asite-99");
-    expect(url).not.toContain("/widget/embed.js");
+    expect(url).not.toContain("registered_scripts/hosted");
     expect(webflowWidgetCanonicalUrl("https://agent.tidyflowapp.com")).toBe(
       "https://agent.tidyflowapp.com/widget.js",
     );
   });
 
-  it("builds inline loader source under 2000 characters that loads widget.js", () => {
+  it("builds inline loader source under 2000 characters that loads only widget.js", () => {
     const source = webflowInlineLoaderSource("https://agent.tidyflowapp.com", "wf:site-99");
     expect(source.length).toBeLessThanOrEqual(2000);
     expect(source).toContain("/widget.js");
@@ -31,11 +32,18 @@ describe("webflow inline widget script", () => {
     expect(source).not.toContain("registered_scripts/hosted");
   });
 
-  it("computes sha384 integrity for on-disk widget.js", async () => {
-    const hash = await webflowEmbedIntegrityHash();
+  it("hashes the chat UI file served at /widget.js", async () => {
+    const hash = await webflowWidgetIntegrityHash();
     expect(hash.startsWith("sha384-")).toBe(true);
-    const bytes = readFileSync(path.join(process.cwd(), "public", "widget.js"));
+    const bytes = readFileSync(path.join(process.cwd(), WEBFLOW_CHAT_UI_FILE));
     const expected = `sha384-${createHash("sha384").update(bytes).digest("base64")}`;
     expect(hash).toBe(expected);
+  });
+
+  it("chat UI does not create a nested remote script to embed.js", () => {
+    const bytes = readFileSync(path.join(process.cwd(), WEBFLOW_CHAT_UI_FILE), "utf8");
+    expect(bytes).not.toMatch(/createElement\(["']script["']\)[\s\S]{0,200}\/widget\/embed\.js/);
+    expect(bytes).not.toContain('src = `${origin}/widget/embed.js');
+    expect(bytes).not.toContain('src=`${origin}/widget/embed.js');
   });
 });

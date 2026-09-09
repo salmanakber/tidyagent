@@ -10,17 +10,28 @@ Do not enable a Designer Extension building block. Every submission field, produ
 
 ## Permission mapping
 
-Use the exact table in SCOPE_MAPPING.md (inline widget.js path — not hosted embed.js).
+Paste the **Exact production endpoint mapping** table from `SCOPE_MAPPING.md`.
 
-## Custom Code (critical)
+## Custom Code (critical — paste this EXACTLY; delete any older hosted/embed.js text)
 
 Production uses one code-delivery path only:
 
-- Executable: https://agent.tidyflowapp.com/widget.js
-- Register: POST /v2/sites/{site_id}/registered_scripts/inline (loader that loads widget.js)
-- Apply: PUT /v2/sites/{site_id}/custom_code (footer)
-- No hosted script registration
-- No embed.js registration
+1. POST /v2/sites/{site_id}/registered_scripts/inline  
+   Registers a compact inline loader (under 2000 characters) that loads:  
+   https://agent.tidyflowapp.com/widget.js?v=1.3.1&instance={workspaceId}
+
+2. PUT /v2/sites/{site_id}/custom_code  
+   Applies that registered script at the site footer.
+
+3. On disconnect: DELETE /v2/sites/{site_id}/custom_code (App-applied scripts only).
+
+Production executable:
+
+- https://agent.tidyflowapp.com/widget.js
+- Delivered through inline script registration only
+- widget.js is the chat UI (JSON API calls only; no nested remote script element)
+- Not used: POST /v2/sites/{site_id}/registered_scripts/hosted
+- Not used: embed.js as a Custom Code registration path
 - No alternative production code-delivery path
 
 ## Uninstall lifecycle
@@ -60,6 +71,6 @@ Visitors get a chat bubble on the live site through Webflow Custom Code: an inli
 - Terms: https://agent.tidyflowapp.com/terms?platform=webflow
 - Privacy: https://agent.tidyflowapp.com/privacy?platform=webflow
 
-Form: Architecture = Data Client. Knowledge = Webflow Data APIs only (page metadata + CMS + ecommerce; no domain crawl; no Get Page Content). Custom Code = inline → widget.js only.
+**Resubmit checklist:** Permission mapping Custom Code rows and the Custom Code narrative field must both say inline → widget.js only. Delete any leftover hosted / embed.js / v=1.1.0 wording from the form or attachments.
 
 See also: https://developers.webflow.com/apps/docs/marketplace/listing-your-app
