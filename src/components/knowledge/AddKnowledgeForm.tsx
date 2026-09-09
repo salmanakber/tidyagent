@@ -29,7 +29,9 @@ export function AddKnowledgeForm({
           <p className="text-sm text-navy-300">
             {webflow
               ? "Add as many labeled facts as you need. The employee uses these first, before Webflow API knowledge."
-              : "Add as many labeled facts as you need. The employee uses these first, before crawled pages."}
+              : platform === "SHOPIFY"
+                ? "Add as many labeled facts as you need. The employee uses these first, before Shopify catalog knowledge."
+                : "Add as many labeled facts as you need. The employee uses these first, before crawled pages."}
           </p>
         </div>
         <p className="text-xs text-navy-400">Last synced: {lastSynced ? new Date(lastSynced).toLocaleString() : "Not yet"}</p>
@@ -79,7 +81,7 @@ export function AddKnowledgeForm({
         <OwnerNoteFields fields={fields} onChange={setFields} />
         <label className="flex items-center gap-2 text-sm text-navy-200">
           <input type="checkbox" checked={priority} onChange={(event) => setPriority(event.target.checked)} />
-          {webflow ? "Use as priority over Webflow API knowledge" : "Use as priority over crawled pages"}
+          {webflow ? "Use as priority over Webflow API knowledge" : platform === "SHOPIFY" ? "Use as priority over Shopify catalog knowledge" : "Use as priority over crawled pages"}
         </label>
         <label className="flex items-center gap-2 text-sm text-navy-200">
           <input type="checkbox" checked={sensitive} onChange={(event) => setSensitive(event.target.checked)} />

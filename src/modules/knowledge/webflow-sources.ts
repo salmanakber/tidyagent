@@ -27,6 +27,12 @@ export type PlatformApiHarvest = {
   displayName?: string | null;
   currency?: string | null;
   locale?: string | null;
+  /** Optional brand signals (hex colors, image URLs, short phrases). */
+  brand?: {
+    colors?: string[];
+    images?: string[];
+    phrases?: string[];
+  };
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -146,12 +152,20 @@ export async function harvestWebflowApis(input: {
           ? `${siteUrl.replace(/\/$/, "")}${publishedPath.startsWith("/") ? publishedPath : `/${publishedPath}`}`
           : `webflow://page/${page.id}`;
         const seoDesc = String(page.seoDescription || page.description || "");
-        const body = [title, seoDesc, publishedPath].filter(Boolean).join("\n\n");
+        const ogTitle = String(page.openGraphTitle || page.ogTitle || "");
+        const ogDesc = String(page.openGraphDescription || page.ogDescription || "");
+        const ogImage = String(
+          page.openGraphImageUrl ||
+            asRecord(page.openGraphImage).url ||
+            page.ogImage ||
+            "",
+        );
+        const body = [title, seoDesc, ogTitle, ogDesc, publishedPath].filter(Boolean).join("\n\n");
         if (body.length < 8) continue;
         pages.push({
           url,
           title,
-          description: seoDesc,
+          description: seoDesc || ogDesc,
           headings: [title],
           text: body,
           emails: [],
@@ -159,7 +173,7 @@ export async function harvestWebflowApis(input: {
           links: [],
           contentType: classifyPage(url, title, body),
           jsonLd: [],
-          imageUrl: undefined,
+          imageUrl: ogImage.startsWith("http") ? ogImage : undefined,
         });
       }
       stages.push({
@@ -205,6 +219,15 @@ export async function harvestWebflowApis(input: {
           const url = siteUrl && slug
             ? `${siteUrl.replace(/\/$/, "")}/${collection.slug || "cms"}/${slug}`
             : `${siteUrl || input.siteUrl}/cms/${collection.id}/${item.id}`;
+          const imageUrl =
+            firstImageUrl(
+              fieldData.image,
+              fieldData.mainImage,
+              fieldData.thumbnail,
+              fieldData.photo,
+              fieldData.cover,
+              item,
+            ) || undefined;
           pages.push({
             url,
             title: `${collection.displayName || "CMS"} · ${name}`.slice(0, 180),
@@ -216,7 +239,7 @@ export async function harvestWebflowApis(input: {
             links: [],
             contentType: classifyPage(url, name, text),
             jsonLd: [],
-            imageUrl: undefined,
+            imageUrl,
           });
           itemCount += 1;
         }
@@ -299,5 +322,43 @@ export async function harvestWebflowApis(input: {
     skipped.push("Ecommerce catalog reading is included on paid plans.");
   }
 
-  return { pages, products, stages, skipped, warnings, siteUrl, displayName, currency, locale };
+  const brandImages = uniqueStrings([
+    ...products.map((p) => p.imageUrl).filter(Boolean) as string[],
+    ...pages.map((p) => p.imageUrl).filter(Boolean) as string[],
+  ]).slice(0, 12);
+  const brandPhrases = uniqueStrings(
+    pages
+      .flatMap((p) => [p.title, p.description, ...(p.headings ?? [])])
+      .map((s) => String(s || "").trim())
+      .filter((s) => s.length >= 3 && s.length <= 48),
+  ).slice(0, 12);
+
+  return {
+    pages,
+    products,
+    stages,
+    skipped,
+    warnings,
+    siteUrl,
+    displayName,
+    currency,
+    locale,
+    brand: {
+      colors: [],
+      images: brandImages,
+      phrases: brandPhrases,
+    },
+  };
+}
+
+function uniqueStrings(values: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
 }

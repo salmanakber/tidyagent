@@ -38,11 +38,17 @@ export type ScanResult = {
   scopeNote: string;
   siteUrl: string | null;
   understanding: SiteUnderstanding | null;
-    counts: { pages: number; products: number; faqs: number; policies: number; chunks: number; facts?: number; conflicts?: number };
+  counts: { pages: number; products: number; faqs: number; policies: number; chunks: number; facts?: number; conflicts?: number };
   sources: { title: string; url: string; type: KnowledgeContentType }[];
   crawl: CrawlItem[];
   stages: ScanStage[];
   skipped: string[];
   warnings: string[];
   analyzedAt: string;
+  /** Brand signals gathered during scan (API + crawl). */
+  brand?: {
+    colors: string[];
+    images: string[];
+    phrases: string[];
+  };
 };

@@ -178,6 +178,52 @@ export function extractPage(html: string, url: string, maxChars: number): Extrac
   };
 }
 
+/** Unique brand-like hex colors from HTML/CSS (filters near-black/white noise). */
+export function extractBrandColors(html: string, limit = 8): string[] {
+  const matches = html.match(/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of matches) {
+    const hex = normalizeHex(raw);
+    if (!hex || seen.has(hex)) continue;
+    if (isNoiseColor(hex)) continue;
+    seen.add(hex);
+    out.push(hex);
+    if (out.length >= limit) break;
+  }
+  const theme =
+    extractMeta(html, "theme-color") ||
+    extractMeta(html, "msapplication-TileColor");
+  if (theme && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(theme.trim())) {
+    const hex = normalizeHex(theme.trim());
+    if (hex && !seen.has(hex) && !isNoiseColor(hex)) {
+      out.unshift(hex);
+    }
+  }
+  return out.slice(0, limit);
+}
+
+function normalizeHex(value: string) {
+  const raw = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{3}$/.test(raw)) {
+    return `#${raw[1]}${raw[1]}${raw[2]}${raw[2]}${raw[3]}${raw[3]}`;
+  }
+  if (/^#[0-9a-f]{6}$/.test(raw)) return raw;
+  return null;
+}
+
+function isNoiseColor(hex: string) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 28) return true;
+  if (min > 235) return true;
+  if (max - min < 12 && r > 90 && r < 180) return true;
+  return false;
+}
+
 export function guessServiceUrls(baseUrl: string, headings: string[], text: string) {
   const blob = `${headings.join(" ")} ${text}`.toLowerCase();
   const paths = new Set<string>();

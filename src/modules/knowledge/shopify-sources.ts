@@ -723,5 +723,24 @@ export async function harvestShopifyApis(input: {
     skipped.push("Ecommerce products are included on paid plans.");
   }
 
-  return { pages, products, stages, skipped, warnings, siteUrl, displayName, currency, locale };
+  return {
+    pages,
+    products,
+    stages,
+    skipped,
+    warnings,
+    siteUrl,
+    displayName,
+    currency,
+    locale,
+    brand: {
+      colors: [],
+      images: products.map((p) => p.imageUrl).filter((url): url is string => Boolean(url)).slice(0, 12),
+      phrases: pages
+        .flatMap((p) => [p.title, p.description])
+        .map((s) => String(s || "").trim())
+        .filter((s) => s.length >= 3 && s.length <= 48)
+        .slice(0, 12),
+    },
+  };
 }

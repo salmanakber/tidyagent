@@ -213,7 +213,7 @@ export function AppShell({
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px]",
-                  active ? "text-amber-300" : "text-navy-300",
+                  active ? "bg-amber-500/10 text-amber-300" : "text-navy-300",
                 )}
               >
                 <item.icon className="h-5 w-5" />

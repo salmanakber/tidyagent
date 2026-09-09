@@ -87,6 +87,7 @@ export function SiteScanPanel({
         tick={tick}
         siteUrl={siteUrl}
         progressLabel={pending ? copy.scanLiveNote : undefined}
+        platform={platform}
       />
 
       {result && !pending ? (

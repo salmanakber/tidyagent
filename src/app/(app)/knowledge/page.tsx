@@ -5,6 +5,7 @@ import { platformLabel } from "@/modules/platforms";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AddKnowledgeForm } from "@/components/knowledge/AddKnowledgeForm";
 import { SiteScanPanel } from "@/components/knowledge/SiteScanPanel";
+import { ManualTrainingPanel } from "@/components/knowledge/ManualTrainingPanel";
 import { entitlementsForOrganization } from "@/modules/billing/service";
 import { planLabel } from "@/modules/billing/catalog";
 import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
@@ -142,6 +143,7 @@ export default async function KnowledgePage() {
           };
         })}
       />
+      <ManualTrainingPanel platform={session.platform} />
       <KnowledgeIntelligence
         platform={session.platform}
         facts={storedFacts.map((row) => ({

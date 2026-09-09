@@ -7,6 +7,7 @@ import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import {
   chunkText,
   extractPage,
+  extractBrandColors,
   guessServiceUrls,
   isSafeHttpUrl,
   parseRobotsSitemaps,
@@ -134,12 +135,14 @@ export async function scanOrganizationSite(input: {
 
   // Webflow Marketplace + Shopify API Terms: knowledge from official Admin/Data APIs only — no public-site crawl/scrape.
   const allowDomainCrawl = scope.includeDomainCrawl && !webflowSite && !shopifySite;
+  let crawlBrandColors: string[] = [];
   if (allowDomainCrawl && origin && host) {
     const crawled = await crawlDomain(origin, host, scope);
     pages.push(...crawled.pages);
     crawl.push(...crawled.crawl);
     stages.push(...crawled.stages);
     warnings.push(...crawled.warnings);
+    crawlBrandColors = crawled.brandColors;
   } else if (webflowSite) {
     skipped.push("Webflow sites load content from your Webflow account (no public-site crawl).");
   } else if (shopifySite) {
@@ -264,6 +267,27 @@ export async function scanOrganizationSite(input: {
 
   if (pricesDoc) pages.push(pricesDoc);
 
+  const knowledgePages = crawl.filter(
+    (item) => item.status === "crawled" && item.contentType !== "PRODUCT" && !String(item.origin).includes("store"),
+  ).length;
+
+  const brand = {
+    colors: unique([...(apiHarvest.brand?.colors ?? []), ...crawlBrandColors]).slice(0, 8),
+    images: unique([
+      ...(apiHarvest.brand?.images ?? []),
+      ...products.map((p) => p.imageUrl).filter((url): url is string => Boolean(url)),
+      ...pages.map((p) => p.imageUrl).filter((url): url is string => Boolean(url)),
+    ]).slice(0, 12),
+    phrases: unique([
+      ...(apiHarvest.brand?.phrases ?? []),
+      ...(understanding.offerings ?? []),
+      ...(understanding.differentiators ?? []).slice(0, 4),
+      ...(understanding.faqs ?? []).slice(0, 4),
+    ]
+      .map((s) => String(s || "").trim())
+      .filter((s) => s.length >= 2 && s.length <= 48)).slice(0, 12),
+  };
+
   const persisted = await persistScan({
     organizationId: input.organizationId,
     siteId: input.siteId,
@@ -272,8 +296,8 @@ export async function scanOrganizationSite(input: {
     products,
     knowledgeLimit: entitlements.knowledgeLimit,
     crawl,
-    pagesDiscovered: crawl.filter((item) => item.origin === "website").length,
-    pagesCrawled: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
+    pagesDiscovered: knowledgePages || crawl.filter((item) => item.status === "crawled").length,
+    pagesCrawled: knowledgePages || crawl.filter((item) => item.status === "crawled").length,
     pagesFailed: crawl.filter((item) => item.status === "failed").length,
     storeOrigin,
     catalogExtractionMethod: wixSite ? "wix-api" : webflowSite ? "webflow-api" : shopifySite ? "shopify-api" : "http",
@@ -301,7 +325,7 @@ export async function scanOrganizationSite(input: {
     siteUrl: resolvedHome,
     understanding,
     counts: {
-      pages: crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
+      pages: knowledgePages,
       products: products.length,
       faqs: pages.filter((page) => page.contentType === "FAQ").length,
       policies: pages.filter((page) => page.contentType === "POLICY").length,
@@ -322,6 +346,7 @@ export async function scanOrganizationSite(input: {
     skipped,
     warnings,
     analyzedAt: new Date().toISOString(),
+    brand,
   };
 }
 
@@ -678,12 +703,14 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
   queue.sort((a, b) => pathPriority(a) - pathPriority(b) || a.length - b.length);
 
   const homepage = await fetchText(homeUrl, host);
+  const brandColors: string[] = [];
   if (!homepage.ok) {
     failed.set(homeUrl, homepage.reason);
     warnings.push(`Homepage could not be crawled (${homepage.reason}). Continuing with catalog APIs and other pages.`);
     stages.push({ key: "homepage", label: "Read homepage and metadata", status: "failed", detail: homepage.reason });
   } else {
     const page = extractPage(homepage.text, homeUrl, scope.maxCharsPerPage);
+    brandColors.push(...extractBrandColors(homepage.text));
     pages.push(page);
     for (const link of page.links) enqueue(link);
     for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
@@ -704,6 +731,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
         continue;
       }
       const page = extractPage(item.result.text, item.url, scope.maxCharsPerPage);
+      if (brandColors.length < 8) brandColors.push(...extractBrandColors(item.result.text, 4));
       pages.push(page);
       for (const link of page.links) enqueue(link);
       for (const link of guessServiceUrls(homeUrl, page.headings, page.text)) enqueue(link);
@@ -732,7 +760,7 @@ async function crawlDomain(origin: URL, host: string, scope: ScanScope) {
       : pages.map((page) => page.title).slice(0, 6).join(" · "),
   });
 
-  return { pages, crawl, stages, warnings };
+  return { pages, crawl, stages, warnings, brandColors: unique(brandColors).slice(0, 8) };
 }
 
 async function fetchText(
