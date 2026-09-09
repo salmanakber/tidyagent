@@ -77,7 +77,7 @@ export function ShopifyEmbeddedAuth({
             <span className="shopify-auth-ring absolute h-16 w-16 rounded-full border border-amber-300/25" />
             <span className="shopify-auth-ring shopify-auth-ring-delay absolute h-16 w-16 rounded-full border border-amber-300/40" />
             <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/15 ring-1 ring-amber-300/35">
-              <span className="shopify-auth-mark h-5 w-5 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 shadow-[0_0_24px_rgba(245,158,11,0.55)]" />
+              <span className="shopify-auth-mark h-5 w-5 rounded-md bg-gradient-to-br from-amber-300 to-amber-500 shadow-[0_0_24px_rgba(201,100,66,0.55)]" />
             </span>
           </div>
         ) : null}

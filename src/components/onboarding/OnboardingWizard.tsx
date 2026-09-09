@@ -15,7 +15,7 @@ import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 import { isWebflowPlatform } from "@/modules/platforms/types";
 
-const STEPS = ["Connected", "Scan", "Business", "Your team", "Owner notes", "Style", "Test", "Go live"];
+const STEPS = ["Connected", "Collect", "Business", "Your team", "Owner notes", "Style", "Test", "Go live"];
 
 const FOCUS_OPTIONS = [
   { key: "customer_support", label: "Customer support" },
@@ -168,11 +168,11 @@ export function OnboardingWizard({
 
         {step === 2 && (
           <Step
-            title={webflow ? "Read your Webflow site via Data APIs" : "Read and understand the website"}
+            title="Collect site knowledge"
             body={
               webflow
-                ? "This loads pages, CMS, and (on Business/Pro) ecommerce through official Webflow APIs — not a domain crawl. Re-run it whenever the site changes."
-                : "This pulls pages, policies, and (on Business/Pro) catalog data from the live site. Re-run it whenever the site changes."
+                ? "Watch pages, topics, and artifacts fill as tidyAgent reads your Webflow site through official Data APIs — not a domain crawl. Re-run whenever the site changes."
+                : "Watch the collection board fill as tidyAgent reads pages, policies, and catalog data from the live site. Re-run whenever the site changes."
             }
           >
             <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />

@@ -29,7 +29,7 @@ export function PricingView({
 }) {
   return (
     <AuroraScene>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070B14]/55 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#1a1613]/55 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo href="/" />
           <Link href="/login" className="text-sm text-navy-200 transition hover:text-white">
@@ -68,7 +68,7 @@ export function PricingView({
               className={cn(
                 "relative flex flex-col overflow-hidden rounded-[28px] border p-7",
                 plan.featured
-                  ? "border-amber-400/40 bg-gradient-to-b from-amber-400/15 via-[#10182a] to-[#0b1220] shadow-[0_30px_80px_rgba(245,158,11,0.18)] lg:-translate-y-3"
+                  ? "border-amber-400/40 bg-gradient-to-b from-amber-400/15 via-[#2a2320] to-[#1a1613] shadow-[0_30px_80px_rgba(201,100,66,0.18)] lg:-translate-y-3"
                   : "border-white/10 bg-white/[0.04] backdrop-blur-xl",
               )}
             >

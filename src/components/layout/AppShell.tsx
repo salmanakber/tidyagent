@@ -100,7 +100,7 @@ export function AppShell({
                   className={cn(
                     "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition",
                     active
-                      ? "bg-amber-500/15 text-amber-200"
+                      ? "bg-amber-500/15 text-amber-300"
                       : "text-navy-200 hover:bg-white/5 hover:text-white",
                   )}
                 >
@@ -157,17 +157,17 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating ? (
-            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white">
               Viewing as site owner · signed in as platform admin {impersonating}
             </div>
           ) : null}
           {locked ? (
-            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white">
               Choose a plan to unlock the dashboard and the live chat bubble.
             </div>
           ) : null}
           {setupIncomplete && !locked ? (
-            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-navy-950">
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white">
               Finish the setup wizard to open the dashboard, inbox, and live widget.
             </div>
           ) : null}

@@ -6,27 +6,27 @@ const config: Config = {
     extend: {
       colors: {
         navy: {
-          950: "#070B14",
-          900: "#0B1220",
-          850: "#0F1830",
-          800: "#141E36",
-          700: "#1C2948",
-          600: "#2A3A5C",
-          500: "#3D5278",
-          400: "#6B7FA3",
-          300: "#9AABC8",
-          200: "#C5D0E3",
-          100: "#E8EDF5",
+          950: "#1a1613",
+          900: "#221c18",
+          850: "#2a2320",
+          800: "#332b26",
+          700: "#443933",
+          600: "#5c4d45",
+          500: "#7a675c",
+          400: "#9a877a",
+          300: "#bba89c",
+          200: "#d9cdc4",
+          100: "#f0ebe6",
         },
         amber: {
-          50: "#FFF8EB",
-          100: "#FFEDC8",
-          200: "#FBD88A",
-          300: "#F5C14A",
-          400: "#E8B86D",
-          500: "#F59E0B",
-          600: "#D97706",
-          700: "#B45309",
+          50: "#FBF4F0",
+          100: "#F6E5DC",
+          200: "#EBC4B3",
+          300: "#DEA089",
+          400: "#D48063",
+          500: "#c96442",
+          600: "#B4532F",
+          700: "#8F3F24",
         },
       },
       fontFamily: {
@@ -34,15 +34,15 @@ const config: Config = {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui"],
       },
       boxShadow: {
-        glow: "0 0 40px -8px rgba(245, 158, 11, 0.35)",
-        card: "0 18px 50px -24px rgba(7, 11, 20, 0.7)",
-        panel: "0 30px 80px -32px rgba(7, 11, 20, 0.85)",
+        glow: "0 0 40px -8px rgba(201, 100, 66, 0.35)",
+        card: "0 18px 50px -24px rgba(26, 22, 19, 0.7)",
+        panel: "0 30px 80px -32px rgba(26, 22, 19, 0.85)",
       },
       backgroundImage: {
         "brand-gradient":
-          "radial-gradient(1200px 600px at 10% -10%, rgba(245,158,11,0.18), transparent 50%), radial-gradient(900px 500px at 100% 0%, rgba(28,41,72,0.9), transparent 45%), linear-gradient(180deg, #0B1220 0%, #070B14 100%)",
+          "radial-gradient(1200px 600px at 10% -10%, rgba(201,100,66,0.16), transparent 50%), radial-gradient(900px 500px at 100% 0%, rgba(68,57,51,0.55), transparent 45%), linear-gradient(180deg, #221c18 0%, #1a1613 100%)",
         "amber-navy":
-          "linear-gradient(135deg, #D97706 0%, #F59E0B 28%, #1C2948 68%, #0B1220 100%)",
+          "linear-gradient(135deg, #B4532F 0%, #c96442 28%, #443933 68%, #1a1613 100%)",
       },
       keyframes: {
         "pulse-soft": {
@@ -69,6 +69,18 @@ const config: Config = {
           "0%, 100%": { transform: "scaleY(0.45)" },
           "50%": { transform: "scaleY(1)" },
         },
+        "flow-dash": {
+          "0%": { strokeDashoffset: "24" },
+          "100%": { strokeDashoffset: "0" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "200% 0" },
+          "100%": { backgroundPosition: "-200% 0" },
+        },
+        "card-fill": {
+          "0%": { opacity: "0", transform: "translateY(8px) scale(0.98)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
       },
       animation: {
         "pulse-soft": "pulse-soft 2.4s ease-in-out infinite",
@@ -77,6 +89,9 @@ const config: Config = {
         "drift-alt": "drift-alt 22s ease-in-out infinite",
         "fade-up": "fade-up 0.35s ease-out both",
         "wave-bar": "wave-bar 0.9s ease-in-out infinite",
+        "flow-dash": "flow-dash 1.2s linear infinite",
+        shimmer: "shimmer 1.8s ease-in-out infinite",
+        "card-fill": "card-fill 0.45s ease-out both",
       },
     },
   },

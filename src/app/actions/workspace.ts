@@ -132,7 +132,7 @@ export async function createSpecialistAgent(input: {
       isPrimary: false,
       specialty: input.specialty,
       knowledgeScopes: scopes,
-      widgetPrimaryColor: workspace.agent?.widgetPrimaryColor ?? "#1F3A5F",
+          widgetPrimaryColor: workspace.agent?.widgetPrimaryColor ?? "#c96442",
       widgetUseGradient: workspace.agent?.widgetUseGradient ?? false,
       widgetGradientTo: workspace.agent?.widgetGradientTo ?? "#4F8CFF",
       widgetGradientAngle: workspace.agent?.widgetGradientAngle ?? "to-bottom-right",

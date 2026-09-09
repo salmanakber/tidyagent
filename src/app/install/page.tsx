@@ -23,7 +23,7 @@ export default async function InstallIndexPage({
 
   return (
     <AuroraScene>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070B14]/55 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#1a1613]/55 backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3.5">
           <Logo href="/" />
           <Link href="/" className="text-sm text-navy-200 transition hover:text-white">

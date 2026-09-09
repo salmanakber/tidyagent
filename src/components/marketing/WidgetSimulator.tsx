@@ -178,7 +178,7 @@ export function WidgetSimulator() {
           <Storefront />
 
           <div className="absolute bottom-4 right-4 z-10 w-[min(100%-1.75rem,292px)] sm:bottom-5 sm:right-5">
-            <div className="overflow-hidden rounded-[24px] bg-[#0B1220] shadow-[0_18px_50px_-18px_rgba(0,0,0,0.65)] ring-1 ring-amber-400/20">
+            <div className="overflow-hidden rounded-[24px] bg-[#1a1613] shadow-[0_18px_50px_-18px_rgba(0,0,0,0.65)] ring-1 ring-amber-400/20">
               <div className="flex items-center gap-2.5 bg-amber-navy px-3.5 py-3 text-white">
                 <img src={AVA} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/30" />
                 <div className="min-w-0 flex-1">
@@ -198,7 +198,7 @@ export function WidgetSimulator() {
                 </button>
               </div>
 
-              <div ref={scroller} className="h-[268px] space-y-2.5 overflow-y-auto bg-[#0B1220] p-3">
+              <div ref={scroller} className="h-[268px] space-y-2.5 overflow-y-auto bg-[#1a1613] p-3">
                 {visibleMessages.map((message) => (
                   <div
                     key={message.id}
@@ -260,7 +260,7 @@ export function WidgetSimulator() {
                 ) : null}
               </div>
 
-              <div className="flex items-center gap-2 border-t border-white/10 bg-[#0B1220] px-3 py-2.5">
+              <div className="flex items-center gap-2 border-t border-white/10 bg-[#1a1613] px-3 py-2.5">
                 <div className="flex-1 rounded-full bg-white/[0.08] px-3.5 py-2 text-[12px] text-navy-400">
                   Ask Ava anything
                 </div>

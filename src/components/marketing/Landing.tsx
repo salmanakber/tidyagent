@@ -71,7 +71,7 @@ const VERTICALS = [
 export function Landing() {
   return (
     <AuroraScene>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070B14]/45 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#1a1613]/45 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo href="/" />
           <nav className="hidden items-center gap-8 text-[13px] text-navy-300 md:flex">

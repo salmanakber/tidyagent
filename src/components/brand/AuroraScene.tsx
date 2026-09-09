@@ -8,8 +8,8 @@ export function AuroraScene({
   className?: string;
 }) {
   return (
-    <div className={cn("aurora-scene relative min-h-dvh overflow-hidden bg-[#070B14] text-navy-100", className)}>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,#1c1428_0%,#0B1220_42%,#070B14_100%)]" />
+    <div className={cn("aurora-scene relative min-h-dvh overflow-hidden bg-[#1a1613] text-navy-100", className)}>
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,#2a2320_0%,#221c18_42%,#1a1613_100%)]" />
       <div className="pointer-events-none absolute -left-24 -top-28 h-[34rem] w-[34rem] animate-drift rounded-full bg-amber-500/35 blur-[110px]" />
       <div className="pointer-events-none absolute -right-24 top-0 h-[32rem] w-[32rem] animate-drift-alt rounded-full bg-[#6366f1]/28 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-[-8rem] left-1/4 h-[28rem] w-[28rem] rounded-full bg-amber-200/18 blur-[100px]" />

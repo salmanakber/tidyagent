@@ -35,7 +35,7 @@ export default async function OnboardingPage() {
       capabilities={capabilities.filter((item) => item.available)}
       agentName={workspace.agent?.name ?? "Sarah"}
       greeting={workspace.agent?.widgetGreeting ?? "Hi! How can I help you today?"}
-      color={workspace.agent?.widgetPrimaryColor ?? "#1F3A5F"}
+      color={workspace.agent?.widgetPrimaryColor ?? "#c96442"}
       avatarUrl={workspace.agent?.widgetAvatarUrl}
       existingUnderstanding={existingUnderstanding}
       humanName={workspace.organization.humanAgentName}

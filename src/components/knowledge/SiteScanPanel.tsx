@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, Check, Loader2, Radar } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { runSiteScan } from "@/app/actions/workspace";
 import type { ScanResult, SiteUnderstanding } from "@/modules/knowledge/types";
+import { KnowledgeCollectionBoard } from "@/components/knowledge/KnowledgeCollectionBoard";
 import { cn } from "@/lib/utils";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 
@@ -23,7 +24,6 @@ export function SiteScanPanel({
   platform?: string | null;
 }) {
   const copy = wizardCopyForPlatform(platform);
-  const stages = copy.scanStages;
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ScanResult | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function SiteScanPanel({
   function run() {
     setError(null);
     setTick(0);
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1400);
+    const timer = window.setInterval(() => setTick((value) => value + 1), 900);
     startTransition(async () => {
       try {
         const next = await runSiteScan({ fullSite });
@@ -51,7 +51,7 @@ export function SiteScanPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4">
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">{planLabel} scan scope</p>
         <p className="mt-2 text-sm leading-6 text-navy-100">{scopeNote}</p>
         {siteUrl ? (
@@ -68,7 +68,7 @@ export function SiteScanPanel({
           <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 accent-amber-500"
               checked={fullSite}
               onChange={(event) => setFullSite(event.target.checked)}
               disabled={pending}
@@ -81,25 +81,15 @@ export function SiteScanPanel({
         )}
       </div>
 
-      {pending ? (
-        <div className="space-y-3">
-          {stages.map((label, index) => (
-            <div key={label} className="flex items-center gap-3 text-sm">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500/15 text-amber-300">
-                {index <= tick % stages.length ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Radar className="h-3.5 w-3.5" />
-                )}
-              </span>
-              <span className={index <= tick ? "text-white" : "text-navy-400"}>{label}</span>
-            </div>
-          ))}
-          <p className="text-xs text-navy-400">{copy.scanLiveNote}</p>
-        </div>
-      ) : null}
+      <KnowledgeCollectionBoard
+        result={pending ? null : result}
+        pending={pending}
+        tick={tick}
+        siteUrl={siteUrl}
+        progressLabel={pending ? copy.scanLiveNote : undefined}
+      />
 
-      {result ? (
+      {result && !pending ? (
         <ScanSummary
           result={result}
           understanding={understanding}
@@ -138,7 +128,12 @@ function ScanSummary({
       <div className="space-y-2">
         {result.stages.map((stage) => (
           <div key={stage.key} className="flex items-start gap-3 rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
-            <Check className={cn("mt-0.5 h-4 w-4 shrink-0", stage.status === "done" ? "text-emerald-300" : stage.status === "skipped" ? "text-navy-500" : "text-rose-300")} />
+            <Check
+              className={cn(
+                "mt-0.5 h-4 w-4 shrink-0",
+                stage.status === "done" ? "text-emerald-300" : stage.status === "skipped" ? "text-navy-500" : "text-rose-300",
+              )}
+            />
             <div>
               <p className="text-white">{stage.label}</p>
               <p className="text-xs text-navy-400">{stage.detail}</p>

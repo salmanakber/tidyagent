@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --navy-950: #070b14;
-  --navy-900: #0b1220;
-  --amber: #f59e0b;
-  --gold: #e8b86d;
+  --navy-950: #1a1613;
+  --navy-900: #221c18;
+  --amber: #c96442;
+  --gold: #d48063;
   color-scheme: dark;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3a5c transparent;
+  scrollbar-color: #5c4d45 transparent;
 }
 
 html,
@@ -21,23 +21,23 @@ body {
 }
 
 body {
-  background: #070b14;
-  color: #e8edf5;
+  background: #1a1613;
+  color: #f0ebe6;
 }
 
 ::selection {
-  background: rgba(245, 158, 11, 0.35);
-  color: #fff8eb;
+  background: rgba(201, 100, 66, 0.35);
+  color: #fbf4f0;
 }
 
 .bg-noise {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
 }
 
 .glass {
-  background: linear-gradient(180deg, rgba(20, 30, 54, 0.78), rgba(11, 18, 32, 0.72));
+  background: linear-gradient(180deg, rgba(51, 43, 38, 0.82), rgba(34, 28, 24, 0.76));
   backdrop-filter: blur(22px);
-  border: 1px solid rgba(232, 184, 109, 0.12);
+  border: 1px solid rgba(201, 100, 66, 0.12);
 }
 
 .hairline {
@@ -45,14 +45,14 @@ body {
 }
 
 .amber-ring {
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.22), 0 12px 40px -18px rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 0 1px rgba(201, 100, 66, 0.24), 0 12px 40px -18px rgba(201, 100, 66, 0.45);
 }
 
 .landing-paper {
   background-color: #f6f3ec;
   background-image:
-    radial-gradient(ellipse 70% 45% at 88% -8%, rgba(245, 158, 11, 0.22), transparent 55%),
-    radial-gradient(ellipse 45% 35% at 0% 18%, rgba(11, 18, 32, 0.06), transparent 50%);
+    radial-gradient(ellipse 70% 45% at 88% -8%, rgba(201, 100, 66, 0.2), transparent 55%),
+    radial-gradient(ellipse 45% 35% at 0% 18%, rgba(26, 22, 19, 0.06), transparent 50%);
 }
 
 .scene-grid {
@@ -74,9 +74,18 @@ body {
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-navy-950 transition hover:bg-amber-400 active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-400 active:scale-[0.98] disabled:opacity-50;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-navy-100 transition hover:bg-white/10 active:scale-[0.98];
@@ -86,6 +95,11 @@ body {
   }
   .panel {
     @apply glass hairline rounded-3xl;
+  }
+  .collect-shimmer {
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(201, 100, 66, 0.14), rgba(255, 255, 255, 0.04));
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
   }
 }
 
@@ -309,8 +323,8 @@ html.theme-light header {
   width: 6px;
   margin-right: 6px;
   border-radius: 999px;
-  background: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+  background: #c96442;
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.18);
 }
 
 .inbox-live-dot::before {
@@ -484,8 +498,8 @@ html.theme-light header {
 
 .inbox-msg.visitor {
   border-radius: 16px 6px 16px 16px;
-  background: #f59e0b;
-  color: #0b1220;
+  background: #c96442;
+  color: #fff8f4;
 }
 
 .inbox-msg.agent {
@@ -504,10 +518,10 @@ html.theme-light header {
   align-items: center;
   gap: 8px;
   border-radius: 16px 6px 16px 16px;
-  background: rgba(245, 158, 11, 0.14);
+  background: rgba(201, 100, 66, 0.14);
   padding: 8px 10px;
   font-size: 11px;
-  color: #fde68a;
+  color: #f0c4b0;
 }
 
 .inbox-typing span {
@@ -519,7 +533,7 @@ html.theme-light header {
   height: 5px;
   width: 5px;
   border-radius: 999px;
-  background: #fbbf24;
+  background: #d48063;
   animation: inbox-dot 1s ease-in-out infinite;
 }
 
@@ -562,8 +576,8 @@ html.theme-light header {
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: #f59e0b;
-  color: #0b1220;
+  background: #c96442;
+  color: #fff8f4;
   cursor: pointer;
 }
 
@@ -580,14 +594,14 @@ html.theme-light header {
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: #f59e0b;
-  color: #0b1220;
-  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.35);
+  background: #c96442;
+  color: #fff8f4;
+  box-shadow: 0 12px 30px rgba(201, 100, 66, 0.35);
   cursor: pointer;
 }
 
 .inbox-launch.has-wait {
-  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.18), 0 12px 30px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 0 6px rgba(201, 100, 66, 0.18), 0 12px 30px rgba(201, 100, 66, 0.35);
 }
 
 .inbox-badge {
