@@ -292,7 +292,7 @@ export function KnowledgeCollectionBoard({
   });
 
   return (
-    <div className="space-y-5">
+    <div className="collection-board space-y-5">
       <ScanStatusFlow
         pending={Boolean(pending)}
         done={Boolean(result?.ok)}

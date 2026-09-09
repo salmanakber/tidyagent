@@ -139,19 +139,21 @@ export function OnboardingWizard({
   const last = step >= STEPS.length - 1;
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-8 overflow-x-auto">
-        <div className="flex min-w-[720px] gap-2">
-          {STEPS.map((label, index) => (
-            <div key={label} className="flex-1">
-              <div className={cn("h-1.5 rounded-full", index <= step ? "bg-amber-500" : "bg-white/10")} />
-              <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-navy-300">{label}</p>
-            </div>
-          ))}
+    <div className="wizard-scope mx-auto max-w-5xl">
+      <div className="sticky top-14 z-20 -mx-4 mb-6 border-b border-white/10 bg-navy-950/90 px-4 py-3 backdrop-blur-xl lg:-mx-8 lg:px-8">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-[720px] gap-2">
+            {STEPS.map((label, index) => (
+              <div key={label} className="flex-1">
+                <div className={cn("h-1.5", index <= step ? "bg-amber-500" : "bg-white/10")} />
+                <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-navy-300">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="panel p-6 sm:p-8">
+      <div className="panel border border-white/10 p-6 sm:p-8">
         {step === 1 && (
           <Step
             title="Website connected"
@@ -199,7 +201,7 @@ export function OnboardingWizard({
                 <p className="text-sm leading-6 text-navy-200">{understanding.summary}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {capabilities.map((capability) => (
-                    <div key={capability.key} className="flex items-center justify-between rounded-2xl bg-navy-950/40 px-4 py-3 text-sm">
+                    <div key={capability.key} className="flex items-center justify-between bg-navy-950/40 px-4 py-3 text-sm">
                       <span>{capability.label}</span>
                       <span className={capability.available ? "text-emerald-300" : "text-navy-400"}>
                         {capability.available ? "Available" : "Not found"}
@@ -307,7 +309,7 @@ export function OnboardingWizard({
                         current.includes(option.key) ? current.filter((key) => key !== option.key) : [...current, option.key],
                       )
                     }
-                    className={cn("rounded-2xl border px-4 py-3 text-left text-sm", selected ? "border-amber-400/40 bg-amber-500/10" : "border-white/10")}
+                    className={cn("border px-4 py-3 text-left text-sm", selected ? "border-amber-400/40 bg-amber-500/10" : "border-white/10")}
                   >
                     {option.label}
                   </button>
@@ -319,7 +321,7 @@ export function OnboardingWizard({
                 <button
                   key={item}
                   onClick={() => setPersonality(item)}
-                  className={cn("rounded-full px-4 py-2 text-sm capitalize", personality === item ? "bg-amber-500 text-navy-950" : "bg-white/5")}
+                  className={cn("px-4 py-2 text-sm capitalize", personality === item ? "bg-amber-500 text-white" : "bg-white/5")}
                 >
                   {item}
                 </button>
@@ -327,14 +329,14 @@ export function OnboardingWizard({
             </div>
             <div className="mt-6 space-y-3">
               <p className="text-sm font-medium">Add tidyAgent to your site</p>
-              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 p-4">
+              <label className="flex cursor-pointer items-start gap-3 border border-white/10 p-4">
                 <input type="radio" checked={embed === "AUTO"} onChange={() => setEmbed("AUTO")} />
                 <span>
                   <span className="block text-sm font-medium">Auto-install (recommended)</span>
                   <span className="text-sm text-navy-300">{copy.autoInstall}</span>
                 </span>
               </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 p-4">
+              <label className="flex cursor-pointer items-start gap-3 border border-white/10 p-4">
                 <input type="radio" checked={embed === "MANUAL"} onChange={() => setEmbed("MANUAL")} />
                 <span>
                   <span className="block text-sm font-medium">Manual placement</span>
@@ -409,7 +411,7 @@ function Step({ title, body, children }: { title: string; body: string; children
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-navy-950/40 p-4">
+    <div className="bg-navy-950/40 p-4">
       <p className="text-[11px] uppercase tracking-[0.16em] text-navy-400">{label}</p>
       <p className="mt-1 text-sm text-white">{value}</p>
     </div>

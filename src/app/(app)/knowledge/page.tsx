@@ -12,8 +12,9 @@ import { scanScopeFromConfig } from "@/modules/knowledge/scan-scope";
 import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import { knowledgeCardsForSite, siteFactsForSite } from "@/modules/knowledge/site-facts";
 import { KnowledgeIntelligence } from "@/components/knowledge/KnowledgeIntelligence";
+import { parseScanSourceMeta, scanSnapshotFromStore } from "@/modules/knowledge/scan-snapshot";
 import { prisma } from "@/lib/prisma";
-import type { CrawlItem } from "@/modules/knowledge/types";
+import type { CrawlItem, SiteUnderstanding } from "@/modules/knowledge/types";
 import type { Prisma } from "@prisma/client";
 import { copyForPlatform, wizardCopyForPlatform } from "@/modules/platforms/copy";
 import { resolveSitePlatform } from "@/modules/platforms";
@@ -53,7 +54,7 @@ export default async function KnowledgePage() {
     }),
     prisma.knowledgeSource.findFirst({
       where: { organizationId: session.organizationId, siteId: session.siteId, type: "site-scan" },
-      select: { metadata: true, pagesDiscovered: true, pagesCrawled: true },
+      select: { metadata: true, pagesDiscovered: true, pagesCrawled: true, lastSyncedAt: true },
     }),
     prisma.knowledgeDocument.findMany({
       where: { organizationId: session.organizationId, siteId: session.siteId, contentType: "CUSTOM" },
@@ -63,6 +64,42 @@ export default async function KnowledgePage() {
     }),
   ]);
   const indexedPages = mergeCrawlIndex(documents, scanSource?.metadata);
+  const { crawl, brand } = parseScanSourceMeta(scanSource?.metadata);
+  const crawlForBoard =
+    crawl.length > 0
+      ? crawl
+      : indexedPages.map((item) => ({
+          url: item.sourceUrl || item.id,
+          title: item.title,
+          contentType: item.contentType,
+          status: item.status,
+          origin: item.origin as CrawlItem["origin"],
+        }));
+
+  const understanding =
+    data.profile?.structured && typeof data.profile.structured === "object"
+      ? (data.profile.structured as unknown as SiteUnderstanding)
+      : null;
+
+  const snapshot = scanSnapshotFromStore({
+    planKey: entitlements.planKey,
+    planLabel: planLabel(entitlements.planKey),
+    scopeNote: copyForPlatform(platform, scope.depthNote),
+    siteUrl: data.site.url,
+    understanding,
+    crawl: crawlForBoard,
+    brand,
+    counts: {
+      pages: indexedPages.filter((item) => item.contentType !== "PRODUCT" && item.status === "crawled").length,
+      products: indexedPages.filter((item) => item.contentType === "PRODUCT" && item.status === "crawled").length,
+      faqs: data.knowledge.faqs,
+      policies: data.knowledge.policies,
+      facts: storedFacts.length,
+      conflicts: conflicts.length,
+    },
+    analyzedAt: scanSource?.lastSyncedAt?.toISOString() ?? data.knowledge.lastSyncedAt?.toISOString() ?? null,
+  });
+
   const cards = knowledgeCardsForSite({
     hasStores: facts.hasStores,
     hasBookings: facts.hasBookings,
@@ -77,12 +114,21 @@ export default async function KnowledgePage() {
   });
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Business knowledge"
-        title="What your AI employee knows"
-        description={copy.knowledgeDescription(platformLabel(session.platform))}
-      />
+    <div className="space-y-7">
+      <div className="relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 sm:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-amber-500/15 blur-3xl" />
+        <PageHeader
+          eyebrow={`${platformLabel(session.platform)} knowledge`}
+          title="What your AI employee knows"
+          description={copy.knowledgeDescription(platformLabel(session.platform))}
+        />
+        {data.profile?.summary ? (
+          <p className="mt-5 max-w-3xl border border-white/10 bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">
+            {data.profile.summary}
+          </p>
+        ) : null}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <div key={card.label} className="panel p-5">
@@ -92,48 +138,53 @@ export default async function KnowledgePage() {
           </div>
         ))}
       </div>
-      <div className="panel p-6">
-        <h2 className="font-display text-xl text-white">
-          {copy.hideDomainCrawlToggle ? "Update what the AI knows" : "Website scanner"}
-        </h2>
-        <p className="mt-2 text-sm text-navy-300">
-          {copy.hideDomainCrawlToggle
-            ? "Re-run this after you change pages or products. Last update: "
-            : "Re-run this after you change pages, policies, or products. Last sync: "}
-          {data.knowledge.lastSyncedAt ? new Date(data.knowledge.lastSyncedAt).toLocaleString() : "not yet"}
-        </p>
+
+      <div className="panel p-5 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-display text-xl text-white">
+              {copy.hideDomainCrawlToggle ? "Teach AI from this site" : "Website scanner"}
+            </h2>
+            <p className="mt-1 text-sm text-navy-300">
+              {copy.hideDomainCrawlToggle
+                ? "Collection stays filled after setup. Re-run after site changes — you stay on Knowledge."
+                : "Collection stays filled after setup. Re-run after site changes — you stay on Knowledge."}
+            </p>
+          </div>
+          <p className="text-xs text-navy-400">
+            Last sync:{" "}
+            {data.knowledge.lastSyncedAt ? new Date(data.knowledge.lastSyncedAt).toLocaleString() : "not yet"}
+          </p>
+        </div>
         {facts.hasStores || platform === "SHOPIFY" ? (
-          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4">
+          <div className="mb-5 border border-amber-500/20 bg-amber-500/5 p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Ecommerce</p>
             <p className="mt-2 text-sm leading-6 text-navy-100">
-              Products, prices, and images are taught to your chat when you run the scanner on a paid plan. Ask the
-              widget about any product and it can reply with product cards.
+              Products, prices, and images are taught when you run the scanner on a paid plan.
             </p>
             <p className="mt-2 text-xs text-navy-400">
-              {indexedPages.filter((item) => item.contentType === "PRODUCT" && item.status === "crawled").length}{" "}
-              products currently loaded
+              {indexedPages.filter((item) => item.contentType === "PRODUCT" && item.status === "crawled").length} products
+              currently loaded
             </p>
           </div>
         ) : null}
-        {data.profile?.summary ? (
-          <p className="mt-4 rounded-2xl bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">{data.profile.summary}</p>
-        ) : null}
-        <div className="mt-6">
-          <SiteScanPanel
-            planLabel={planLabel(entitlements.planKey)}
-            scopeNote={copyForPlatform(platform, scope.depthNote)}
-            siteUrl={data.site.url}
-            platform={session.platform}
-          />
-        </div>
+        <SiteScanPanel
+          planLabel={planLabel(entitlements.planKey)}
+          scopeNote={copyForPlatform(platform, scope.depthNote)}
+          siteUrl={data.site.url}
+          platform={session.platform}
+          initial={snapshot}
+        />
       </div>
+
       <AddKnowledgeForm
         platform={session.platform}
         lastSynced={data.knowledge.lastSyncedAt?.toISOString() ?? null}
         notes={customNotes.map((row) => {
-          const meta = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
-            ? (row.metadata as Record<string, unknown>)
-            : {};
+          const meta =
+            row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+              ? (row.metadata as Record<string, unknown>)
+              : {};
           return {
             id: row.id,
             title: row.title,
@@ -172,9 +223,10 @@ function mergeCrawlIndex(
   metadata: Prisma.JsonValue | undefined,
 ) {
   const fromDocs = documents.map((row) => {
-    const meta = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
-      ? (row.metadata as Record<string, unknown>)
-      : {};
+    const meta =
+      row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+        ? (row.metadata as Record<string, unknown>)
+        : {};
     return {
       id: row.id,
       title: row.title,

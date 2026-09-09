@@ -46,11 +46,11 @@ export default async function AgentPage() {
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         eyebrow="Your AI employee"
         title={workspace.agent.name}
-        description="Widget look, voice, and specialists. Each specialist only sees the website data you assign."
+        description="Identity, look, voice, and tools — preview stays beside you."
       />
       <AgentStudio
         agent={agents.find((row) => row.id === workspace.agent?.id) ?? agents[0]}

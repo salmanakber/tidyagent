@@ -19,7 +19,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const suspended = workspace.organization.accessStatus === "suspended";
   const paid = entitlements.isPaidSeat || Boolean(impersonating);
   const path = (await headers()).get("x-tidyagent-path") || "";
-  const setupComplete = workspace.organization.onboardingStatus === "PUBLISHED";
+  const setupComplete =
+    workspace.organization.onboardingStatus === "PUBLISHED" || workspace.agent?.status === "ACTIVE";
   const shopify = isShopifyPlatform(session.platform);
   const shopifyApiKey = shopify ? (await getShopifyOAuthConfig()).apiKey || "" : "";
 

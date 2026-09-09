@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(localStorage.getItem("tidyagent-theme")==="light")document.documentElement.classList.add("theme-light")}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("tidyagent-theme");if(t!=="dark")document.documentElement.classList.add("theme-light")}catch(e){}})();`,
           }}
         />
         {shopifyApiKey ? (

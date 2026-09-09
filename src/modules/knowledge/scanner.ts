@@ -301,6 +301,7 @@ export async function scanOrganizationSite(input: {
     pagesFailed: crawl.filter((item) => item.status === "failed").length,
     storeOrigin,
     catalogExtractionMethod: wixSite ? "wix-api" : webflowSite ? "webflow-api" : shopifySite ? "shopify-api" : "http",
+    brand,
   });
   stages.push({
     key: "knowledge",
@@ -363,6 +364,7 @@ async function persistScan(input: {
   pagesFailed?: number;
   storeOrigin?: CrawlItem["origin"];
   catalogExtractionMethod?: string;
+  brand?: { colors: string[]; images: string[]; phrases: string[] };
 }) {
   await prisma.businessProfile.upsert({
     where: { organizationId: input.organizationId },
@@ -573,7 +575,7 @@ async function persistScan(input: {
         pagesFailed: input.pagesFailed ?? 0,
         crawlVersion,
         lastError: null,
-        metadata: { crawl: input.crawl } as Prisma.InputJsonValue,
+        metadata: { crawl: input.crawl, brand: input.brand ?? null } as Prisma.InputJsonValue,
       },
     });
   } else {
@@ -590,7 +592,7 @@ async function persistScan(input: {
         pagesCrawled: input.pagesCrawled ?? input.crawl.filter((item) => item.origin === "website" && item.status === "crawled").length,
         pagesFailed: input.pagesFailed ?? 0,
         crawlVersion,
-        metadata: { crawl: input.crawl } as Prisma.InputJsonValue,
+        metadata: { crawl: input.crawl, brand: input.brand ?? null } as Prisma.InputJsonValue,
       },
     });
   }

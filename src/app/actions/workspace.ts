@@ -386,10 +386,17 @@ export async function runSiteScan(input?: { fullSite?: boolean }) {
     fullSite: input?.fullSite !== false,
   });
   if (result.ok) {
-    await prisma.organization.update({
+    // Never regress a published workspace back into onboarding (blank app shell / redirect).
+    const org = await prisma.organization.findUnique({
       where: { id: session.organizationId },
-      data: { onboardingStatus: "ANALYZING" },
+      select: { onboardingStatus: true },
     });
+    if (org?.onboardingStatus && org.onboardingStatus !== "PUBLISHED") {
+      await prisma.organization.update({
+        where: { id: session.organizationId },
+        data: { onboardingStatus: "ANALYZING" },
+      });
+    }
   }
   revalidatePath("/onboarding");
   revalidatePath("/knowledge");

@@ -9,6 +9,11 @@ export async function workspacePathForOrganization(organizationId: string) {
   });
   const entitlements = await entitlementsForOrganization(organizationId);
   if (!entitlements.isPaidSeat) return "/billing";
-  if (organization?.onboardingStatus !== "PUBLISHED") return "/onboarding";
-  return "/dashboard";
+  // ACTIVE agent means setup already finished — do not bounce to onboarding after a re-scan.
+  const agent = await prisma.agent.findFirst({
+    where: { organizationId, isPrimary: true },
+    select: { status: true },
+  });
+  if (organization?.onboardingStatus === "PUBLISHED" || agent?.status === "ACTIVE") return "/dashboard";
+  return "/onboarding";
 }
