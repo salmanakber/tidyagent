@@ -3,7 +3,6 @@
 import type { CSSProperties } from "react";
 import {
   Bot,
-  Code2,
   FileCode2,
   FileSpreadsheet,
   Globe2,
@@ -39,30 +38,15 @@ type CategoryCard = {
   filling?: boolean;
 };
 
-const CATEGORY_META: {
-  key: CollectionCategory;
-  label: string;
-  icon: typeof FileCode2;
-  accent: string;
-  glow: string;
-}[] = [
-  { key: "pages", label: "Pages", icon: FileCode2, accent: "from-sky-500/25 to-transparent", glow: "rgba(56,189,248,0.22)" },
-  { key: "colors", label: "Colors", icon: Palette, accent: "from-violet-500/25 to-transparent", glow: "rgba(167,139,250,0.22)" },
-  { key: "images", label: "Images", icon: ImageIcon, accent: "from-rose-500/20 to-transparent", glow: "rgba(244,63,94,0.18)" },
-  { key: "phrases", label: "Phrases", icon: MessageSquareQuote, accent: "from-amber-500/25 to-transparent", glow: "rgba(201,100,66,0.22)" },
-  { key: "intents", label: "Intents", icon: Target, accent: "from-emerald-500/25 to-transparent", glow: "rgba(16,185,129,0.2)" },
-  { key: "artifacts", label: "Artifacts", icon: FileSpreadsheet, accent: "from-cyan-500/20 to-transparent", glow: "rgba(6,182,212,0.18)" },
-  { key: "topics", label: "Topics", icon: Lightbulb, accent: "from-yellow-500/20 to-transparent", glow: "rgba(234,179,8,0.18)" },
-  { key: "prompts", label: "Prompts", icon: MessagesSquare, accent: "from-orange-500/25 to-transparent", glow: "rgba(249,115,22,0.2)" },
-];
-
-const FLY_PACKETS = [
-  { label: "pages", delay: "0s", y: "18%" },
-  { label: "CMS", delay: "0.35s", y: "38%" },
-  { label: "colors", delay: "0.7s", y: "28%" },
-  { label: "products", delay: "1.05s", y: "52%" },
-  { label: "SEO", delay: "1.4s", y: "44%" },
-  { label: "FAQs", delay: "1.75s", y: "62%" },
+const CATEGORY_META: { key: CollectionCategory; label: string; icon: typeof FileCode2 }[] = [
+  { key: "pages", label: "Pages", icon: FileCode2 },
+  { key: "colors", label: "Colors", icon: Palette },
+  { key: "images", label: "Images", icon: ImageIcon },
+  { key: "phrases", label: "Phrases", icon: MessageSquareQuote },
+  { key: "intents", label: "Intents", icon: Target },
+  { key: "artifacts", label: "Artifacts", icon: FileSpreadsheet },
+  { key: "topics", label: "Topics", icon: Lightbulb },
+  { key: "prompts", label: "Prompts", icon: MessagesSquare },
 ];
 
 function flowStatusFor(platform?: string | null) {
@@ -273,7 +257,7 @@ export function KnowledgeCollectionBoard({
     ? statuses[Math.min(statuses.length - 1, t % statuses.length)]
     : result?.ok
       ? "AI context ready"
-      : `Waiting to collect ${platformLabel(platform)} knowledge`;
+      : `Ready to collect ${platformLabel(platform)} knowledge`;
 
   const cards: CategoryCard[] = CATEGORY_META.map((meta) => {
     if (live) {
@@ -301,7 +285,7 @@ export function KnowledgeCollectionBoard({
   const filledCount = cards.filter((c) => c.count > 0 || c.filling).length;
 
   return (
-    <div className="collection-board space-y-5">
+    <div className="collection-board space-y-4">
       <ScanStatusFlow
         pending={Boolean(pending)}
         done={Boolean(result?.ok)}
@@ -311,52 +295,24 @@ export function KnowledgeCollectionBoard({
         platform={platform}
       />
 
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-400">Collected blocks</p>
-          <p className="mt-1 text-sm text-navy-200">
-            {pending
-              ? "Pulling live signals into knowledge slots…"
-              : result?.ok
-                ? `${filledCount} of ${cards.length} blocks filled from your site`
-                : "Blocks light up as pages, brand, and catalog land"}
-          </p>
-        </div>
-        <p className="shrink-0 font-display text-2xl tabular-nums text-amber-300">
+      <div className="flex items-center justify-between gap-3 px-0.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-400">Collected</p>
+        <p className="font-display text-sm tabular-nums text-amber-300">
           {filledCount}
-          <span className="text-base text-navy-400">/{cards.length}</span>
+          <span className="text-navy-400">/{cards.length}</span>
         </p>
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card, index) => {
-          const meta = CATEGORY_META[index];
-          return (
-            <CollectionCard
-              key={card.key}
-              card={card}
-              delay={index * 45}
-              accent={meta.accent}
-              glow={meta.glow}
-            />
-          );
-        })}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card, index) => (
+          <CollectionCard key={card.key} card={card} delay={index * 40} />
+        ))}
       </div>
     </div>
   );
 }
 
-function CollectionCard({
-  card,
-  delay,
-  accent,
-  glow,
-}: {
-  card: CategoryCard;
-  delay: number;
-  accent: string;
-  glow: string;
-}) {
+function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) {
   const Icon = card.icon;
   const empty = card.count === 0 && !card.filling;
   const swatches = card.swatches?.filter((c) => c.startsWith("#")) ?? [];
@@ -365,85 +321,51 @@ function CollectionCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border transition duration-300",
-        lit
-          ? "border-amber-500/30 bg-navy-900/90 shadow-[0_18px_40px_-28px_var(--collect-glow)]"
-          : "border-white/10 bg-navy-900/55",
-        card.filling && "amber-ring",
+        "relative overflow-hidden rounded-2xl border bg-navy-900/70 transition duration-300",
+        lit ? "border-amber-500/30 amber-ring" : "border-white/10",
       )}
-      style={
-        {
-          animationDelay: `${delay}ms`,
-          ["--collect-glow" as string]: glow,
-        } as CSSProperties
-      }
+      style={{ animationDelay: `${delay}ms` } as CSSProperties}
     >
-      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-90", accent)} aria-hidden />
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-y-0 left-0 w-[3px] transition",
-          lit ? "bg-amber-500" : "bg-white/10",
-          card.filling && "animate-pulse",
-        )}
-        aria-hidden
-      />
-
-      <div className="relative flex items-start justify-between gap-3 px-4 pb-2 pt-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl border transition",
-              lit
-                ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
-                : "border-white/10 bg-white/5 text-navy-400",
-            )}
-          >
-            <Icon className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{card.label}</p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">
-              {card.filling ? "Collecting" : lit ? "Captured" : "Empty"}
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center gap-2.5 border-b border-white/8 px-3.5 py-3">
         <span
           className={cn(
-            "flex h-8 min-w-8 items-center justify-center rounded-xl px-2 font-display text-base tabular-nums",
-            card.count > 0 || card.filling
-              ? "bg-amber-500 text-white shadow-[0_8px_20px_-10px_rgba(201,100,66,0.8)]"
-              : "bg-white/8 text-navy-400",
+            "flex h-8 w-8 items-center justify-center rounded-xl",
+            lit ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-navy-400",
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{card.label}</p>
+        <span
+          className={cn(
+            "flex h-6 min-w-6 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold tabular-nums",
+            card.count > 0 || card.filling ? "bg-amber-500 text-white" : "bg-white/8 text-navy-400",
           )}
         >
           {card.count}
         </span>
       </div>
 
-      <div className="relative min-h-[92px] space-y-2 px-4 pb-4 pt-1">
+      <div className="min-h-[84px] px-3.5 py-3">
         {empty ? (
-          <div className="space-y-2 pt-1">
-            <div className="h-7 w-[78%] rounded-xl border border-dashed border-white/10 bg-white/[0.03]" />
-            <div className="h-7 w-[58%] rounded-xl border border-dashed border-white/10 bg-white/[0.02]" />
-            <div className="h-7 w-[42%] rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015]" />
+          <div className="space-y-2 pt-0.5">
+            <div className="h-6 w-[70%] rounded-lg bg-white/[0.04]" />
+            <div className="h-6 w-[48%] rounded-lg bg-white/[0.03]" />
           </div>
         ) : card.filling && card.chips.every((c) => !c) ? (
-          <div className="space-y-2 pt-1">
-            <div className="h-7 w-[72%] rounded-xl collect-shimmer" />
-            <div className="h-7 w-[52%] rounded-xl collect-shimmer" />
-            <div className="h-7 w-[38%] rounded-xl collect-shimmer" />
+          <div className="space-y-2 pt-0.5">
+            <div className="h-6 w-[68%] rounded-lg collect-shimmer" />
+            <div className="h-6 w-[46%] rounded-lg collect-shimmer" />
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
+          <div className="flex flex-wrap gap-1.5">
             {swatches.length
               ? swatches.slice(0, 5).map((hex) => (
                   <span
                     key={hex}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-navy-950/50 px-2.5 py-1.5 text-[11px] font-medium text-navy-100 backdrop-blur-sm"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-navy-100"
                   >
-                    <span
-                      className="h-3.5 w-3.5 rounded-md ring-1 ring-white/25 shadow-inner"
-                      style={{ background: hex }}
-                    />
+                    <span className="h-3 w-3 rounded-full ring-1 ring-white/20" style={{ background: hex }} />
                     {hex}
                   </span>
                 ))
@@ -451,13 +373,13 @@ function CollectionCard({
                   chip ? (
                     <span
                       key={`${card.key}-${chip}-${i}`}
-                      className="animate-card-fill rounded-xl border border-amber-500/25 bg-amber-500/12 px-2.5 py-1.5 text-[11px] font-medium text-amber-100"
-                      style={{ animationDelay: `${i * 70}ms` }}
+                      className="animate-card-fill rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-100"
+                      style={{ animationDelay: `${i * 55}ms` }}
                     >
                       {chip}
                     </span>
                   ) : (
-                    <span key={`${card.key}-ph-${i}`} className="h-7 w-16 rounded-xl collect-shimmer" />
+                    <span key={`${card.key}-ph-${i}`} className="h-6 w-14 rounded-lg collect-shimmer" />
                   ),
                 )}
           </div>
@@ -496,12 +418,25 @@ function ScanStatusFlow({
       : "Source data";
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-navy-850/90 to-navy-950/90 shadow-card">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-400">Current status</p>
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-navy-900/60">
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-xl",
+              pending ? "bg-amber-500/15 text-amber-300" : done ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-navy-400",
+            )}
+          >
+            {done ? <Bot className="h-4 w-4" /> : <Globe2 className={cn("h-4 w-4", pending && "animate-pulse")} />}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{host}</p>
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">{sourceLabel}</p>
+          </div>
+        </div>
         <span
           className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
             pending
               ? "bg-amber-500/15 text-amber-300"
               : done
@@ -513,103 +448,12 @@ function ScanStatusFlow({
         </span>
       </div>
 
-      <div className="relative px-4 py-7 sm:px-6">
-        <div className="pointer-events-none absolute inset-x-[18%] top-[46%] hidden h-0 md:block" aria-hidden>
-          <svg className="h-8 w-full overflow-visible" viewBox="0 0 400 32" preserveAspectRatio="none">
-            <path
-              d="M0 16 C 120 16, 160 4, 200 16 S 280 28, 400 16"
-              fill="none"
-              stroke="rgba(201,100,66,0.35)"
-              strokeWidth="1.5"
-              strokeDasharray="6 8"
-              className={pending ? "animate-flow-dash" : undefined}
-            />
-          </svg>
-        </div>
-
-        {pending ? (
-          <div className="pointer-events-none absolute inset-x-[16%] top-[28%] bottom-[34%] hidden md:block" aria-hidden>
-            {FLY_PACKETS.map((packet) => (
-              <span
-                key={packet.label}
-                className="data-fly absolute left-0 rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100 shadow-glow"
-                style={{ top: packet.y, animationDelay: packet.delay }}
-              >
-                {packet.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="relative grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-3">
-          <div
-            className={cn(
-              "relative rounded-2xl border bg-navy-900/90 p-4 transition",
-              pending ? "border-sky-400/30 shadow-[0_0_32px_-12px_rgba(56,189,248,0.45)]" : "border-white/10",
-            )}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
-                <Globe2 className={cn("h-4 w-4", pending && "animate-pulse")} />
-              </span>
-              {pending ? (
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                  · Extracting…
-                </span>
-              ) : done ? (
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                  · Synced
-                </span>
-              ) : null}
-            </div>
-            <p className="font-display text-lg text-white">{host}</p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-navy-400">{sourceLabel}</p>
-          </div>
-
-          <div className="relative z-10 flex items-center justify-center gap-2 md:flex-col md:py-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-navy-900 px-2.5 py-1 text-[11px] text-navy-200">
-              <Code2 className="h-3 w-3 text-amber-400" />
-              {pending ? "streaming" : done ? "200 OK" : "idle"}
-            </span>
-            <span
-              className={cn(
-                "hidden h-9 w-9 items-center justify-center rounded-full border md:flex",
-                pending
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-200 animate-pulse-soft"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-300",
-              )}
-            >
-              <Code2 className="h-3.5 w-3.5" />
-            </span>
-          </div>
-
-          <div
-            className={cn(
-              "relative rounded-2xl border bg-gradient-to-br from-amber-500/10 to-navy-900/90 p-4 transition",
-              pending || done ? "border-amber-500/40 shadow-[0_0_40px_-14px_rgba(201,100,66,0.55)]" : "border-amber-500/25",
-            )}
-          >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
-                <Bot className={cn("h-4 w-4", pending && "animate-pulse")} />
-              </span>
-              <span className={cn("text-amber-400/80", pending && "animate-pulse-soft")}>✦</span>
-            </div>
-            <p className="font-display text-lg text-white">tidyAgent</p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-300/80">AI context</p>
-            {pending ? (
-              <p className="mt-2 text-[11px] text-amber-100/80">Receiving site intelligence…</p>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-white/10 px-4 py-4 sm:px-5">
-        <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="space-y-3 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
           <p className="truncate text-sm text-navy-100">{statusText}</p>
-          <p className="shrink-0 font-display text-sm text-amber-300">{Math.round(progress)}%</p>
+          <p className="shrink-0 font-display text-sm tabular-nums text-amber-300">{Math.round(progress)}%</p>
         </div>
-        <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
           <div
             className={cn("h-full rounded-full bg-amber-500 transition-[width] duration-700 ease-out", pending && "shadow-glow")}
             style={{ width: `${progress}%` }}

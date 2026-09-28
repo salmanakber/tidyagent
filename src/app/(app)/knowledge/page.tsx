@@ -145,29 +145,13 @@ export default async function KnowledgePage() {
             <h2 className="font-display text-xl text-white">
               {copy.hideDomainCrawlToggle ? "Teach AI from this site" : "Website scanner"}
             </h2>
-            <p className="mt-1 text-sm text-navy-300">
-              {copy.hideDomainCrawlToggle
-                ? "Collection stays filled after setup. Re-run after site changes — you stay on Knowledge."
-                : "Collection stays filled after setup. Re-run after site changes — you stay on Knowledge."}
-            </p>
+            <p className="mt-1 text-sm text-navy-300">Re-run after site changes to refresh what the AI knows.</p>
           </div>
           <p className="text-xs text-navy-400">
             Last sync:{" "}
             {data.knowledge.lastSyncedAt ? new Date(data.knowledge.lastSyncedAt).toLocaleString() : "not yet"}
           </p>
         </div>
-        {facts.hasStores || platform === "SHOPIFY" ? (
-          <div className="mb-5 border border-amber-500/20 bg-amber-500/5 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Ecommerce</p>
-            <p className="mt-2 text-sm leading-6 text-navy-100">
-              Products, prices, and images are taught when you run the scanner on a paid plan.
-            </p>
-            <p className="mt-2 text-xs text-navy-400">
-              {indexedPages.filter((item) => item.contentType === "PRODUCT" && item.status === "crawled").length} products
-              currently loaded
-            </p>
-          </div>
-        ) : null}
         <SiteScanPanel
           planLabel={planLabel(entitlements.planKey)}
           scopeNote={copyForPlatform(platform, scope.depthNote)}

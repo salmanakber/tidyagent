@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   BookOpen,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   LayoutDashboard,
   Menu,
@@ -44,6 +46,8 @@ const MOBILE_PRIMARY = [
   { href: "/knowledge", label: "Know", icon: BookOpen },
 ];
 
+const SIDEBAR_KEY = "tidyagent.sidebar.expanded";
+
 export function AppShell({
   children,
   orgName,
@@ -55,6 +59,7 @@ export function AppShell({
   suspendedReason,
   locked,
   setupIncomplete,
+  choosePlan,
   platformLabel = "Wix",
 }: {
   children: React.ReactNode;
@@ -67,16 +72,41 @@ export function AppShell({
   suspendedReason?: string | null;
   locked?: boolean;
   setupIncomplete?: boolean;
+  choosePlan?: boolean;
   platformLabel?: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const nav = locked
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_KEY);
+      if (saved === "1") setExpanded(true);
+      if (saved === "0") setExpanded(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
+  const nav = locked || choosePlan
     ? NAV.filter((item) => item.href === "/billing")
     : setupIncomplete
       ? []
       : NAV;
-  const mobile = locked
+  const mobile = locked || choosePlan
     ? [{ href: "/billing", label: "Plan", icon: CreditCard }]
     : setupIncomplete
       ? []
@@ -85,43 +115,100 @@ export function AppShell({
   return (
     <div className="min-h-dvh bg-brand-gradient bg-noise">
       <div className="flex min-h-dvh">
-        <aside className="hidden w-72 shrink-0 border-r border-white/5 lg:flex lg:flex-col">
-          <div className="px-5 py-6">
-            <Logo />
-            <p className="mt-4 truncate text-xs text-navy-300">{siteName}</p>
+        <aside
+          className={cn(
+            "hidden shrink-0 border-r border-white/5 transition-[width] duration-200 ease-out lg:flex lg:flex-col",
+            expanded ? "w-72" : "w-[4.5rem]",
+          )}
+        >
+          <div className={cn("flex items-start justify-between gap-2 py-5", expanded ? "px-5" : "px-3")}>
+            <div className={cn("min-w-0", !expanded && "flex w-full justify-center")}>
+              {expanded ? (
+                <>
+                  <Logo />
+                  <p className="mt-4 truncate text-xs text-navy-300">{siteName}</p>
+                </>
+              ) : (
+                <Logo compact />
+              )}
+            </div>
           </div>
-          <nav className="flex-1 space-y-1 px-3">
+
+          <nav className={cn("flex-1 space-y-1", expanded ? "px-3" : "px-2")}>
             {nav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  title={item.label}
                   className={cn(
-                    "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition",
+                    "group relative flex items-center rounded-2xl text-sm transition",
+                    expanded ? "gap-3 px-3 py-2.5" : "justify-center px-0 py-2.5",
                     active
                       ? "bg-amber-500/15 text-amber-300"
                       : "text-navy-200 hover:bg-white/5 hover:text-white",
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {expanded ? <span className="truncate">{item.label}</span> : null}
+                  {!expanded ? (
+                    <span className="pointer-events-none absolute left-full z-40 ml-2 hidden whitespace-nowrap rounded-lg border border-white/10 bg-navy-900 px-2 py-1 text-xs text-white shadow-panel group-hover:block">
+                      {item.label}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
           </nav>
-          <div className="p-4">
-            <div className="panel flex items-center gap-3 p-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-navy text-xs font-semibold">
+
+          <div className={cn("space-y-3 pb-4", expanded ? "px-4" : "px-2")}>
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              className={cn(
+                "flex w-full items-center rounded-2xl border border-white/10 bg-white/[0.03] text-navy-200 transition hover:bg-white/5 hover:text-white",
+                expanded ? "justify-between gap-2 px-3 py-2.5 text-sm" : "justify-center py-2.5",
+              )}
+              aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+              title={expanded ? "Collapse" : "Expand"}
+            >
+              {expanded ? (
+                <>
+                  <span>Collapse</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </>
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+
+            {expanded ? (
+              <div className="panel flex items-center gap-3 p-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-navy text-xs font-semibold">
+                  {initials(userName || orgName)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-white">{userName || orgName}</p>
+                  <p className="truncate text-xs text-navy-300">
+                    {choosePlan
+                      ? "Choose a plan to continue"
+                      : setupIncomplete
+                        ? "Finish setup to open the dashboard"
+                        : agentStatus === "ACTIVE"
+                          ? "AI employee live"
+                          : "Setup in progress"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-navy text-xs font-semibold"
+                title={userName || orgName}
+              >
                 {initials(userName || orgName)}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">{userName || orgName}</p>
-                <p className="truncate text-xs text-navy-300">
-                  {setupIncomplete ? "Finish setup to open the dashboard" : agentStatus === "ACTIVE" ? "AI employee live" : "Setup in progress"}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </aside>
 
@@ -136,7 +223,7 @@ export function AppShell({
                 </button>
               </div>
               <nav className="space-y-1">
-                {NAV.filter((item) => !locked || item.href === "/billing").map((item) => (
+                {NAV.filter((item) => !(locked || choosePlan) || item.href === "/billing").map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -166,7 +253,12 @@ export function AppShell({
               Choose a plan to unlock the dashboard and the live chat bubble.
             </div>
           ) : null}
-          {setupIncomplete && !locked ? (
+          {choosePlan && !locked ? (
+            <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white">
+              Choose Free or a paid plan to continue setup.
+            </div>
+          ) : null}
+          {setupIncomplete && !locked && !choosePlan ? (
             <div className="bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white">
               Finish the setup wizard to open the dashboard, inbox, and live widget.
             </div>
@@ -178,7 +270,7 @@ export function AppShell({
             </div>
           ) : null}
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/5 bg-navy-950/70 px-4 py-3 backdrop-blur-xl lg:px-8">
-            {setupIncomplete || locked ? <span className="w-9 lg:hidden" /> : (
+            {setupIncomplete || locked || choosePlan ? <span className="w-9 lg:hidden" /> : (
             <button className="rounded-full p-2 hover:bg-white/5 lg:hidden" onClick={() => setOpen(true)}>
               <Menu className="h-5 w-5" />
             </button>
@@ -197,14 +289,14 @@ export function AppShell({
               </form>
             </div>
           </header>
-          <main className={cn("flex-1 px-4 pt-6 lg:px-8 lg:pb-10", setupIncomplete || locked ? "pb-10" : "pb-28")}>{children}</main>
+          <main className={cn("flex-1 px-4 pt-6 lg:px-8 lg:pb-10", setupIncomplete || locked || choosePlan ? "pb-10" : "pb-28")}>{children}</main>
         </div>
       </div>
-      {locked || setupIncomplete ? null : <OwnerInboxBubble />}
+      {locked || setupIncomplete || choosePlan ? null : <OwnerInboxBubble />}
 
-      {setupIncomplete || locked ? null : (
+      {setupIncomplete || locked || choosePlan ? null : (
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-navy-950/90 px-2 py-2 backdrop-blur-xl lg:hidden">
-        <div className={cn("grid", locked ? "grid-cols-1" : "grid-cols-5")}>
+        <div className={cn("grid", locked || choosePlan ? "grid-cols-1" : "grid-cols-5")}>
           {mobile.map((item) => {
             const active = pathname === item.href;
             return (
@@ -221,7 +313,7 @@ export function AppShell({
               </Link>
             );
           })}
-          {locked ? null : (
+          {locked || choosePlan ? null : (
           <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-1 py-2 text-[11px] text-navy-300">
             <Menu className="h-5 w-5" />
             More

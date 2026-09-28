@@ -53,21 +53,24 @@ export default async function BillingPage({
   const hasCardCustomer = Boolean(subscription?.stripeCustomerId);
   const checkoutReady = wix ? Boolean(upgradeUrl) : webflow ? cardReady : shopify;
   const shopDomain = shopify ? session.wixInstanceId.replace(/^shopify:/, "") : "";
+  const needsPlanPick = shopify && data.organization.onboardingStatus === "SITE_CONNECTED";
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow={`${name} billing`}
-        title={e.isPaidSeat ? "Plan & limits" : "Choose a plan to go live"}
+        title={needsPlanPick ? "Choose your plan" : e.isPaidSeat ? "Plan & limits" : "Choose a plan to go live"}
         description={
           wix
             ? e.isPaidSeat
               ? "Checkout stays on Wix. Paid plans include a 7-day free trial."
               : "The dashboard and live chat stay off until a plan is purchased. Start a 7-day trial — Starter, Business, or Pro."
             : shopify
-              ? e.isPaidSeat
-                ? `Current plan and limits for this ${name} store. Billing is managed in Shopify.`
-                : `Pick a plan below. You’ll approve the charge on Shopify’s billing screen.`
+              ? needsPlanPick
+                ? "Continue with Free, or approve a paid plan in Shopify to unlock higher limits."
+                : e.isPaidSeat
+                  ? `Current plan and limits for this ${name} store. Billing is managed in Shopify.`
+                  : `Pick a plan below. You’ll approve the charge on Shopify’s billing screen.`
               : e.isPaidSeat
                 ? `Current plan and limits for this ${name} site.`
                 : cardReady
@@ -188,6 +191,7 @@ export default async function BillingPage({
           isPaidSeat={e.isPaidSeat}
           pricing={pricing}
           scopes={scopes}
+          needsPlanPick={needsPlanPick}
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">

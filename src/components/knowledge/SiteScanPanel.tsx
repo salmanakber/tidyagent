@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 import { wizardCopyForPlatform } from "@/modules/platforms/copy";
 
 export function SiteScanPanel({
-  planLabel,
-  scopeNote,
+  planLabel: _planLabel,
+  scopeNote: _scopeNote,
   siteUrl,
   initial,
   onComplete,
@@ -23,6 +23,8 @@ export function SiteScanPanel({
   onComplete?: (result: ScanResult) => void;
   platform?: string | null;
 }) {
+  void _planLabel;
+  void _scopeNote;
   const copy = wizardCopyForPlatform(platform);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ScanResult | null>(initial ?? null);
@@ -51,35 +53,21 @@ export function SiteScanPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">{planLabel} scan scope</p>
-        <p className="mt-2 text-sm leading-6 text-navy-100">{scopeNote}</p>
-        {siteUrl ? (
-          <p className="mt-2 truncate text-xs text-navy-400">{siteUrl}</p>
-        ) : (
-          <p className="mt-2 text-xs text-rose-200">{copy.noUrl}</p>
-        )}
-        {copy.hideDomainCrawlToggle ? (
-          <p className="mt-4 text-sm leading-6 text-navy-100">
-            How knowledge is loaded
+      {!copy.hideDomainCrawlToggle ? (
+        <label className="flex items-start gap-3 text-sm text-navy-100">
+          <input
+            type="checkbox"
+            className="mt-1 accent-amber-500"
+            checked={fullSite}
+            onChange={(event) => setFullSite(event.target.checked)}
+            disabled={pending}
+          />
+          <span>
+            Crawl every public page we can find
             <span className="mt-1 block text-xs text-navy-400">{copy.crawlHint}</span>
-          </p>
-        ) : (
-          <label className="mt-4 flex items-start gap-3 text-sm text-navy-100">
-            <input
-              type="checkbox"
-              className="mt-1 accent-amber-500"
-              checked={fullSite}
-              onChange={(event) => setFullSite(event.target.checked)}
-              disabled={pending}
-            />
-            <span>
-              Crawl every public page we can find
-              <span className="mt-1 block text-xs text-navy-400">{copy.crawlHint}</span>
-            </span>
-          </label>
-        )}
-      </div>
+          </span>
+        </label>
+      ) : null}
 
       <KnowledgeCollectionBoard
         result={pending ? null : result}

@@ -173,8 +173,8 @@ export function OnboardingWizard({
             title="Collect site knowledge"
             body={
               webflow
-                ? "Watch pages, topics, and artifacts fill as tidyAgent reads your Webflow site through official Data APIs — not a domain crawl. Re-run whenever the site changes."
-                : "Watch the collection board fill as tidyAgent reads pages, policies, and catalog data from the live site. Re-run whenever the site changes."
+                ? "Read your Webflow site through official Data APIs, then continue."
+                : "Scan the live site so the AI learns pages, policies, and catalog data."
             }
           >
             <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />

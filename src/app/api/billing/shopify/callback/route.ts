@@ -57,6 +57,10 @@ export async function GET(request: Request) {
       siteId: site.id,
       preferredPlanKey: planKey,
     });
+    await prisma.organization.updateMany({
+      where: { id: site.organizationId, onboardingStatus: "SITE_CONNECTED" },
+      data: { onboardingStatus: "ANALYZING" },
+    });
   } catch (error) {
     console.error("Shopify billing sync failed", error);
     return NextResponse.redirect(new URL("/billing?error=checkout", origin));

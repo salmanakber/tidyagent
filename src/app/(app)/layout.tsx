@@ -22,12 +22,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const setupComplete =
     workspace.organization.onboardingStatus === "PUBLISHED" || workspace.agent?.status === "ACTIVE";
   const shopify = isShopifyPlatform(session.platform);
+  const choosePlan = shopify && workspace.organization.onboardingStatus === "SITE_CONNECTED";
   const shopifyApiKey = shopify ? (await getShopifyOAuthConfig()).apiKey || "" : "";
 
+  if (choosePlan && !path.startsWith("/billing")) {
+    redirect("/billing");
+  }
   if (!paid && !path.startsWith("/billing")) {
     redirect("/billing");
   }
-  if (paid && !setupComplete && !path.startsWith("/onboarding") && !path.startsWith("/billing")) {
+  if (paid && !setupComplete && !choosePlan && !path.startsWith("/onboarding") && !path.startsWith("/billing")) {
     redirect("/onboarding");
   }
 
@@ -43,7 +47,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         suspended={suspended}
         suspendedReason={workspace.organization.suspendedReason}
         locked={!paid}
-        setupIncomplete={paid && !setupComplete}
+        setupIncomplete={paid && !setupComplete && !choosePlan}
+        choosePlan={choosePlan}
         platformLabel={platformLabel(session.platform)}
       >
         {children}

@@ -6,6 +6,7 @@ import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
 import { ShopifyPlanCheckoutButton } from "@/components/shopify/ShopifyPlanCheckoutButton";
+import { continueShopifyFreePlan } from "@/app/actions/workspace";
 
 const ALL_PLANS = ["FREE", "STARTER", "GROWTH", "PRO"] as const;
 
@@ -18,18 +19,20 @@ export function ShopifyBillingPlans({
   isPaidSeat,
   pricing,
   scopes,
+  needsPlanPick = false,
 }: {
   currentPlanKey: string;
   isPaidSeat: boolean;
   pricing: DisplayPricing;
   scopes: Record<PlanKey, PlanScopeConfig>;
+  needsPlanPick?: boolean;
 }) {
   return (
     <div className="space-y-5">
       <div className="rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 via-white/[0.03] to-transparent px-5 py-4 text-sm text-navy-200">
-        Start on Free with limited store knowledge, or open Shopify’s charge approval screen for a paid plan (Billing
-        API). If Shopify says App Pricing is blocking charges, switch this app to Manual pricing in Partner Dashboard
-        first.
+        {needsPlanPick
+          ? "Pick Free to continue setup, or approve a paid plan in Shopify. You can change plans later."
+          : "Start on Free with limited store knowledge, or open Shopify’s charge approval screen for a paid plan."}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -48,7 +51,7 @@ export function ShopifyBillingPlans({
             <div
               key={key}
               className={`relative flex flex-col rounded-3xl border p-6 transition ${
-                showingCurrent
+                showingCurrent || (needsPlanPick && free)
                   ? "border-amber-400/40 bg-amber-500/10 amber-ring"
                   : featured
                     ? "border-emerald-400/35 bg-white/[0.06] shadow-[0_0_0_1px_rgba(52,211,153,0.12)]"
@@ -61,14 +64,14 @@ export function ShopifyBillingPlans({
                 <span className="absolute -top-3 left-5 rounded-full border border-emerald-400/30 bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
                   Most chosen
                 </span>
-              ) : free && !showingCurrent ? (
+              ) : free && needsPlanPick ? (
                 <span className="absolute -top-3 left-5 rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-200">
                   No charge
                 </span>
               ) : null}
 
               <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">
-                {showingCurrent ? "Current plan" : free ? "Included" : "Package"}
+                {showingCurrent && !needsPlanPick ? "Current plan" : free ? "Included" : "Package"}
               </p>
               <p className="mt-3 font-display text-3xl text-white">{planLabel(key)}</p>
 
@@ -115,15 +118,23 @@ export function ShopifyBillingPlans({
               </ul>
 
               {free ? (
-                <p
-                  className={`mt-6 inline-flex w-full items-center justify-center rounded-full border px-4 py-2.5 text-sm font-medium ${
-                    showingCurrent
-                      ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
-                      : "border-white/10 bg-white/5 text-navy-200"
-                  }`}
-                >
-                  {showingCurrent ? "You’re on Free" : "Downgrade by cancelling in Shopify"}
-                </p>
+                needsPlanPick ? (
+                  <form action={continueShopifyFreePlan} className="mt-6">
+                    <button type="submit" className="btn-primary w-full">
+                      Continue with Free
+                    </button>
+                  </form>
+                ) : (
+                  <p
+                    className={`mt-6 inline-flex w-full items-center justify-center rounded-full border px-4 py-2.5 text-sm font-medium ${
+                      showingCurrent
+                        ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
+                        : "border-white/10 bg-white/5 text-navy-200"
+                    }`}
+                  >
+                    {showingCurrent ? "You’re on Free" : "Downgrade by cancelling in Shopify"}
+                  </p>
+                )
               ) : canCheckout ? (
                 <ShopifyPlanCheckoutButton
                   planParam={planParam}

@@ -243,9 +243,11 @@ export async function scanOrganizationSite(input: {
 
   if (!pages.length && !products.length) {
     warnings.push(
-      wixSite
-        ? "No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions."
-        : `No public pages or catalog data could be read yet. Publish the ${marketplace} site and try again.`,
+      shopifySite
+        ? "No store profile, pages, or products could be read yet. Reopen tidyAgent from Shopify Admin (so the token refreshes), confirm the store has published content, then scan again."
+        : wixSite
+          ? "No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions."
+          : `No public pages or catalog data could be read yet. Publish the ${marketplace} site and try again.`,
     );
     return emptyResult(scope, resolvedHome.includes("://site") ? null : resolvedHome, stages, skipped, warnings);
   }

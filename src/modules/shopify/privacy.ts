@@ -73,6 +73,11 @@ export async function handleShopifyAppUninstalled(shopDomain: string, payload: S
 
   await clearShopifySubscriptionOnUninstall(site.organizationId, "shopify_app_uninstalled");
 
+  await prisma.organization.update({
+    where: { id: site.organizationId },
+    data: { onboardingStatus: "SITE_CONNECTED" },
+  });
+
   await prisma.billingEvent.create({
     data: {
       organizationId: site.organizationId,

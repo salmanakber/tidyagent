@@ -86,10 +86,10 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     maxPages: 25,
     maxProducts: 40,
     maxCharsPerPage: 8000,
-    maxCmsCollections: 2,
+    maxCmsCollections: 4,
     maxCmsItemsPerCollection: 20,
     includeSiteProperties: true,
-    includeCms: false,
+    includeCms: true,
     includeStores: true,
     includeBookings: false,
     includeDomainCrawl: true,
@@ -188,7 +188,16 @@ export function mergePlanScope(planKey: PlanKey, raw: unknown): PlanScopeConfig 
       maxProducts: Math.max(fallback.scan.maxProducts, next.scan?.maxProducts ?? 0),
       maxCharsPerPage: Math.max(fallback.scan.maxCharsPerPage, next.scan?.maxCharsPerPage ?? 0),
       maxCmsCollections: Math.max(fallback.scan.maxCmsCollections, next.scan?.maxCmsCollections ?? 0),
-      maxCmsItemsPerCollection: Math.max(fallback.scan.maxCmsItemsPerCollection, next.scan?.maxCmsItemsPerCollection ?? 0),
+      maxCmsItemsPerCollection: Math.max(
+        fallback.scan.maxCmsItemsPerCollection,
+        next.scan?.maxCmsItemsPerCollection ?? 0,
+      ),
+      // Keep API reads enabled when the default plan turned them on (avoids stale FREE=0 scopes blocking scans).
+      includeSiteProperties: Boolean(fallback.scan.includeSiteProperties || next.scan?.includeSiteProperties),
+      includeCms: Boolean(fallback.scan.includeCms || next.scan?.includeCms),
+      includeStores: Boolean(fallback.scan.includeStores || next.scan?.includeStores),
+      includeBookings: Boolean(fallback.scan.includeBookings || next.scan?.includeBookings),
+      includeDomainCrawl: Boolean(fallback.scan.includeDomainCrawl || next.scan?.includeDomainCrawl),
     },
   };
 }

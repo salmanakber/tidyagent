@@ -425,6 +425,23 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
   revalidatePath("/dashboard");
 }
 
+/** Shopify install gate: stay on Free and continue into onboarding. */
+export async function continueShopifyFreePlan() {
+  const session = await requireSession();
+  const { isShopifyPlatform } = await import("@/modules/platforms/types");
+  if (!isShopifyPlatform(session.platform)) {
+    throw new Error("Free continue is only available for Shopify stores.");
+  }
+  await prisma.organization.update({
+    where: { id: session.organizationId },
+    data: { onboardingStatus: "ANALYZING" },
+  });
+  revalidatePath("/billing");
+  revalidatePath("/onboarding");
+  const { redirect } = await import("next/navigation");
+  redirect("/onboarding");
+}
+
 export async function toggleWorkflow(key: string, enabled: boolean) {
   const session = await requireSession();
   const entitlements = await requirePaidSeat(session);
