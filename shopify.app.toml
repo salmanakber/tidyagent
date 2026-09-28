@@ -30,6 +30,6 @@ redirect_urls = [ "https://agent.tidyflowapp.com/api/shopify/oauth/callback" ]
 api_version = "2025-01"
 
 [[webhooks.subscriptions]]
-topics = [ "app_subscriptions/update" ]
+topics = [ "app/uninstalled", "app_subscriptions/update" ]
 compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 uri = "https://agent.tidyflowapp.com/api/shopify/webhooks"

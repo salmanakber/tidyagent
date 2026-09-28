@@ -10,12 +10,17 @@ import {
   type BillingEventInput,
   type DerivedSubscription,
 } from "@/modules/billing/lifecycle";
-import { resolveEntitlements, withComplimentaryGrant, type Entitlements } from "@/modules/billing/entitlements";
+import {
+  PLAN_ENTITLEMENTS,
+  resolveEntitlements,
+  withComplimentaryGrant,
+  type Entitlements,
+} from "@/modules/billing/entitlements";
 import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes";
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
 import { getReviewerConfig, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
-import { isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -263,7 +268,25 @@ export async function entitlementsForOrganization(organizationId: string): Promi
         suspended,
       );
 
-  return applyPlanScope(base, scopes[base.planKey] ?? defaultPlanScope(base.planKey));
+  // Shopify Free is a real usable seat (limited). Wix/Webflow Free still requires a paid plan.
+  const shopifyFreeSeat =
+    isShopifyPlatform(site?.platform) &&
+    !suspended &&
+    (base.planKey === "FREE" || base.isFree) &&
+    !base.isPaidSeat;
+
+  const resolved = shopifyFreeSeat
+    ? {
+        ...base,
+        planKey: "FREE" as const,
+        isFree: true,
+        isPaidSeat: true,
+        isUsable: true,
+        ...PLAN_ENTITLEMENTS.FREE,
+      }
+    : base;
+
+  return applyPlanScope(resolved, scopes[resolved.planKey] ?? defaultPlanScope(resolved.planKey));
 }
 
 function asString(value: unknown): string | null {

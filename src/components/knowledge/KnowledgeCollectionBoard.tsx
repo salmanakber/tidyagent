@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import {
   Bot,
   Code2,
@@ -38,15 +39,21 @@ type CategoryCard = {
   filling?: boolean;
 };
 
-const CATEGORY_META: { key: CollectionCategory; label: string; icon: typeof FileCode2 }[] = [
-  { key: "pages", label: "Pages", icon: FileCode2 },
-  { key: "colors", label: "Colors", icon: Palette },
-  { key: "images", label: "Images", icon: ImageIcon },
-  { key: "phrases", label: "Phrases", icon: MessageSquareQuote },
-  { key: "intents", label: "Intents", icon: Target },
-  { key: "artifacts", label: "Artifacts", icon: FileSpreadsheet },
-  { key: "topics", label: "Topics", icon: Lightbulb },
-  { key: "prompts", label: "Prompts", icon: MessagesSquare },
+const CATEGORY_META: {
+  key: CollectionCategory;
+  label: string;
+  icon: typeof FileCode2;
+  accent: string;
+  glow: string;
+}[] = [
+  { key: "pages", label: "Pages", icon: FileCode2, accent: "from-sky-500/25 to-transparent", glow: "rgba(56,189,248,0.22)" },
+  { key: "colors", label: "Colors", icon: Palette, accent: "from-violet-500/25 to-transparent", glow: "rgba(167,139,250,0.22)" },
+  { key: "images", label: "Images", icon: ImageIcon, accent: "from-rose-500/20 to-transparent", glow: "rgba(244,63,94,0.18)" },
+  { key: "phrases", label: "Phrases", icon: MessageSquareQuote, accent: "from-amber-500/25 to-transparent", glow: "rgba(201,100,66,0.22)" },
+  { key: "intents", label: "Intents", icon: Target, accent: "from-emerald-500/25 to-transparent", glow: "rgba(16,185,129,0.2)" },
+  { key: "artifacts", label: "Artifacts", icon: FileSpreadsheet, accent: "from-cyan-500/20 to-transparent", glow: "rgba(6,182,212,0.18)" },
+  { key: "topics", label: "Topics", icon: Lightbulb, accent: "from-yellow-500/20 to-transparent", glow: "rgba(234,179,8,0.18)" },
+  { key: "prompts", label: "Prompts", icon: MessagesSquare, accent: "from-orange-500/25 to-transparent", glow: "rgba(249,115,22,0.2)" },
 ];
 
 const FLY_PACKETS = [
@@ -291,6 +298,8 @@ export function KnowledgeCollectionBoard({
     };
   });
 
+  const filledCount = cards.filter((c) => c.count > 0 || c.filling).length;
+
   return (
     <div className="collection-board space-y-5">
       <ScanStatusFlow
@@ -302,78 +311,139 @@ export function KnowledgeCollectionBoard({
         platform={platform}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card, index) => (
-          <CollectionCard key={card.key} card={card} delay={index * 40} />
-        ))}
+      <div className="flex items-end justify-between gap-3 px-0.5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-400">Collected blocks</p>
+          <p className="mt-1 text-sm text-navy-200">
+            {pending
+              ? "Pulling live signals into knowledge slots…"
+              : result?.ok
+                ? `${filledCount} of ${cards.length} blocks filled from your site`
+                : "Blocks light up as pages, brand, and catalog land"}
+          </p>
+        </div>
+        <p className="shrink-0 font-display text-2xl tabular-nums text-amber-300">
+          {filledCount}
+          <span className="text-base text-navy-400">/{cards.length}</span>
+        </p>
+      </div>
+
+      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card, index) => {
+          const meta = CATEGORY_META[index];
+          return (
+            <CollectionCard
+              key={card.key}
+              card={card}
+              delay={index * 45}
+              accent={meta.accent}
+              glow={meta.glow}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) {
+function CollectionCard({
+  card,
+  delay,
+  accent,
+  glow,
+}: {
+  card: CategoryCard;
+  delay: number;
+  accent: string;
+  glow: string;
+}) {
   const Icon = card.icon;
   const empty = card.count === 0 && !card.filling;
   const swatches = card.swatches?.filter((c) => c.startsWith("#")) ?? [];
+  const lit = Boolean(card.active || card.filling);
 
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-navy-900/80 transition duration-300",
-        card.active || card.filling
-          ? "border-amber-500/35 shadow-[0_0_0_1px_rgba(201,100,66,0.08)]"
-          : "border-white/10",
+        "group relative overflow-hidden rounded-2xl border transition duration-300",
+        lit
+          ? "border-amber-500/30 bg-navy-900/90 shadow-[0_18px_40px_-28px_var(--collect-glow)]"
+          : "border-white/10 bg-navy-900/55",
         card.filling && "amber-ring",
       )}
-      style={{ animationDelay: `${delay}ms` }}
+      style={
+        {
+          animationDelay: `${delay}ms`,
+          ["--collect-glow" as string]: glow,
+        } as CSSProperties
+      }
     >
-      <div className="flex items-center gap-2.5 border-b border-white/10 px-3.5 py-3">
+      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-90", accent)} aria-hidden />
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-0 w-[3px] transition",
+          lit ? "bg-amber-500" : "bg-white/10",
+          card.filling && "animate-pulse",
+        )}
+        aria-hidden
+      />
+
+      <div className="relative flex items-start justify-between gap-3 px-4 pb-2 pt-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-xl border transition",
+              lit
+                ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
+                : "border-white/10 bg-white/5 text-navy-400",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{card.label}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">
+              {card.filling ? "Collecting" : lit ? "Captured" : "Empty"}
+            </p>
+          </div>
+        </div>
         <span
           className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-xl",
-            card.active || card.filling ? "bg-amber-500/15 text-amber-400" : "bg-white/5 text-navy-400",
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{card.label}</p>
-        <span
-          className={cn(
-            "flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-            card.count > 0 || card.filling ? "bg-amber-500 text-white" : "bg-white/10 text-navy-400",
+            "flex h-8 min-w-8 items-center justify-center rounded-xl px-2 font-display text-base tabular-nums",
+            card.count > 0 || card.filling
+              ? "bg-amber-500 text-white shadow-[0_8px_20px_-10px_rgba(201,100,66,0.8)]"
+              : "bg-white/8 text-navy-400",
           )}
         >
           {card.count}
         </span>
       </div>
-      <div
-        className={cn(
-          "relative h-[1px] w-full bg-white/10",
-          (card.active || card.filling) && "after:absolute after:inset-y-0 after:left-0 after:w-1/3 after:bg-amber-500",
-        )}
-      />
-      <div className="min-h-[76px] space-y-2 px-3.5 py-3">
+
+      <div className="relative min-h-[92px] space-y-2 px-4 pb-4 pt-1">
         {empty ? (
-          <div className="space-y-2 pt-0.5">
-            <div className="h-6 w-[72%] rounded-lg bg-white/10" />
-            <div className="h-6 w-[54%] rounded-lg bg-white/5" />
-            <div className="h-6 w-[40%] rounded-lg bg-white/[0.04]" />
+          <div className="space-y-2 pt-1">
+            <div className="h-7 w-[78%] rounded-xl border border-dashed border-white/10 bg-white/[0.03]" />
+            <div className="h-7 w-[58%] rounded-xl border border-dashed border-white/10 bg-white/[0.02]" />
+            <div className="h-7 w-[42%] rounded-xl border border-dashed border-white/[0.08] bg-white/[0.015]" />
           </div>
         ) : card.filling && card.chips.every((c) => !c) ? (
-          <div className="space-y-2 pt-0.5">
-            <div className="h-6 w-[68%] rounded-lg collect-shimmer" />
-            <div className="h-6 w-[48%] rounded-lg collect-shimmer" />
-            <div className="h-6 w-[36%] rounded-lg collect-shimmer" />
+          <div className="space-y-2 pt-1">
+            <div className="h-7 w-[72%] rounded-xl collect-shimmer" />
+            <div className="h-7 w-[52%] rounded-xl collect-shimmer" />
+            <div className="h-7 w-[38%] rounded-xl collect-shimmer" />
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
             {swatches.length
               ? swatches.slice(0, 5).map((hex) => (
                   <span
                     key={hex}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-navy-100"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-navy-950/50 px-2.5 py-1.5 text-[11px] font-medium text-navy-100 backdrop-blur-sm"
                   >
-                    <span className="h-3 w-3 rounded-full ring-1 ring-white/20" style={{ background: hex }} />
+                    <span
+                      className="h-3.5 w-3.5 rounded-md ring-1 ring-white/25 shadow-inner"
+                      style={{ background: hex }}
+                    />
                     {hex}
                   </span>
                 ))
@@ -381,13 +451,13 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
                   chip ? (
                     <span
                       key={`${card.key}-${chip}-${i}`}
-                      className="animate-card-fill rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-100"
-                      style={{ animationDelay: `${i * 60}ms` }}
+                      className="animate-card-fill rounded-xl border border-amber-500/25 bg-amber-500/12 px-2.5 py-1.5 text-[11px] font-medium text-amber-100"
+                      style={{ animationDelay: `${i * 70}ms` }}
                     >
                       {chip}
                     </span>
                   ) : (
-                    <span key={`${card.key}-ph-${i}`} className="h-6 w-16 rounded-lg collect-shimmer" />
+                    <span key={`${card.key}-ph-${i}`} className="h-7 w-16 rounded-xl collect-shimmer" />
                   ),
                 )}
           </div>
@@ -444,7 +514,6 @@ function ScanStatusFlow({
       </div>
 
       <div className="relative px-4 py-7 sm:px-6">
-        {/* Flight path */}
         <div className="pointer-events-none absolute inset-x-[18%] top-[46%] hidden h-0 md:block" aria-hidden>
           <svg className="h-8 w-full overflow-visible" viewBox="0 0 400 32" preserveAspectRatio="none">
             <path

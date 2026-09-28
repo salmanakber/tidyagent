@@ -120,10 +120,23 @@ async function connectExistingShopifySite(input: {
       url: input.url,
       ownerEmail: input.ownerEmail,
       connectionStatus: "connected",
+      accessStatus: "active",
       lastSyncedAt: new Date(),
       platform: "SHOPIFY",
     },
   });
+
+  // After uninstall the local seat is FREE. Re-sync with Shopify so a live charge
+  // (if any) is restored, but a cancelled/missing charge cannot revive a stale paid row.
+  try {
+    const { syncShopifyBillingFromShop } = await import("@/modules/shopify/billing");
+    await syncShopifyBillingFromShop({
+      organizationId: existingSite.organizationId,
+      siteId: existingSite.id,
+    });
+  } catch (error) {
+    console.warn("Shopify reinstall billing sync failed; keeping FREE seat", error);
+  }
 
   await prisma.wixCredential.upsert({
     where: { siteId: existingSite.id },

@@ -30,6 +30,65 @@ async function findShopifySite(shopDomain?: string | null) {
   });
 }
 
+/** Drop any paid Shopify seat so reinstall cannot revive the old plan. */
+export async function clearShopifySubscriptionOnUninstall(organizationId: string, reason: string) {
+  const { applyShopifySubscriptionState } = await import("@/modules/shopify/billing");
+  await applyShopifySubscriptionState({
+    organizationId,
+    planKey: "FREE",
+    status: "NONE",
+    isFree: true,
+    shopifySubscriptionId: null,
+    autoRenewing: false,
+    cancelAtPeriodEnd: false,
+    canceledAt: new Date(),
+    cancelReason: reason,
+    billingIssue: false,
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+  });
+}
+
+/**
+ * app/uninstalled — fires immediately when the merchant removes the app.
+ * Clears tokens, marks the site disconnected, and resets billing to FREE.
+ */
+export async function handleShopifyAppUninstalled(shopDomain: string, payload: ShopifyPrivacyPayload) {
+  const site = await findShopifySite(shopDomain || payload.shop_domain);
+  if (!site) return { ok: true as const, found: false };
+
+  await prisma.wixCredential.updateMany({
+    where: { siteId: site.id },
+    data: { metadata: {} },
+  });
+
+  await prisma.wixSite.update({
+    where: { id: site.id },
+    data: {
+      connectionStatus: "uninstalled",
+      accessStatus: "revoked",
+      lastSyncedAt: new Date(),
+    },
+  });
+
+  await clearShopifySubscriptionOnUninstall(site.organizationId, "shopify_app_uninstalled");
+
+  await prisma.billingEvent.create({
+    data: {
+      organizationId: site.organizationId,
+      siteId: site.id,
+      wixInstanceId: site.wixInstanceId,
+      eventType: "shopify.app/uninstalled",
+      payload: {
+        shop_domain: shopDomain || payload.shop_domain,
+        shop_id: payload.shop_id,
+      } as Prisma.InputJsonValue,
+    },
+  });
+
+  return { ok: true as const, found: true };
+}
+
 /**
  * customers/data_request — acknowledge and snapshot what we store for those emails.
  * Shopify requires a 200 after HMAC verification; we log a BillingEvent for the operator.
@@ -122,6 +181,7 @@ export async function handleShopifyCustomersRedact(shopDomain: string, payload: 
 
 /**
  * shop/redact — 48h after uninstall. Wipe Shopify tokens and site PII for that shop only.
+ * Also clears any leftover paid subscription (idempotent with app/uninstalled).
  * Never touches Wix rows.
  */
 export async function handleShopifyShopRedact(shopDomain: string, payload: ShopifyPrivacyPayload) {
@@ -156,6 +216,8 @@ export async function handleShopifyShopRedact(shopDomain: string, payload: Shopi
     },
   });
 
+  await clearShopifySubscriptionOnUninstall(site.organizationId, "shopify_shop_redact");
+
   await prisma.billingEvent.create({
     data: {
       organizationId: site.organizationId,
@@ -181,6 +243,8 @@ export async function dispatchShopifyPrivacyWebhook(topic: string, shopDomain: s
   }
 
   switch (topic) {
+    case "app/uninstalled":
+      return handleShopifyAppUninstalled(shopDomain, payload);
     case "customers/data_request":
       return handleShopifyCustomersDataRequest(shopDomain, payload);
     case "customers/redact":

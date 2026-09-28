@@ -226,8 +226,20 @@ html.theme-light .collection-board .border-white\/8 {
 
 html.theme-light .collection-board .bg-white\/5,
 html.theme-light .collection-board .bg-white\/10,
-html.theme-light .collection-board .bg-white\/\[0\.04\] {
+html.theme-light .collection-board .bg-white\/\[0\.04\],
+html.theme-light .collection-board .bg-white\/\[0\.03\],
+html.theme-light .collection-board .bg-white\/\[0\.02\],
+html.theme-light .collection-board .bg-white\/\[0\.015\],
+html.theme-light .collection-board .bg-white\/8 {
   background-color: rgba(26, 22, 19, 0.05) !important;
+}
+
+html.theme-light .collection-board .bg-navy-950\/50 {
+  background-color: rgba(247, 244, 239, 0.9) !important;
+}
+
+html.theme-light .collection-board .border-dashed {
+  border-color: rgba(26, 22, 19, 0.12) !important;
 }
 
 .logo-mark-light {

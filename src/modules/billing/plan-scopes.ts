@@ -83,17 +83,17 @@ export const allPlanScopesSchema = z.object({
 
 const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
   FREE: {
-    maxPages: 0,
-    maxProducts: 0,
-    maxCharsPerPage: 0,
-    maxCmsCollections: 0,
-    maxCmsItemsPerCollection: 0,
-    includeSiteProperties: false,
+    maxPages: 25,
+    maxProducts: 40,
+    maxCharsPerPage: 8000,
+    maxCmsCollections: 2,
+    maxCmsItemsPerCollection: 20,
+    includeSiteProperties: true,
     includeCms: false,
-    includeStores: false,
+    includeStores: true,
     includeBookings: false,
-    includeDomainCrawl: false,
-    depthNote: "Purchase Starter, Business, or Pro to read the site and go live.",
+    includeDomainCrawl: true,
+    depthNote: "Limited read of the live site — enough to try the widget. Upgrade for full crawl depth.",
   },
   STARTER: {
     maxPages: 200,
@@ -229,8 +229,13 @@ export function automationAllowedOnScope(scope: PlanScopeConfig, key: Automation
 export function bulletsForPlanScope(planKey: PlanKey, scope: PlanScopeConfig): string[] {
   if (planKey === "FREE") {
     return [
-      "Install on a Wix site",
-      "Choose Starter, Business, or Pro to unlock the dashboard and live widget",
+      "1 general agent",
+      "Classic chat widget",
+      "Limited Wix site profile and pages",
+      scope.scan.includeStores ? "Sample of the store catalog" : "Upgrade for store catalog",
+      `${scope.conversationLimit.toLocaleString()} conversations / month`,
+      `${scope.knowledgeLimit.toLocaleString()} knowledge pages`,
+      "Upgrade anytime for full crawl depth",
     ];
   }
 

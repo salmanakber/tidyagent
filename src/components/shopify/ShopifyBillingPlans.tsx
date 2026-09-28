@@ -7,7 +7,7 @@ import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
 import { ShopifyPlanCheckoutButton } from "@/components/shopify/ShopifyPlanCheckoutButton";
 
-const PAID_PLANS = ["STARTER", "GROWTH", "PRO"] as const;
+const ALL_PLANS = ["FREE", "STARTER", "GROWTH", "PRO"] as const;
 
 /**
  * Shopify-only plan picker. Checkout fetches confirmationUrl inside the iframe
@@ -27,45 +27,58 @@ export function ShopifyBillingPlans({
   return (
     <div className="space-y-5">
       <div className="rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-500/10 via-white/[0.03] to-transparent px-5 py-4 text-sm text-navy-200">
-        Each plan opens Shopify’s charge approval screen (Billing API), the same confirm link style tidySync uses. If
-        Shopify says App Pricing is blocking charges, switch this app to Manual pricing in Partner Dashboard first.
+        Start on Free with limited store knowledge, or open Shopify’s charge approval screen for a paid plan (Billing
+        API). If Shopify says App Pricing is blocking charges, switch this app to Manual pricing in Partner Dashboard
+        first.
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {PAID_PLANS.map((key) => {
-          const current = currentPlanKey === key && isPaidSeat;
-          const featured = key === "GROWTH" && !current;
-          const price = pricing.plans[key];
-          const monthly = formatListedPrice(price.monthly, pricing.symbol);
-          const yearly = formatListedPrice(price.yearly, pricing.symbol);
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {ALL_PLANS.map((key) => {
+          const free = key === "FREE";
+          const showingCurrent = free ? currentPlanKey === "FREE" : currentPlanKey === key && isPaidSeat;
+          const featured = key === "GROWTH" && !showingCurrent;
+          const price = free ? null : pricing.plans[key];
+          const monthly = price ? formatListedPrice(price.monthly, pricing.symbol) : null;
+          const yearly = price ? formatListedPrice(price.yearly, pricing.symbol) : null;
           const bullets = bulletsForPlatform("SHOPIFY", bulletsForPlanScope(key, scopes[key]));
           const planParam = key === "GROWTH" ? "BUSINESS" : key;
-          const canCheckout = Boolean(monthly);
+          const canCheckout = !free && Boolean(monthly);
 
           return (
             <div
               key={key}
               className={`relative flex flex-col rounded-3xl border p-6 transition ${
-                current
+                showingCurrent
                   ? "border-amber-400/40 bg-amber-500/10 amber-ring"
                   : featured
                     ? "border-emerald-400/35 bg-white/[0.06] shadow-[0_0_0_1px_rgba(52,211,153,0.12)]"
-                    : "border-white/10 bg-white/[0.03]"
+                    : free
+                      ? "border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent"
+                      : "border-white/10 bg-white/[0.03]"
               }`}
             >
               {featured ? (
                 <span className="absolute -top-3 left-5 rounded-full border border-emerald-400/30 bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
                   Most chosen
                 </span>
+              ) : free && !showingCurrent ? (
+                <span className="absolute -top-3 left-5 rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-200">
+                  No charge
+                </span>
               ) : null}
 
               <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">
-                {current ? "Current plan" : "Package"}
+                {showingCurrent ? "Current plan" : free ? "Included" : "Package"}
               </p>
               <p className="mt-3 font-display text-3xl text-white">{planLabel(key)}</p>
 
               <p className="mt-3 text-2xl text-amber-200">
-                {monthly ? (
+                {free ? (
+                  <>
+                    $0
+                    <span className="text-sm font-normal text-navy-300"> / forever</span>
+                  </>
+                ) : monthly ? (
                   <>
                     {monthly}
                     <span className="text-sm font-normal text-navy-300"> / month</span>
@@ -75,9 +88,13 @@ export function ShopifyBillingPlans({
                 )}
               </p>
               {yearly ? <p className="mt-1 text-sm text-navy-300">{yearly} / year</p> : null}
-              {pricing.trialDays > 0 ? (
+              {!free && pricing.trialDays > 0 ? (
                 <p className="mt-2 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-navy-200">
                   {pricing.trialDays}-day trial · billed in Shopify
+                </p>
+              ) : free ? (
+                <p className="mt-2 inline-flex w-fit rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-navy-200">
+                  Limited store knowledge · upgrade anytime
                 </p>
               ) : null}
 
@@ -86,18 +103,33 @@ export function ShopifyBillingPlans({
                   .filter((item) => !/7-day/i.test(item))
                   .map((item) => (
                     <li key={item} className="flex gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300/80" aria-hidden />
+                      <span
+                        className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                          free ? "bg-navy-300/80" : "bg-emerald-300/80"
+                        }`}
+                        aria-hidden
+                      />
                       <span>{item}</span>
                     </li>
                   ))}
               </ul>
 
-              {canCheckout ? (
+              {free ? (
+                <p
+                  className={`mt-6 inline-flex w-full items-center justify-center rounded-full border px-4 py-2.5 text-sm font-medium ${
+                    showingCurrent
+                      ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
+                      : "border-white/10 bg-white/5 text-navy-200"
+                  }`}
+                >
+                  {showingCurrent ? "You’re on Free" : "Downgrade by cancelling in Shopify"}
+                </p>
+              ) : canCheckout ? (
                 <ShopifyPlanCheckoutButton
                   planParam={planParam}
-                  label={current ? "Change plan in Shopify" : `Start ${planLabel(key)} in Shopify`}
+                  label={showingCurrent ? "Change plan in Shopify" : `Start ${planLabel(key)} in Shopify`}
                   className={`inline-flex w-full items-center justify-center disabled:opacity-60 ${
-                    current || featured ? "btn-primary" : "btn-secondary"
+                    showingCurrent || featured ? "btn-primary" : "btn-secondary"
                   }`}
                 />
               ) : (
