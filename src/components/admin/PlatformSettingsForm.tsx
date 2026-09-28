@@ -20,6 +20,7 @@ export function PlatformSettingsForm({
   planPricePro,
   planPriceCurrency,
   planTrialDays,
+  shopifyBillingTest,
   platformPrices,
   productFounder,
   googleTtsVoice,
@@ -67,6 +68,7 @@ export function PlatformSettingsForm({
   planPricePro: string;
   planPriceCurrency: string;
   planTrialDays: string;
+  shopifyBillingTest: boolean;
   platformPrices: {
     wix: { starter: string; business: string; pro: string; currency: string };
     webflow: { starter: string; business: string; pro: string; currency: string };
@@ -347,7 +349,9 @@ export function PlatformSettingsForm({
             </li>
             <li>
               Billing uses Shopify&apos;s native app subscriptions (not card checkout). Set Shopify package prices in
-              the pricing section. On development stores, charges run in test mode automatically until production.
+              the pricing section. Partner development stores always get <code className="text-amber-200">test: true</code>{" "}
+              charges (no card needed). On the production host, turn on <strong className="text-white">Shopify billing
+              test mode</strong> below if you need test charges on a real store without charging a card.
             </li>
             <li>Copy API key and API secret into the fields below, then save.</li>
             <li>
@@ -365,6 +369,17 @@ export function PlatformSettingsForm({
               <span className="text-white">Enable Shopify</span>
               <span className="mt-1 block text-xs text-navy-400">
                 Off by default. Does not change Wix or Webflow billing, embed, or installs.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="shopify_billing_test" defaultChecked={shopifyBillingTest} className="mt-1" />
+            <span>
+              <span className="text-white">Shopify billing test mode</span>
+              <span className="mt-1 block text-xs text-navy-400">
+                Forces <code className="text-amber-200">test: true</code> on every new app subscription. Use while
+                testing upgrades from a production app URL. Partner development stores already force test mode even
+                when this is off. Turn off before real merchant billing.
               </span>
             </span>
           </label>

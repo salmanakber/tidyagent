@@ -87,6 +87,7 @@ export async function getPlatformSettingsView() {
     planPricePro,
     planPriceCurrency,
     planTrialDays,
+    shopifyBillingTest: (await getSetting("shopify_billing_test", "")).trim().toLowerCase() === "true",
     platformPrices,
     productFounder,
     googleTtsVoice: googleTtsVoice || "en-US-Neural2-F",
@@ -153,6 +154,10 @@ export async function savePlatformSettings(_prev: { ok: boolean; error?: string 
     await savePlatformPriceGroup("WEBFLOW", formData);
     await savePlatformPriceGroup("SHOPIFY", formData);
     await setSetting("plan_trial_days", String(formData.get("plan_trial_days") ?? "7").trim() || "7");
+    await setSetting(
+      "shopify_billing_test",
+      formData.get("shopify_billing_test") === "on" ? "true" : "false",
+    );
     await setSetting("product_founder", String(formData.get("product_founder") ?? "").trim());
     const googleTts = String(formData.get("google_tts_api_key") ?? "").trim();
     const googleTtsVoice = String(formData.get("google_tts_voice") ?? "").trim();

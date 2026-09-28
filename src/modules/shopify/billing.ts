@@ -148,10 +148,45 @@ export async function getShopifyShopCredentials(siteId: string) {
   };
 }
 
-async function useTestCharges() {
-  const configured = await getSetting("shopify_billing_test", "");
-  if (configured === "true") return true;
-  if (configured === "false") return false;
+/** Partner development stores cannot accept live app charges — they need test: true. */
+async function shopIsPartnerDevelopment(shop: string, accessToken: string) {
+  try {
+    const data = await shopifyGraphql<{
+      shop?: { plan?: { partnerDevelopment?: boolean | null } | null } | null;
+    }>(
+      shop,
+      accessToken,
+      `#graphql
+      query ShopPlanForBillingTest {
+        shop {
+          plan {
+            partnerDevelopment
+          }
+        }
+      }
+    `,
+    );
+    return Boolean(data.shop?.plan?.partnerDevelopment);
+  } catch (error) {
+    console.warn("Could not read Shopify shop.plan.partnerDevelopment", error);
+    return false;
+  }
+}
+
+/**
+ * Whether appSubscriptionCreate should use test: true.
+ * Live charges on a Partner development store ask for a payment method and fail approval.
+ * Production hosts still force test mode when the shop is a partner development store.
+ */
+async function useTestCharges(shop: string, accessToken: string) {
+  const configured = (await getSetting("shopify_billing_test", "")).trim().toLowerCase();
+  if (configured === "true" || configured === "1" || configured === "on") return true;
+
+  const partnerDev = await shopIsPartnerDevelopment(shop, accessToken);
+  // Never bill a partner development store for real — Shopify will demand a card.
+  if (partnerDev) return true;
+
+  if (configured === "false" || configured === "0" || configured === "off") return false;
   return getEnv().NODE_ENV !== "production";
 }
 
@@ -183,7 +218,7 @@ export async function createShopifyBillingConfirmation(input: {
   const shop = creds.shop;
   const returnUrl = `${origin}/api/billing/shopify/callback?plan=${input.planKey}&siteId=${encodeURIComponent(input.siteId)}&shop=${encodeURIComponent(shop)}`;
   const name = `tidyAgent ${planLabel(input.planKey)}`;
-  const test = await useTestCharges();
+  const test = await useTestCharges(creds.shop, creds.accessToken);
 
   const data = await shopifyGraphql<{
     appSubscriptionCreate?: {

@@ -27,6 +27,7 @@ export default async function AdminSettingsPage() {
         planPricePro={settings.planPricePro}
         planPriceCurrency={settings.planPriceCurrency}
         planTrialDays={settings.planTrialDays}
+        shopifyBillingTest={settings.shopifyBillingTest}
         platformPrices={settings.platformPrices}
         productFounder={settings.productFounder}
         googleTtsVoice={settings.googleTtsVoice}
