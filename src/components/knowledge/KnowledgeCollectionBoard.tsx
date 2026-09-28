@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import {
   Bot,
+  Code2,
   FileCode2,
   FileSpreadsheet,
   Globe2,
@@ -47,6 +48,15 @@ const CATEGORY_META: { key: CollectionCategory; label: string; icon: typeof File
   { key: "artifacts", label: "Artifacts", icon: FileSpreadsheet },
   { key: "topics", label: "Topics", icon: Lightbulb },
   { key: "prompts", label: "Prompts", icon: MessagesSquare },
+];
+
+const FLY_PACKETS = [
+  { label: "pages", delay: "0s", y: "16%" },
+  { label: "CMS", delay: "0.4s", y: "36%" },
+  { label: "colors", delay: "0.8s", y: "26%" },
+  { label: "products", delay: "1.15s", y: "50%" },
+  { label: "SEO", delay: "1.5s", y: "42%" },
+  { label: "FAQs", delay: "1.85s", y: "60%" },
 ];
 
 function flowStatusFor(platform?: string | null) {
@@ -321,12 +331,12 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-navy-900/70 transition duration-300",
+        "relative overflow-hidden rounded-2xl border bg-navy-900/80 transition duration-300",
         lit ? "border-amber-500/30 amber-ring" : "border-white/10",
       )}
       style={{ animationDelay: `${delay}ms` } as CSSProperties}
     >
-      <div className="flex items-center gap-2.5 border-b border-white/8 px-3.5 py-3">
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-3.5 py-3">
         <span
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-xl",
@@ -339,7 +349,7 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
         <span
           className={cn(
             "flex h-6 min-w-6 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold tabular-nums",
-            card.count > 0 || card.filling ? "bg-amber-500 text-white" : "bg-white/8 text-navy-400",
+            card.count > 0 || card.filling ? "bg-amber-500 text-white" : "bg-white/10 text-navy-400",
           )}
         >
           {card.count}
@@ -349,8 +359,8 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
       <div className="min-h-[84px] px-3.5 py-3">
         {empty ? (
           <div className="space-y-2 pt-0.5">
-            <div className="h-6 w-[70%] rounded-lg bg-white/[0.04]" />
-            <div className="h-6 w-[48%] rounded-lg bg-white/[0.03]" />
+            <div className="h-6 w-[70%] rounded-lg bg-white/5" />
+            <div className="h-6 w-[48%] rounded-lg bg-white/[0.04]" />
           </div>
         ) : card.filling && card.chips.every((c) => !c) ? (
           <div className="space-y-2 pt-0.5">
@@ -418,25 +428,12 @@ function ScanStatusFlow({
       : "Source data";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-navy-900/60">
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-xl",
-              pending ? "bg-amber-500/15 text-amber-300" : done ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-navy-400",
-            )}
-          >
-            {done ? <Bot className="h-4 w-4" /> : <Globe2 className={cn("h-4 w-4", pending && "animate-pulse")} />}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">{host}</p>
-            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">{sourceLabel}</p>
-          </div>
-        </div>
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-navy-850/90 to-navy-950/90 shadow-card">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-400">Current status</p>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+            "rounded-full px-2.5 py-1 text-[11px] font-semibold",
             pending
               ? "bg-amber-500/15 text-amber-300"
               : done
@@ -448,12 +445,102 @@ function ScanStatusFlow({
         </span>
       </div>
 
-      <div className="space-y-3 px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="truncate text-sm text-navy-100">{statusText}</p>
-          <p className="shrink-0 font-display text-sm tabular-nums text-amber-300">{Math.round(progress)}%</p>
+      <div className="relative px-4 py-7 sm:px-6">
+        {/* Flight path */}
+        <div className="pointer-events-none absolute inset-x-[18%] top-[46%] hidden h-0 md:block" aria-hidden>
+          <svg className="h-8 w-full overflow-visible" viewBox="0 0 400 32" preserveAspectRatio="none">
+            <path
+              d="M0 16 C 120 16, 160 4, 200 16 S 280 28, 400 16"
+              fill="none"
+              stroke="rgba(201,100,66,0.4)"
+              strokeWidth="1.75"
+              strokeDasharray="6 8"
+              className={pending ? "animate-flow-dash" : undefined}
+            />
+          </svg>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+
+        {pending ? (
+          <div className="pointer-events-none absolute inset-x-[16%] top-[28%] bottom-[34%] hidden md:block" aria-hidden>
+            {FLY_PACKETS.map((packet) => (
+              <span
+                key={packet.label}
+                className="data-fly absolute left-0 rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100 shadow-glow"
+                style={{ top: packet.y, animationDelay: packet.delay }}
+              >
+                {packet.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="relative grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-3">
+          <div
+            className={cn(
+              "relative rounded-2xl border bg-navy-900/90 p-4 transition",
+              pending ? "border-sky-400/30 shadow-[0_0_32px_-12px_rgba(56,189,248,0.45)]" : "border-white/10",
+            )}
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
+                <Globe2 className={cn("h-4 w-4", pending && "animate-pulse")} />
+              </span>
+              {pending ? (
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  · Extracting…
+                </span>
+              ) : done ? (
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  · Synced
+                </span>
+              ) : null}
+            </div>
+            <p className="font-display text-lg text-white">{host}</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-navy-400">{sourceLabel}</p>
+          </div>
+
+          <div className="relative z-10 flex items-center justify-center gap-2 md:flex-col md:py-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-navy-900 px-2.5 py-1 text-[11px] text-navy-200">
+              <Code2 className="h-3 w-3 text-amber-400" />
+              {pending ? "streaming" : done ? "200 OK" : "idle"}
+            </span>
+            <span
+              className={cn(
+                "hidden h-9 w-9 items-center justify-center rounded-full border md:flex",
+                pending
+                  ? "border-amber-500/50 bg-amber-500/20 text-amber-200 animate-pulse-soft"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-300",
+              )}
+            >
+              <Code2 className="h-3.5 w-3.5" />
+            </span>
+          </div>
+
+          <div
+            className={cn(
+              "relative rounded-2xl border bg-gradient-to-br from-amber-500/10 to-navy-900/90 p-4 transition",
+              pending || done ? "border-amber-500/40 shadow-[0_0_40px_-14px_rgba(201,100,66,0.55)]" : "border-amber-500/25",
+            )}
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+                <Bot className={cn("h-4 w-4", pending && "animate-pulse")} />
+              </span>
+              <span className={cn("text-amber-400/80", pending && "animate-pulse-soft")}>✦</span>
+            </div>
+            <p className="font-display text-lg text-white">tidyAgent</p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-300/80">AI context</p>
+            {pending ? <p className="mt-2 text-[11px] text-amber-100/80">Receiving site intelligence…</p> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 px-4 py-4 sm:px-5">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="truncate text-sm text-navy-100">{statusText}</p>
+          <p className="shrink-0 font-display text-sm text-amber-300">{Math.round(progress)}%</p>
+        </div>
+        <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
           <div
             className={cn("h-full rounded-full bg-amber-500 transition-[width] duration-700 ease-out", pending && "shadow-glow")}
             style={{ width: `${progress}%` }}

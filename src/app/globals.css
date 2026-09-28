@@ -147,6 +147,8 @@ html.theme-light .bg-gradient-to-b.from-navy-850\/90 {
 }
 
 html.theme-light .bg-navy-850\/90,
+html.theme-light .bg-navy-900\/60,
+html.theme-light .bg-navy-900\/70,
 html.theme-light .bg-navy-900\/80,
 html.theme-light .bg-navy-900\/90,
 html.theme-light .to-navy-900\/90 {
@@ -210,8 +212,11 @@ html.theme-light .text-emerald-300 {
   color: #047857 !important;
 }
 
+html.theme-light .collection-board .bg-navy-900\/60,
+html.theme-light .collection-board .bg-navy-900\/70,
 html.theme-light .collection-board .bg-navy-900\/80,
 html.theme-light .collection-board .bg-navy-900\/90,
+html.theme-light .collection-board .bg-navy-900,
 html.theme-light .collection-board .to-navy-900\/90,
 html.theme-light .collection-board .from-navy-850\/90,
 html.theme-light .collection-board .to-navy-950\/90 {
@@ -222,6 +227,20 @@ html.theme-light .collection-board .to-navy-950\/90 {
 html.theme-light .collection-board .border-white\/10,
 html.theme-light .collection-board .border-white\/8 {
   border-color: rgba(26, 22, 19, 0.1) !important;
+}
+
+html.theme-light .collection-board .text-white {
+  color: #1a1613 !important;
+}
+
+html.theme-light .collection-board .text-navy-100,
+html.theme-light .collection-board .text-navy-200 {
+  color: #3d342e !important;
+}
+
+html.theme-light .collection-board .text-navy-300,
+html.theme-light .collection-board .text-navy-400 {
+  color: #6b5e55 !important;
 }
 
 html.theme-light .collection-board .bg-white\/5,
@@ -240,6 +259,11 @@ html.theme-light .collection-board .bg-navy-950\/50 {
 
 html.theme-light .collection-board .border-dashed {
   border-color: rgba(26, 22, 19, 0.12) !important;
+}
+
+html.theme-light .collection-board .from-amber-500\/10 {
+  --tw-gradient-from: rgba(201, 100, 66, 0.08) !important;
+  --tw-gradient-to: #ffffff !important;
 }
 
 .logo-mark-light {
