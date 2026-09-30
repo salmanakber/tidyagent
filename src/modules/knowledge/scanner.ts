@@ -244,10 +244,12 @@ export async function scanOrganizationSite(input: {
   if (!pages.length && !products.length) {
     warnings.push(
       shopifySite
-        ? "No store profile, pages, or products could be read yet. Reopen tidyAgent from Shopify Admin (so the token refreshes), confirm the store has published content, then scan again."
+        ? "No store profile, pages, or products could be read yet. Reopen tidyAgent from Shopify Admin, confirm the store has published content, then scan again."
         : wixSite
           ? "No site, CMS, or catalog data could be read yet. Publish the Wix site and confirm app permissions."
-          : `No public pages or catalog data could be read yet. Publish the ${marketplace} site and try again.`,
+          : webflowSite
+            ? "No Webflow pages or CMS items could be read yet. Publish the site in Webflow, reopen tidyAgent, then scan again."
+            : `No public pages or catalog data could be read yet. Publish the ${marketplace} site and try again.`,
     );
     return emptyResult(scope, resolvedHome.includes("://site") ? null : resolvedHome, stages, skipped, warnings);
   }

@@ -167,7 +167,7 @@ export function OnboardingWizard({
         {step === 2 && (
           <Step
             title="Collect site knowledge"
-            body={webflow ? "Read your Webflow site through Data APIs." : "Scan the live site for pages, policies, and catalog."}
+            body={webflow ? "Teach the AI from your Webflow site pages, CMS, and products." : "Scan the live site for pages, policies, and catalog."}
           >
             <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />
           </Step>
@@ -189,7 +189,7 @@ export function OnboardingWizard({
                 <p className="text-sm leading-6 text-navy-200">{understanding.summary}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {capabilities.map((capability) => (
-                    <div key={capability.key} className="flex items-center justify-between bg-navy-950/40 px-4 py-3 text-sm">
+                    <div key={capability.key} className="flex items-center justify-between rounded-2xl border border-white/5 bg-navy-950/40 px-4 py-3 text-sm">
                       <span>{capability.label}</span>
                       <span className={capability.available ? "text-emerald-300" : "text-navy-400"}>
                         {capability.available ? "Available" : "Not found"}
@@ -399,9 +399,9 @@ function Step({ title, body, children }: { title: string; body: string; children
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-navy-950/40 p-4">
+    <div className="rounded-2xl border border-white/5 bg-navy-950/40 p-4">
       <p className="text-[11px] uppercase tracking-[0.16em] text-navy-400">{label}</p>
-      <p className="mt-1 text-sm text-white">{value}</p>
+      <p className="mt-1 truncate text-sm text-white">{value}</p>
     </div>
   );
 }

@@ -57,14 +57,14 @@ export default async function SettingsPage() {
               : isShopifyPlatform(session.platform)
                 ? "Clears this browser session. Reopen tidyAgent from Shopify Admin to authenticate again."
                 : isWebflowPlatform(session.platform)
-                  ? "Removes tidyAgent’s Webflow Custom Code via the API (other scripts stay), clears this session, then asks you to Publish the site so the live bubble disappears."
+                  ? "Removes the chat widget from Webflow, signs you out here, then asks you to Publish so the live bubble disappears."
                   : `Clears this browser session for this ${name} site.`}
           </p>
         </div>
         <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">Subscription (server-side)</h2>
+          <h2 className="font-display text-xl text-white">Your plan</h2>
           <p className="mt-2 text-sm text-navy-300">
-            Frontend plan badges are never trusted. Entitlements are enforced on the backend.
+            Limits below are what this workspace can use right now.
           </p>
           <dl className="mt-5 space-y-3 text-sm">
             <Row label="Plan" value={planLabel(data.entitlements.planKey)} />

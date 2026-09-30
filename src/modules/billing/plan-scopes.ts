@@ -93,7 +93,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: false,
     includeDomainCrawl: true,
-    depthNote: "Limited read of the live site — enough to try the widget. Upgrade for full crawl depth.",
+    depthNote: "A focused read of your site — enough to try the widget. Upgrade for fuller coverage.",
   },
   STARTER: {
     maxPages: 200,
@@ -106,7 +106,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: false,
     includeDomainCrawl: true,
-    depthNote: "Reads every public page we can find (sitemap and on-site links), plus Wix site profile, CMS, and the ecommerce catalog.",
+    depthNote: "Reads your site profile, pages, CMS, and ecommerce catalog so answers match real content.",
   },
   GROWTH: {
     maxPages: 500,
@@ -119,7 +119,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: true,
     includeDomainCrawl: true,
-    depthNote: "Full website crawl, CMS, the complete Wix Stores product list, and bookings data.",
+    depthNote: "Deeper site coverage — pages, CMS, full store catalog, and bookings when available.",
   },
   PRO: {
     maxPages: 1000,
@@ -132,7 +132,7 @@ const DEFAULT_SCAN: Record<PlanKey, PlanScanScope> = {
     includeStores: true,
     includeBookings: true,
     includeDomainCrawl: true,
-    depthNote: "Full-domain crawl plus Wix APIs: every store product, CMS, and bookings this site exposes.",
+    depthNote: "Maximum coverage — site profile, pages, CMS, store catalog, and bookings this site exposes.",
   },
 };
 
@@ -240,11 +240,11 @@ export function bulletsForPlanScope(planKey: PlanKey, scope: PlanScopeConfig): s
     return [
       "1 general agent",
       "Classic chat widget",
-      "Limited Wix site profile and pages",
+      "Site profile and sample pages",
       scope.scan.includeStores ? "Sample of the store catalog" : "Upgrade for store catalog",
       `${scope.conversationLimit.toLocaleString()} conversations / month`,
       `${scope.knowledgeLimit.toLocaleString()} knowledge pages`,
-      "Upgrade anytime for full crawl depth",
+      "Upgrade anytime for fuller coverage",
     ];
   }
 
@@ -256,7 +256,7 @@ export function bulletsForPlanScope(planKey: PlanKey, scope: PlanScopeConfig): s
   );
   bullets.push(scope.allTemplates ? "All four widget looks (Classic, Atelier, Dock, Noir)" : "Classic chat widget");
 
-  const knowledge: string[] = ["Wix site profile and pages"];
+  const knowledge: string[] = ["Site profile and pages"];
   if (scope.scan.includeCms) knowledge.push("CMS");
   if (scope.scan.includeStores) knowledge.push("store catalog");
   if (scope.scan.includeBookings) knowledge.push("bookings");

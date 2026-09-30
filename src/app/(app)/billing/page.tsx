@@ -105,28 +105,26 @@ export default async function BillingPage({
       {params.error || params.checkout === "success" || e.grantedByAdmin || e.status === "TRIALING" || e.cancelAtPeriodEnd || e.billingIssue || (webflow && !e.isPaidSeat && !cardReady && !needsPlanPick) ? (
         <div className="space-y-3">
           {shopify && params.error === "checkout" ? (
-            <Alert tone="rose">Could not start Shopify billing. Confirm plan prices in Admin → Settings.</Alert>
+            <Alert tone="rose">Could not start billing. Please try again in a moment.</Alert>
           ) : null}
           {shopify && params.error === "app_pricing" ? (
-            <Alert tone="rose">
-              Shopify App Pricing is blocking charges. Switch this app to Manual pricing in Partner Dashboard.
-            </Alert>
+            <Alert tone="rose">Billing setup needs a quick update from the app publisher. Try again shortly.</Alert>
           ) : null}
           {shopify && params.error === "plan" ? (
             <Alert tone="rose">That plan is not available. Choose Starter, Business, or Pro.</Alert>
           ) : null}
           {shopify && params.checkout === "success" ? (
-            <Alert tone="emerald">Shopify subscription updated.</Alert>
+            <Alert tone="emerald">Subscription updated.</Alert>
           ) : null}
           {e.grantedByAdmin ? (
-            <Alert tone="amber">Complimentary paid access from the platform owner.</Alert>
+            <Alert tone="amber">Complimentary paid access is active on this workspace.</Alert>
           ) : null}
           {e.status === "TRIALING" && !e.grantedByAdmin ? (
             <Alert tone="amber">
               {wix
-                ? "Trial active — Wix charges when it ends."
+                ? "Trial active — billing starts when it ends."
                 : shopify
-                  ? "Trial active — Shopify charges when it ends."
+                  ? "Trial active — billing starts when it ends unless you cancel."
                   : "Trial active — you’ll be charged when it ends unless you cancel."}
             </Alert>
           ) : null}
@@ -136,14 +134,12 @@ export default async function BillingPage({
           {e.billingIssue ? (
             <Alert tone="amber">
               {shopify
-                ? "Payment issue on this Shopify subscription. Update billing in Shopify Admin."
-                : "Payment issue on this plan. Update your card in Manage billing."}
+                ? "There’s a payment issue on this subscription. Update billing in Shopify."
+                : "There’s a payment issue on this plan. Update your card in Manage billing."}
             </Alert>
           ) : null}
           {webflow && !e.isPaidSeat && !cardReady && !needsPlanPick ? (
-            <Alert tone="neutral">
-              Card checkout isn’t configured yet. Free still works; paid upgrades need Admin → Settings keys.
-            </Alert>
+            <Alert tone="neutral">Paid upgrades aren’t available yet. You can continue on Free.</Alert>
           ) : null}
         </div>
       ) : null}

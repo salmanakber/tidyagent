@@ -132,7 +132,7 @@ function ScanSummary({
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {result.counts.pages > 0 ? (
-          <Stat label={apiOnly ? "Pages from APIs" : "Pages crawled"} value={result.counts.pages} />
+          <Stat label={apiOnly ? "Pages learned" : "Pages crawled"} value={result.counts.pages} />
         ) : null}
         {result.counts.products > 0 ? <Stat label={productLabel} value={result.counts.products} /> : null}
         {leftover > 0 ? <Stat label="Found, not yet read" value={leftover} /> : null}

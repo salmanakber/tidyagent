@@ -100,7 +100,7 @@ export function KnowledgeIntelligence({
           ) : (
             <p className="text-sm text-navy-400">
               {apiOnly
-                ? "Run a store update to extract facts from your site."
+                ? "Run Teach AI to extract facts from your site."
                 : "Run the scanner to extract facts from the live website."}
             </p>
           )}
@@ -193,7 +193,7 @@ function FilterChip({
 function statusLabel(status: IndexedPage["status"], apiOnly?: boolean) {
   if (status === "crawled") return apiOnly ? "Loaded" : "Crawled";
   if (status === "failed") return "Could not read";
-  return apiOnly ? "Found, not loaded yet" : "Found, not crawled yet";
+  return apiOnly ? "Found, waiting for next scan" : "Found, not crawled yet";
 }
 
 function originLabel(origin: string, contentType: string, platform?: string | null) {

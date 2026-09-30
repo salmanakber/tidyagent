@@ -64,8 +64,8 @@ const FLY_PACKETS = [
 function flowStatusFor(platform?: string | null) {
   if (isWebflowPlatform(platform)) {
     return [
-      "Connecting to Webflow Data APIs…",
-      "Reading page metadata & SEO…",
+      "Connecting to your Webflow site…",
+      "Reading page titles & SEO…",
       "Loading CMS collections…",
       "Loading ecommerce catalog…",
       "Building AI context…",
@@ -73,7 +73,7 @@ function flowStatusFor(platform?: string | null) {
   }
   if (isShopifyPlatform(platform)) {
     return [
-      "Connecting to Shopify Admin…",
+      "Connecting to your Shopify store…",
       "Reading pages & policies…",
       "Loading product catalog…",
       "Indexing images & variants…",
@@ -444,9 +444,9 @@ function ScanStatusFlow({
   }
 
   const sourceLabel = isWebflowPlatform(platform)
-    ? "Webflow APIs"
+    ? "Webflow site"
     : isShopifyPlatform(platform)
-      ? "Shopify Admin"
+      ? "Shopify store"
       : "Source data";
 
   return (

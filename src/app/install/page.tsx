@@ -50,7 +50,7 @@ export default async function InstallIndexPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Webflow</p>
             <p className="mt-3 font-display text-2xl text-white">Webflow install guide</p>
             <p className="mt-2 text-sm leading-6 text-navy-300">
-              Marketplace Data Client, OAuth scopes, Custom Code widget, Data APIs only.
+              Install from the Webflow Marketplace, approve permissions, then teach the AI from your site.
             </p>
             <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Webflow guide →</span>
           </Link>
@@ -61,7 +61,7 @@ export default async function InstallIndexPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Shopify</p>
             <p className="mt-3 font-display text-2xl text-white">Shopify install guide</p>
             <p className="mt-2 text-sm leading-6 text-navy-300">
-              App Store install, Admin API scopes, script tag widget, Shopify Billing.
+              Install from the Shopify App Store, open tidyAgent from Admin, then teach the AI from your store.
             </p>
             <span className={`mt-4 inline-block text-sm ${legalLinkClass}`}>Open Shopify permissions →</span>
             <span className="mt-2 block text-xs text-navy-400">

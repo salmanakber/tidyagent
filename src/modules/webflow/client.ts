@@ -74,9 +74,29 @@ export async function webflowGet<T>(accessToken: string, path: string): Promise<
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
+    cache: "no-store",
   });
   if (!response.ok) {
-    throw new WebflowApiError(`Webflow GET ${path} failed (${response.status})`, response.status);
+    const text = await response.text().catch(() => "");
+    let detail = "";
+    try {
+      const body = JSON.parse(text) as {
+        message?: string;
+        msg?: string;
+        error?: string;
+        code?: string;
+        err?: string;
+      };
+      detail = body.message || body.msg || body.error || body.err || body.code || "";
+    } catch {
+      detail = text.slice(0, 160);
+    }
+    throw new WebflowApiError(
+      detail
+        ? `Webflow GET ${path} failed (${response.status}): ${detail}`
+        : `Webflow GET ${path} failed (${response.status})`,
+      response.status,
+    );
   }
   return (await response.json()) as T;
 }

@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
-import { WEBFLOW_SCOPE_STRING } from "@/modules/webflow/scopes";
 
 const MESSAGES: Record<string, { title: string; body: string }> = {
   disabled: {
-    title: "Webflow is turned off",
-    body: "Enable Webflow in Admin → Settings, then click Install again in Webflow.",
+    title: "Webflow installs are paused",
+    body: "tidyAgent isn’t accepting new Webflow installs right now. Please try again later.",
   },
   not_configured: {
-    title: "Webflow credentials are missing",
-    body: "Save the Webflow client ID and secret in Admin → Settings, then install the app again.",
+    title: "Webflow install isn’t ready",
+    body: "tidyAgent isn’t ready for Webflow installs yet. Please try again later.",
   },
   denied: {
     title: "Install was cancelled",
@@ -20,16 +19,16 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
     body: "You (or Webflow) did not grant access. Click Connect Webflow again and approve every permission on the consent screen.",
   },
   invalid_scope: {
-    title: "Permissions do not match the App",
-    body: `The install URL asked for scopes that are not enabled on this Webflow App. In the Webflow App dashboard, enable exactly these Data Client scopes (and no extras): ${WEBFLOW_SCOPE_STRING}. Then try Connect again.`,
+    title: "Permissions do not match",
+    body: "Webflow didn’t grant the permissions tidyAgent needs. Reinstall from the Webflow Marketplace and approve every permission on the consent screen.",
   },
   invalid_request: {
     title: "Webflow rejected the install request",
-    body: "Check that the App’s redirect URI is exactly https://agent.tidyflowapp.com/api/webflow/oauth/callback and that the client ID in Admin → Settings matches this App.",
+    body: "Something went wrong starting install. Open tidyAgent from the Webflow Marketplace again.",
   },
   unauthorized_client: {
-    title: "Webflow client is not authorized",
-    body: "The client ID / secret in Admin → Settings may be wrong for this App, or the App is not published/available for install. Update credentials and try again.",
+    title: "Webflow could not authorize this app",
+    body: "Reinstall tidyAgent from the Webflow Marketplace. If it keeps failing, contact support.",
   },
   oauth_server: {
     title: "Webflow had a temporary error",
@@ -49,7 +48,7 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
   },
   api: {
     title: "Webflow connected, but we could not load the site",
-    body: "The login token arrived, then Webflow did not return the site list. Click Connect Webflow again.",
+    body: "The login finished, then Webflow did not return the site list. Click Connect Webflow again.",
   },
   token: {
     title: "Could not finish Webflow login",
@@ -80,17 +79,9 @@ export default async function WebflowMissingPage({
             {params.detail}
           </p>
         ) : null}
-        <div className="mt-6 grid gap-3">
-          <a href="/webflow/install?popup=1" className="btn-primary" target="_blank" rel="noopener">
-            Connect Webflow again
-          </a>
-          <Link href="/install/webflow" className="btn-secondary">
-            Install &amp; permissions guide
-          </Link>
-          <Link href="/login" className="btn-secondary">
-            Sign in with email
-          </Link>
-        </div>
+        <Link href="/webflow" className="btn-primary mt-6 inline-flex">
+          Connect Webflow
+        </Link>
       </div>
     </div>
   );

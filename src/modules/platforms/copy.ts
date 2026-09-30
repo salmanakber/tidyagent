@@ -81,7 +81,7 @@ export function wizardCopyForPlatform(platform?: string | null) {
         `We teach your AI employee from this ${name} site — including pages and your ecommerce products on paid plans. Custom notes you add sit above that and are never overwritten.`,
       scanButton: "Read and understand this website",
       scanPending: "Reading website…",
-      scanLiveNote: "This reads the live site. It is not a canned demo.",
+      scanLiveNote: "This reads the live site so answers match real content.",
       hideDomainCrawlToggle: false,
     };
   }
@@ -113,25 +113,24 @@ export function wizardCopyForPlatform(platform?: string | null) {
   const name = platformLabel(platform);
   return {
     connected: (siteName: string, planLabel: string) =>
-      `${siteName} is connected through ${name}. Next, teach your AI employee this site — scoped to ${planLabel} — so answers match your real page metadata, CMS, and products.`,
+      `${siteName} is connected through ${name}. Next, teach your AI employee this site — scoped to ${planLabel} — so answers match your real pages, CMS, and products.`,
     autoInstall: "Adds the widget site-wide. Publish the site so visitors can see it.",
     manualInstall: "We'll still add site-wide code. Choose this only if you will place the snippet yourself.",
     scanStages: [
       "Confirming your Webflow site",
-      "Reading page metadata and CMS",
+      "Reading pages and CMS",
       "Loading products & ecommerce",
       "Writing a business understanding",
     ],
     noUrl: "No public URL yet — publish the Webflow site, then scan.",
-    crawlHint:
-      "We load site profile, page metadata (title, SEO description, path), CMS items, and ecommerce from Webflow Data APIs — not page DOM content and not a domain crawl.",
+    crawlHint: "We teach the AI from your Webflow site profile, page titles, CMS, and products.",
     storeHint: "from your ecommerce catalog",
     factsHint: "Contact details and business facts from CMS items, products, and owner notes.",
     knowledgeDescription: (nameLabel: string) =>
-      `We teach your AI employee from this ${nameLabel} site — page metadata, CMS, and ecommerce products on paid plans. Full static page body text is not loaded. Custom notes you add sit above that and are never overwritten.`,
+      `We teach your AI employee from this ${nameLabel} site — pages, CMS, and products. Notes you add stay on top and are never overwritten.`,
     scanButton: "Teach AI from this site",
     scanPending: "Learning your site…",
-    scanLiveNote: "This reads Webflow Data APIs (page metadata, CMS, products). It does not scrape your live HTML.",
+    scanLiveNote: "Reading your Webflow site so answers match real content…",
     hideDomainCrawlToggle: true,
   };
 }

@@ -189,18 +189,9 @@ body {
   box-shadow: 0 0 18px -2px rgba(201, 100, 66, 0.55);
 }
 
-/* Onboarding wizard: square surfaces (no pill / card radius) */
-.wizard-scope .rounded-full,
-.wizard-scope .rounded-xl,
-.wizard-scope .rounded-2xl,
-.wizard-scope .rounded-3xl,
-.wizard-scope .rounded-\[28px\],
-.wizard-scope .rounded-\[32px\],
-.wizard-scope .panel,
-.wizard-scope .field,
-.wizard-scope .btn-primary,
-.wizard-scope .btn-secondary {
-  border-radius: 0 !important;
+/* Onboarding wizard: keep soft rounded surfaces (match workspace) */
+.wizard-scope .panel {
+  border-radius: 1.5rem !important;
 }
 
 /* Light theme: collection board + scan status stay readable */
@@ -364,7 +355,11 @@ html.theme-light .workspace-hero {
     radial-gradient(ellipse 70% 55% at 100% -10%, rgba(201, 100, 66, 0.14), transparent 55%),
     radial-gradient(ellipse 45% 40% at 0% 100%, rgba(26, 22, 19, 0.04), transparent 50%) !important;
   border-color: rgba(26, 22, 19, 0.1) !important;
-  box-shadow: 0 14px 40px -28px rgba(26, 22, 19, 0.2);
+  box-shadow: 0 18px 48px -28px rgba(26, 22, 19, 0.22);
+}
+
+.workspace-hero {
+  border-radius: 1.75rem;
 }
 
 html.theme-light .workspace-hero .bg-navy-950\/40,

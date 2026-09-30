@@ -115,15 +115,16 @@ export default async function KnowledgePage() {
 
   return (
     <div className="space-y-7">
-      <div className="workspace-hero relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 sm:p-7">
+      <div className="workspace-hero relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 sm:p-7 shadow-card">
         <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-amber-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl" />
         <PageHeader
           eyebrow={`${platformLabel(session.platform)} knowledge`}
           title="What your AI employee knows"
           description={copy.knowledgeDescription(platformLabel(session.platform))}
         />
         {data.profile?.summary ? (
-          <p className="mt-5 max-w-3xl border border-white/10 bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">
+          <p className="mt-5 max-w-3xl rounded-2xl border border-white/10 bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">
             {data.profile.summary}
           </p>
         ) : null}

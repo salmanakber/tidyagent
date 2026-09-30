@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/security/settings";
 import { firstImageUrl } from "@/modules/knowledge/media";
-import { webflowGet } from "@/modules/webflow/client";
+import { WebflowApiError, webflowGet } from "@/modules/webflow/client";
 import { sitePublicUrl, coerceWebflowPublicUrl, type WebflowSiteRecord } from "@/modules/webflow/sites";
 import { isWebflowPlatform } from "@/modules/platforms/types";
 import type { ScanScope } from "@/modules/knowledge/scan-scope";
@@ -27,7 +27,6 @@ export type PlatformApiHarvest = {
   displayName?: string | null;
   currency?: string | null;
   locale?: string | null;
-  /** Optional brand signals (hex colors, image URLs, short phrases). */
   brand?: {
     colors?: string[];
     images?: string[];
@@ -56,6 +55,56 @@ function fieldText(value: unknown): string {
   return "";
 }
 
+function merchantWebflowError(error: unknown, fallback: string) {
+  if (error instanceof WebflowApiError) {
+    if (error.status === 401 || error.status === 403) {
+      return "Webflow access expired or is missing a required permission. Reinstall tidyAgent from Webflow and try again.";
+    }
+    if (error.status === 404) {
+      return "This Webflow site could not be found with the current connection. Reinstall tidyAgent and pick the site again.";
+    }
+    if (error.status === 429) {
+      return "Webflow is rate-limiting requests right now. Wait a minute and scan again.";
+    }
+  }
+  return fallback;
+}
+
+/** Never surface raw API paths/status codes to merchants. */
+function merchantStageDetail(error: unknown, fallback: string) {
+  return merchantWebflowError(error, fallback);
+}
+
+function asSiteList(payload: unknown): WebflowSiteRecord[] {
+  if (Array.isArray(payload)) return payload as WebflowSiteRecord[];
+  const row = asRecord(payload);
+  if (Array.isArray(row.sites)) return row.sites as WebflowSiteRecord[];
+  return [];
+}
+
+function asPageList(payload: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(payload)) return payload as Array<Record<string, unknown>>;
+  const row = asRecord(payload);
+  if (Array.isArray(row.pages)) return row.pages as Array<Record<string, unknown>>;
+  return [];
+}
+
+function asCollectionList(payload: unknown): Array<{ id?: string; displayName?: string; slug?: string }> {
+  if (Array.isArray(payload)) return payload as Array<{ id?: string; displayName?: string; slug?: string }>;
+  const row = asRecord(payload);
+  if (Array.isArray(row.collections)) {
+    return row.collections as Array<{ id?: string; displayName?: string; slug?: string }>;
+  }
+  return [];
+}
+
+function asItemList(payload: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(payload)) return payload as Array<Record<string, unknown>>;
+  const row = asRecord(payload);
+  if (Array.isArray(row.items)) return row.items as Array<Record<string, unknown>>;
+  return [];
+}
+
 async function getWebflowCreds(siteId: string) {
   const site = await prisma.wixSite.findUnique({
     where: { id: siteId },
@@ -68,10 +117,55 @@ async function getWebflowCreds(siteId: string) {
   return { site, webflowSiteId: site.webflowSiteId, accessToken };
 }
 
+/** If stored site id is stale, re-pick from the token’s authorized sites and persist. */
+async function resolveLiveWebflowSiteId(input: {
+  siteRowId: string;
+  preferredId: string;
+  accessToken: string;
+}) {
+  try {
+    await webflowGet<WebflowSiteRecord>(input.accessToken, `/v2/sites/${input.preferredId}`);
+    return input.preferredId;
+  } catch (error) {
+    if (!(error instanceof WebflowApiError) || (error.status !== 404 && error.status !== 403)) {
+      throw error;
+    }
+  }
+
+  const listed = await webflowGet<unknown>(input.accessToken, "/v2/sites");
+  const sites = asSiteList(listed);
+  const match =
+    sites.find((row) => row.id === input.preferredId) ||
+    sites.find((row) => (row.customDomains?.length ?? 0) > 0) ||
+    sites[0];
+  if (!match?.id) throw new WebflowApiError("No Webflow sites available for this connection", 404);
+
+  if (match.id !== input.preferredId) {
+    await prisma.wixSite.update({
+      where: { id: input.siteRowId },
+      data: {
+        webflowSiteId: match.id,
+        displayName: match.displayName || match.shortName || undefined,
+        url: sitePublicUrl(match) ?? undefined,
+      },
+    });
+  }
+  return match.id;
+}
+
+function pageTitle(page: Record<string, unknown>) {
+  const seo = asRecord(page.seo);
+  return String(page.title || seo.title || page.slug || "Page");
+}
+
+function pageDescription(page: Record<string, unknown>) {
+  const seo = asRecord(page.seo);
+  return String(seo.description || page.seoDescription || page.description || "");
+}
+
 /**
  * Native Webflow Data API harvest (site, page metadata, CMS, ecommerce).
  * Does not call GET /v2/pages/{page_id}/dom (Get Page Content).
- * Domain crawl is never used for Webflow (Marketplace Data access rules).
  */
 export async function harvestWebflowApis(input: {
   siteId: string;
@@ -90,13 +184,30 @@ export async function harvestWebflowApis(input: {
 
   const creds = await getWebflowCreds(input.siteId);
   if (!creds) {
-    warnings.push("Webflow API token missing. Reconnect the app from Webflow to refresh Data API access.");
+    warnings.push("Webflow isn’t connected yet. Open tidyAgent from Webflow and authorize the site, then scan again.");
+    return { pages, products, stages, skipped, warnings };
+  }
+
+  let webflowSiteId = creds.webflowSiteId;
+  try {
+    webflowSiteId = await resolveLiveWebflowSiteId({
+      siteRowId: creds.site.id,
+      preferredId: creds.webflowSiteId,
+      accessToken: creds.accessToken,
+    });
+  } catch (error) {
+    warnings.push(
+      merchantWebflowError(
+        error,
+        "Could not reach your Webflow site. Reinstall tidyAgent from Webflow and try again.",
+      ),
+    );
     return { pages, products, stages, skipped, warnings };
   }
 
   if (input.scope.includeSiteProperties) {
     try {
-      const site = await webflowGet<WebflowSiteRecord>(creds.accessToken, `/v2/sites/${creds.webflowSiteId}`);
+      const site = await webflowGet<WebflowSiteRecord>(creds.accessToken, `/v2/sites/${webflowSiteId}`);
       displayName = site.displayName || site.shortName || null;
       siteUrl = sitePublicUrl(site) || coerceWebflowPublicUrl(input.siteUrl) || siteUrl;
       const text = [
@@ -124,34 +235,36 @@ export async function harvestWebflowApis(input: {
         key: "webflow-site",
         label: "Read Webflow site profile",
         status: "done",
-        detail: displayName || siteUrl || creds.webflowSiteId,
+        detail: displayName || siteUrl || webflowSiteId,
       });
     } catch (error) {
       stages.push({
         key: "webflow-site",
         label: "Read Webflow site profile",
         status: "failed",
-        detail: error instanceof Error ? error.message : "Site profile unavailable",
+        detail: merchantStageDetail(error, "Site profile unavailable — reinstall tidyAgent and try again"),
       });
-      warnings.push("Webflow site profile could not be read. Check sites:read permission and reconnect if needed.");
+      warnings.push(
+        merchantWebflowError(error, "We couldn’t read the Webflow site profile. Reinstall tidyAgent and try again."),
+      );
     }
   }
 
   if (input.scope.includeCms) {
     try {
-      const listed = await webflowGet<{ pages?: Array<Record<string, unknown>> }>(
+      const listed = await webflowGet<unknown>(
         creds.accessToken,
-        `/v2/sites/${creds.webflowSiteId}/pages`,
+        `/v2/sites/${webflowSiteId}/pages?limit=100`,
       );
-      const apiPages = listed.pages ?? [];
+      const apiPages = asPageList(listed);
       for (const page of apiPages.slice(0, input.scope.maxPages)) {
-        const title = String(page.title || page.seoTitle || page.slug || "Page");
+        const title = pageTitle(page);
         const slug = String(page.slug || page.id || "");
         const publishedPath = String(page.publishedPath || (slug ? `/${slug}` : ""));
         const url = siteUrl
           ? `${siteUrl.replace(/\/$/, "")}${publishedPath.startsWith("/") ? publishedPath : `/${publishedPath}`}`
           : `webflow://page/${page.id}`;
-        const seoDesc = String(page.seoDescription || page.description || "");
+        const seoDesc = pageDescription(page);
         const body = [title, seoDesc, publishedPath].filter(Boolean).join("\n\n");
         if (body.length < 8) continue;
         pages.push({
@@ -170,36 +283,50 @@ export async function harvestWebflowApis(input: {
       }
       stages.push({
         key: "webflow-pages",
-        label: "Read Webflow page metadata",
+        label: "Read Webflow page titles",
         status: apiPages.length ? "done" : "skipped",
         detail: apiPages.length
-          ? `${Math.min(apiPages.length, input.scope.maxPages)} pages (title, SEO description, published path only)`
-          : "No pages listed",
+          ? `${Math.min(apiPages.length, input.scope.maxPages)} pages`
+          : "No pages listed yet — publish the site in Webflow",
       });
     } catch (error) {
       stages.push({
         key: "webflow-pages",
-        label: "Read Webflow page metadata",
+        label: "Read Webflow page titles",
         status: "failed",
-        detail: error instanceof Error ? error.message : "Pages unavailable",
+        detail: merchantStageDetail(error, "Pages unavailable — reinstall tidyAgent and try again"),
       });
-      warnings.push("Webflow pages list API could not be read (page metadata only; page DOM content is not requested).");
+      warnings.push(
+        merchantWebflowError(error, "We couldn’t read page titles and paths from Webflow. Reinstall tidyAgent and try again."),
+      );
     }
 
     try {
-      const collections = await webflowGet<{ collections?: Array<{ id?: string; displayName?: string; slug?: string }> }>(
+      const collections = await webflowGet<unknown>(
         creds.accessToken,
-        `/v2/sites/${creds.webflowSiteId}/collections`,
+        `/v2/sites/${webflowSiteId}/collections`,
       );
-      const list = (collections.collections ?? []).slice(0, input.scope.maxCmsCollections);
+      const list = asCollectionList(collections).slice(0, input.scope.maxCmsCollections);
       let itemCount = 0;
       for (const collection of list) {
         if (!collection.id) continue;
-        const items = await webflowGet<{ items?: Array<Record<string, unknown>> }>(
+        // Prefer published/live items; fall back to draft items if live is empty/unavailable.
+        const liveItems = await webflowGet<unknown>(
           creds.accessToken,
-          `/v2/collections/${collection.id}/items`,
-        ).catch(() => ({ items: [] as Array<Record<string, unknown>> }));
-        for (const item of (items.items ?? []).slice(0, input.scope.maxCmsItemsPerCollection)) {
+          `/v2/collections/${collection.id}/items/live?limit=${Math.min(100, input.scope.maxCmsItemsPerCollection)}`,
+        )
+          .then(asItemList)
+          .catch(() => [] as Array<Record<string, unknown>>);
+        const draftItems =
+          liveItems.length > 0
+            ? liveItems
+            : await webflowGet<unknown>(
+                creds.accessToken,
+                `/v2/collections/${collection.id}/items?limit=${Math.min(100, input.scope.maxCmsItemsPerCollection)}`,
+              )
+                .then(asItemList)
+                .catch(() => [] as Array<Record<string, unknown>>);
+        for (const item of draftItems.slice(0, input.scope.maxCmsItemsPerCollection)) {
           const fieldData = asRecord(item.fieldData);
           const name = String(fieldData.name || fieldData.title || item.id || "CMS item");
           const slug = String(fieldData.slug || "");
@@ -208,9 +335,10 @@ export async function harvestWebflowApis(input: {
             .filter((line) => line.length > 3)
             .join("\n");
           if (text.length < 12) continue;
-          const url = siteUrl && slug
-            ? `${siteUrl.replace(/\/$/, "")}/${collection.slug || "cms"}/${slug}`
-            : `${siteUrl || input.siteUrl}/cms/${collection.id}/${item.id}`;
+          const url =
+            siteUrl && slug
+              ? `${siteUrl.replace(/\/$/, "")}/${collection.slug || "cms"}/${slug}`
+              : `${siteUrl || input.siteUrl}/cms/${collection.id}/${item.id}`;
           const imageUrl =
             firstImageUrl(
               fieldData.image,
@@ -240,28 +368,33 @@ export async function harvestWebflowApis(input: {
         key: "webflow-cms",
         label: "Read Webflow CMS",
         status: itemCount ? "done" : "skipped",
-        detail: itemCount ? `${itemCount} CMS items` : "No CMS items in plan scope",
+        detail: itemCount ? `${itemCount} CMS items` : "No CMS items found for this site",
       });
     } catch (error) {
       stages.push({
         key: "webflow-cms",
         label: "Read Webflow CMS",
         status: "failed",
-        detail: error instanceof Error ? error.message : "CMS unavailable",
+        detail: merchantStageDetail(error, "CMS unavailable — reinstall tidyAgent and try again"),
       });
-      warnings.push("Webflow CMS could not be read.");
+      warnings.push(
+        merchantWebflowError(error, "We couldn’t read CMS collections from Webflow. Reinstall tidyAgent and try again."),
+      );
     }
   } else {
-    skipped.push("CMS reading is included on paid plans.");
+    skipped.push("CMS reading unlocks on paid plans.");
   }
 
   if (input.scope.includeStores) {
     try {
-      const listed = await webflowGet<{
-        items?: Array<Record<string, unknown>>;
-        products?: Array<Record<string, unknown>>;
-      }>(creds.accessToken, `/v2/sites/${creds.webflowSiteId}/products`);
-      const rows = listed.items ?? listed.products ?? [];
+      const listed = await webflowGet<unknown>(creds.accessToken, `/v2/sites/${webflowSiteId}/products`);
+      const listedRow = asRecord(listed);
+      const itemRows = asItemList(listed);
+      const rows = itemRows.length
+        ? itemRows
+        : Array.isArray(listedRow.products)
+          ? (listedRow.products as Array<Record<string, unknown>>)
+          : [];
       for (const row of rows.slice(0, input.scope.maxProducts)) {
         const product = asRecord(row.product ?? row);
         const fieldData = asRecord(product.fieldData);
@@ -307,16 +440,16 @@ export async function harvestWebflowApis(input: {
         key: "webflow-store",
         label: "Read Webflow ecommerce catalog",
         status: "skipped",
-        detail: error instanceof Error ? error.message : "Ecommerce not available on this site",
+        detail: merchantStageDetail(error, "Ecommerce not available on this site"),
       });
     }
   } else {
-    skipped.push("Ecommerce catalog reading is included on paid plans.");
+    skipped.push("Ecommerce catalog unlocks on paid plans.");
   }
 
   const brandImages = uniqueStrings([
-    ...products.map((p) => p.imageUrl).filter(Boolean) as string[],
-    ...pages.map((p) => p.imageUrl).filter(Boolean) as string[],
+    ...(products.map((p) => p.imageUrl).filter(Boolean) as string[]),
+    ...(pages.map((p) => p.imageUrl).filter(Boolean) as string[]),
   ]).slice(0, 12);
   const brandPhrases = uniqueStrings(
     pages

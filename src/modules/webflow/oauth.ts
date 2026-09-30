@@ -91,7 +91,7 @@ async function completeWebflowLoginOnce(input: {
   if (!config.clientId || !config.clientSecret) {
     throw new WebflowInstallError(
       "not_configured",
-      "Webflow client ID and secret are not saved in Admin → Settings.",
+      "tidyAgent isn’t ready for Webflow installs yet. Please try again later.",
     );
   }
 

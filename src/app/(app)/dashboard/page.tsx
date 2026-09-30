@@ -72,8 +72,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="workspace-hero relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-5 sm:p-6">
+      <div className="workspace-hero relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-5 sm:p-6 shadow-card">
         <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-amber-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-10 bottom-0 h-28 w-28 rounded-full bg-sky-500/10 blur-3xl" />
         <PageHeader
           eyebrow={`${platformName} · ${siteName}`}
           title={data.agent?.name ?? "Your AI employee"}
@@ -102,7 +103,7 @@ export default async function DashboardPage() {
           }
         />
 
-        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           <Stat label="Conversations" value={formatNumber(data.metrics.conversations)} />
           <Stat label="Resolved by AI" value={formatNumber(data.metrics.resolvedByAi)} />
           <Stat label="Escalations" value={formatNumber(data.metrics.humanEscalations)} />
@@ -111,8 +112,8 @@ export default async function DashboardPage() {
       </div>
 
       {widgetNotice?.error ? (
-        <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-navy-200">
-          Widget not applied on {widgetHost} ({widgetNotice.error}). Reopen the app after confirming permissions.
+        <p className="rounded-2xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5 text-xs text-navy-200">
+          Widget not applied on {widgetHost} yet. Reopen tidyAgent after confirming permissions, then publish the site.
         </p>
       ) : null}
 
@@ -184,7 +185,7 @@ export default async function DashboardPage() {
               data.topQuestions.slice(0, 4).map((item, index) => (
                 <div
                   key={item.topic}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-navy-950/35 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-navy-950/35 px-3.5 py-3 transition hover:border-amber-500/20"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm text-white">
@@ -219,7 +220,7 @@ export default async function DashboardPage() {
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-navy-950/40 px-3 py-2.5">
+    <div className="rounded-2xl border border-white/10 bg-navy-950/40 px-3.5 py-3 transition hover:border-amber-500/25">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">{label}</p>
       <p className={cn("mt-1 font-display text-xl tabular-nums sm:text-2xl", accent ? "text-amber-300" : "text-white")}>
         {value}
@@ -230,7 +231,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 
 function HealthCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-navy-950/35 px-3 py-2.5">
+    <div className="rounded-2xl border border-white/5 bg-navy-950/35 px-3.5 py-3">
       <dt className="text-[10px] uppercase tracking-[0.12em] text-navy-400">{label}</dt>
       <dd className="mt-1 font-medium text-white">{value}</dd>
     </div>
