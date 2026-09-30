@@ -51,12 +51,14 @@ const CATEGORY_META: { key: CollectionCategory; label: string; icon: typeof File
 ];
 
 const FLY_PACKETS = [
-  { label: "pages", delay: "0s", y: "16%" },
-  { label: "CMS", delay: "0.4s", y: "36%" },
-  { label: "colors", delay: "0.8s", y: "26%" },
-  { label: "products", delay: "1.15s", y: "50%" },
-  { label: "SEO", delay: "1.5s", y: "42%" },
-  { label: "FAQs", delay: "1.85s", y: "60%" },
+  { label: "pages", delay: "0s", y: "14%", duration: "1.7s" },
+  { label: "CMS", delay: "0.28s", y: "34%", duration: "1.85s" },
+  { label: "colors", delay: "0.55s", y: "24%", duration: "1.65s" },
+  { label: "products", delay: "0.82s", y: "48%", duration: "1.95s" },
+  { label: "SEO", delay: "1.05s", y: "40%", duration: "1.75s" },
+  { label: "FAQs", delay: "1.28s", y: "58%", duration: "1.9s" },
+  { label: "media", delay: "1.5s", y: "30%", duration: "1.8s" },
+  { label: "policy", delay: "1.72s", y: "52%", duration: "2s" },
 ];
 
 function flowStatusFor(platform?: string | null) {
@@ -250,6 +252,7 @@ export function KnowledgeCollectionBoard({
   siteUrl,
   progressLabel,
   platform,
+  compact = false,
 }: {
   result?: ScanResult | null;
   pending?: boolean;
@@ -257,6 +260,8 @@ export function KnowledgeCollectionBoard({
   siteUrl?: string | null;
   progressLabel?: string;
   platform?: string | null;
+  /** Denser layout for dashboard — less scroll */
+  compact?: boolean;
 }) {
   const t = tick ?? 0;
   const statuses = flowStatusFor(platform);
@@ -293,17 +298,21 @@ export function KnowledgeCollectionBoard({
   });
 
   const filledCount = cards.filter((c) => c.count > 0 || c.filling).length;
+  const showFlow = !compact || pending || !result?.ok;
 
   return (
-    <div className="collection-board space-y-4">
-      <ScanStatusFlow
-        pending={Boolean(pending)}
-        done={Boolean(result?.ok)}
-        siteUrl={siteUrl}
-        progress={progress}
-        statusText={progressLabel || statusText}
-        platform={platform}
-      />
+    <div className={cn("collection-board", compact ? "space-y-3" : "space-y-4")}>
+      {showFlow ? (
+        <ScanStatusFlow
+          pending={Boolean(pending)}
+          done={Boolean(result?.ok)}
+          siteUrl={siteUrl}
+          progress={progress}
+          statusText={progressLabel || statusText}
+          platform={platform}
+          compact={compact}
+        />
+      ) : null}
 
       <div className="flex items-center justify-between gap-3 px-0.5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-400">Collected</p>
@@ -313,16 +322,24 @@ export function KnowledgeCollectionBoard({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={cn("grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4", compact && "gap-2")}>
         {cards.map((card, index) => (
-          <CollectionCard key={card.key} card={card} delay={index * 40} />
+          <CollectionCard key={card.key} card={card} delay={index * 40} compact={compact} />
         ))}
       </div>
     </div>
   );
 }
 
-function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) {
+function CollectionCard({
+  card,
+  delay,
+  compact,
+}: {
+  card: CategoryCard;
+  delay: number;
+  compact?: boolean;
+}) {
   const Icon = card.icon;
   const empty = card.count === 0 && !card.filling;
   const swatches = card.swatches?.filter((c) => c.startsWith("#")) ?? [];
@@ -333,22 +350,25 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
       className={cn(
         "relative overflow-hidden rounded-2xl border bg-navy-900/80 transition duration-300",
         lit ? "border-amber-500/30 amber-ring" : "border-white/10",
+        card.filling && "collect-card-pulse",
       )}
       style={{ animationDelay: `${delay}ms` } as CSSProperties}
     >
-      <div className="flex items-center gap-2.5 border-b border-white/10 px-3.5 py-3">
+      <div className={cn("flex items-center gap-2.5 border-b border-white/10", compact ? "px-3 py-2.5" : "px-3.5 py-3")}>
         <span
           className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-xl",
+            "flex items-center justify-center rounded-xl",
+            compact ? "h-7 w-7" : "h-8 w-8",
             lit ? "bg-amber-500/15 text-amber-300" : "bg-white/5 text-navy-400",
           )}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </span>
         <p className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{card.label}</p>
         <span
           className={cn(
-            "flex h-6 min-w-6 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold tabular-nums",
+            "flex min-w-6 items-center justify-center rounded-lg px-1.5 text-[11px] font-semibold tabular-nums",
+            compact ? "h-5" : "h-6",
             card.count > 0 || card.filling ? "bg-amber-500 text-white" : "bg-white/10 text-navy-400",
           )}
         >
@@ -356,21 +376,21 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
         </span>
       </div>
 
-      <div className="min-h-[84px] px-3.5 py-3">
+      <div className={cn(compact ? "min-h-[64px] px-3 py-2.5" : "min-h-[84px] px-3.5 py-3")}>
         {empty ? (
           <div className="space-y-2 pt-0.5">
-            <div className="h-6 w-[70%] rounded-lg bg-white/5" />
-            <div className="h-6 w-[48%] rounded-lg bg-white/[0.04]" />
+            <div className="h-5 w-[70%] rounded-lg bg-white/5" />
+            <div className="h-5 w-[48%] rounded-lg bg-white/[0.04]" />
           </div>
         ) : card.filling && card.chips.every((c) => !c) ? (
           <div className="space-y-2 pt-0.5">
-            <div className="h-6 w-[68%] rounded-lg collect-shimmer" />
-            <div className="h-6 w-[46%] rounded-lg collect-shimmer" />
+            <div className="h-5 w-[68%] rounded-lg collect-shimmer" />
+            <div className="h-5 w-[46%] rounded-lg collect-shimmer" />
           </div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {swatches.length
-              ? swatches.slice(0, 5).map((hex) => (
+              ? swatches.slice(0, compact ? 3 : 5).map((hex) => (
                   <span
                     key={hex}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-navy-100"
@@ -379,7 +399,7 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
                     {hex}
                   </span>
                 ))
-              : card.chips.slice(0, 4).map((chip, i) =>
+              : card.chips.slice(0, compact ? 3 : 4).map((chip, i) =>
                   chip ? (
                     <span
                       key={`${card.key}-${chip}-${i}`}
@@ -389,7 +409,7 @@ function CollectionCard({ card, delay }: { card: CategoryCard; delay: number }) 
                       {chip}
                     </span>
                   ) : (
-                    <span key={`${card.key}-ph-${i}`} className="h-6 w-14 rounded-lg collect-shimmer" />
+                    <span key={`${card.key}-ph-${i}`} className="h-5 w-14 rounded-lg collect-shimmer" />
                   ),
                 )}
           </div>
@@ -406,6 +426,7 @@ function ScanStatusFlow({
   progress,
   statusText,
   platform,
+  compact,
 }: {
   pending: boolean;
   done: boolean;
@@ -413,6 +434,7 @@ function ScanStatusFlow({
   progress: number;
   statusText: string;
   platform?: string | null;
+  compact?: boolean;
 }) {
   let host = platformLabel(platform);
   try {
@@ -429,7 +451,7 @@ function ScanStatusFlow({
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-navy-850/90 to-navy-950/90 shadow-card">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 sm:px-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-400">Current status</p>
         <span
           className={cn(
@@ -445,14 +467,19 @@ function ScanStatusFlow({
         </span>
       </div>
 
-      <div className="relative px-4 py-7 sm:px-6">
-        {/* Flight path */}
+      <div className={cn("relative px-4 sm:px-6", compact ? "py-5" : "py-7")}>
         <div className="pointer-events-none absolute inset-x-[18%] top-[46%] hidden h-0 md:block" aria-hidden>
           <svg className="h-8 w-full overflow-visible" viewBox="0 0 400 32" preserveAspectRatio="none">
             <path
               d="M0 16 C 120 16, 160 4, 200 16 S 280 28, 400 16"
               fill="none"
-              stroke="rgba(201,100,66,0.4)"
+              stroke="rgba(201,100,66,0.22)"
+              strokeWidth="3"
+            />
+            <path
+              d="M0 16 C 120 16, 160 4, 200 16 S 280 28, 400 16"
+              fill="none"
+              stroke="rgba(201,100,66,0.55)"
               strokeWidth="1.75"
               strokeDasharray="6 8"
               className={pending ? "animate-flow-dash" : undefined}
@@ -461,12 +488,16 @@ function ScanStatusFlow({
         </div>
 
         {pending ? (
-          <div className="pointer-events-none absolute inset-x-[16%] top-[28%] bottom-[34%] hidden md:block" aria-hidden>
+          <div className="pointer-events-none absolute inset-x-[14%] top-[24%] bottom-[30%] hidden md:block" aria-hidden>
             {FLY_PACKETS.map((packet) => (
               <span
                 key={packet.label}
-                className="data-fly absolute left-0 rounded-full border border-amber-500/40 bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100 shadow-glow"
-                style={{ top: packet.y, animationDelay: packet.delay }}
+                className="data-fly absolute left-0 rounded-full border border-amber-500/45 bg-amber-500/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100 shadow-glow"
+                style={{
+                  top: packet.y,
+                  animationDelay: packet.delay,
+                  animationDuration: packet.duration,
+                }}
               >
                 {packet.label}
               </span>
@@ -474,32 +505,32 @@ function ScanStatusFlow({
           </div>
         ) : null}
 
-        <div className="relative grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-3">
+        <div className="relative grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
           <div
             className={cn(
-              "relative rounded-2xl border bg-navy-900/90 p-4 transition",
-              pending ? "border-sky-400/30 shadow-[0_0_32px_-12px_rgba(56,189,248,0.45)]" : "border-white/10",
+              "relative rounded-2xl border bg-navy-900/90 p-3.5 transition",
+              pending ? "border-sky-400/35 shadow-[0_0_36px_-10px_rgba(56,189,248,0.55)] collect-source-pulse" : "border-white/10",
             )}
           >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
                 <Globe2 className={cn("h-4 w-4", pending && "animate-pulse")} />
               </span>
               {pending ? (
                 <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                  · Extracting…
+                  Extracting
                 </span>
               ) : done ? (
                 <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
-                  · Synced
+                  Synced
                 </span>
               ) : null}
             </div>
-            <p className="font-display text-lg text-white">{host}</p>
+            <p className="truncate font-display text-base text-white sm:text-lg">{host}</p>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-navy-400">{sourceLabel}</p>
           </div>
 
-          <div className="relative z-10 flex items-center justify-center gap-2 md:flex-col md:py-2">
+          <div className="relative z-10 flex items-center justify-center gap-2 md:flex-col md:py-1">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-navy-900 px-2.5 py-1 text-[11px] text-navy-200">
               <Code2 className="h-3 w-3 text-amber-400" />
               {pending ? "streaming" : done ? "200 OK" : "idle"}
@@ -508,7 +539,7 @@ function ScanStatusFlow({
               className={cn(
                 "hidden h-9 w-9 items-center justify-center rounded-full border md:flex",
                 pending
-                  ? "border-amber-500/50 bg-amber-500/20 text-amber-200 animate-pulse-soft"
+                  ? "border-amber-500/55 bg-amber-500/25 text-amber-200 animate-pulse-soft collect-hub-glow"
                   : "border-amber-500/30 bg-amber-500/10 text-amber-300",
               )}
             >
@@ -518,31 +549,37 @@ function ScanStatusFlow({
 
           <div
             className={cn(
-              "relative rounded-2xl border bg-gradient-to-br from-amber-500/10 to-navy-900/90 p-4 transition",
-              pending || done ? "border-amber-500/40 shadow-[0_0_40px_-14px_rgba(201,100,66,0.55)]" : "border-amber-500/25",
+              "relative rounded-2xl border bg-gradient-to-br from-amber-500/10 to-navy-900/90 p-3.5 transition",
+              pending || done
+                ? "border-amber-500/45 shadow-[0_0_44px_-12px_rgba(201,100,66,0.65)]"
+                : "border-amber-500/25",
+              pending && "collect-target-pulse",
             )}
           >
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300">
                 <Bot className={cn("h-4 w-4", pending && "animate-pulse")} />
               </span>
               <span className={cn("text-amber-400/80", pending && "animate-pulse-soft")}>✦</span>
             </div>
-            <p className="font-display text-lg text-white">tidyAgent</p>
+            <p className="font-display text-base text-white sm:text-lg">tidyAgent</p>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-300/80">AI context</p>
-            {pending ? <p className="mt-2 text-[11px] text-amber-100/80">Receiving site intelligence…</p> : null}
+            {pending ? <p className="mt-1.5 text-[11px] text-amber-100/80">Receiving site intelligence…</p> : null}
           </div>
         </div>
       </div>
 
-      <div className="border-t border-white/10 px-4 py-4 sm:px-5">
+      <div className="border-t border-white/10 px-4 py-3 sm:px-5">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="truncate text-sm text-navy-100">{statusText}</p>
           <p className="shrink-0 font-display text-sm text-amber-300">{Math.round(progress)}%</p>
         </div>
-        <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
           <div
-            className={cn("h-full rounded-full bg-amber-500 transition-[width] duration-700 ease-out", pending && "shadow-glow")}
+            className={cn(
+              "h-full rounded-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-400 transition-[width] duration-700 ease-out",
+              pending && "shadow-glow collect-progress-glow",
+            )}
             style={{ width: `${progress}%` }}
           />
         </div>

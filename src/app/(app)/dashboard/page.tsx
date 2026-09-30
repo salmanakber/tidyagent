@@ -1,11 +1,10 @@
 import { getSession } from "@/lib/security/session";
 import { getDashboardOverview } from "@/modules/analytics/overview";
 import { isPlatformReviewMode } from "@/modules/auth/reviewer";
-import { platformLabel, isWebflowPlatform, isShopifyPlatform, isWixPlatform } from "@/modules/platforms";
+import { platformLabel, isWebflowPlatform, isShopifyPlatform } from "@/modules/platforms";
 import { webflowWidgetStatus } from "@/modules/webflow/embed";
 import { shopifyWidgetStatus } from "@/modules/shopify/embed";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { MetricCard } from "@/components/ui/MetricCard";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DashboardTestChat } from "@/components/dashboard/DashboardTestChat";
 import { KnowledgeCollectionBoard } from "@/components/knowledge/KnowledgeCollectionBoard";
@@ -18,10 +17,9 @@ import { getPlanScope } from "@/modules/billing/plan-scope-store";
 import { copyForPlatform } from "@/modules/platforms/copy";
 import { prisma } from "@/lib/prisma";
 import type { CrawlItem, SiteUnderstanding } from "@/modules/knowledge/types";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, MessageSquare, Sparkles } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -73,98 +71,81 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <div className="workspace-hero relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-6 shadow-card sm:p-8">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-amber-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+    <div className="space-y-5">
+      <div className="workspace-hero relative overflow-hidden border border-white/10 bg-gradient-to-br from-navy-850 via-navy-900 to-navy-950 p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-amber-500/15 blur-3xl" />
         <PageHeader
-          eyebrow={`${platformName} workspace`}
+          eyebrow={`${platformName} · ${siteName}`}
           title={data.agent?.name ?? "Your AI employee"}
-          description={`${siteName} is connected. Answers stay evidence-based. Sensitive actions stay behind confirmation.`}
+          description={
+            understanding?.summary
+              ? understanding.summary.length > 140
+                ? `${understanding.summary.slice(0, 137)}…`
+                : understanding.summary
+              : "Answers stay evidence-based from your site knowledge."
+          }
           actions={
             <>
               <StatusPill status={data.agent?.status ?? "DRAFT"} />
-              <Link href="/knowledge" className="btn-secondary">
+              <Link href="/knowledge" className="btn-secondary px-3 py-1.5 text-xs">
                 Knowledge
               </Link>
-              <Link href="/agent" className="btn-secondary">
+              <Link href="/agent" className="btn-secondary px-3 py-1.5 text-xs">
                 Agent
               </Link>
               {testingMode ? (
-                <a href="#test-ai" className="btn-primary">
+                <a href="#test-ai" className="btn-primary px-3 py-1.5 text-xs">
                   Test AI
                 </a>
               ) : null}
             </>
           }
         />
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <QuickLink href="/conversations" icon={<MessageSquare className="h-4 w-4" />} label="Inbox" hint="Live visitor chats" />
-          <QuickLink
-            href="/knowledge"
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Train knowledge"
-            hint={
-              isWebflowPlatform(session.platform)
-                ? "Webflow APIs + manual notes"
-                : isShopifyPlatform(session.platform)
-                  ? "Shopify catalog + manual notes"
-                  : "Site scan + owner notes"
-            }
-          />
-          <QuickLink href="/agent" icon={<Sparkles className="h-4 w-4" />} label="Agent style" hint="Voice, color, greeting" />
+
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="Conversations" value={formatNumber(data.metrics.conversations)} />
+          <Stat label="Resolved by AI" value={formatNumber(data.metrics.resolvedByAi)} />
+          <Stat label="Escalations" value={formatNumber(data.metrics.humanEscalations)} />
+          <Stat label="Coverage" value={`${data.metrics.knowledgeCoverage}%`} accent />
         </div>
       </div>
 
-      {widgetNotice ? (
-        <div className="border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-navy-100">
-          {widgetNotice.error ? (
-            <>
-              The chat widget was not applied on {widgetHost} ({widgetNotice.error}). Open the app again after confirming
-              script / custom-code permission.
-            </>
-          ) : (
-            <>
-              The chat widget is attached on this {widgetHost} site
-              {widgetNotice.injectedAt ? ` (updated ${widgetNotice.injectedAt})` : ""}.
-              {isWebflowPlatform(session.platform)
-                ? " Publish the Webflow site if visitors do not see the bubble yet."
-                : " Reload the storefront if visitors do not see the bubble yet."}
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {isWixPlatform(session.platform) && !widgetNotice ? (
-        <div className="border border-white/10 bg-navy-900/50 px-4 py-3 text-sm text-navy-300">
-          Connected through Wix. Keep scanning after site edits so answers stay current.
-        </div>
+      {widgetNotice?.error ? (
+        <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-navy-200">
+          Widget not applied on {widgetHost} ({widgetNotice.error}). Reopen the app after confirming permissions.
+        </p>
       ) : null}
 
       {snapshot ? (
-        <section className="panel p-5 sm:p-6">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <section className="panel overflow-hidden p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="font-display text-xl text-white">Site knowledge</h2>
-              <p className="mt-1 text-sm text-navy-300">
-                {understanding?.name ? `${understanding.name} · ${understanding.industry}` : "Collected from your live site"}
+              <h2 className="font-display text-lg text-white">Site knowledge</h2>
+              <p className="text-xs text-navy-400">
+                {understanding?.name
+                  ? `${understanding.name}${understanding.industry ? ` · ${understanding.industry}` : ""}`
+                  : "From your live site"}
               </p>
             </div>
-            <Link href="/knowledge" className="text-sm text-amber-300 hover:text-amber-200">
-              Open knowledge →
+            <Link href="/knowledge" className="text-xs font-medium text-amber-300 hover:text-amber-200">
+              Manage →
             </Link>
           </div>
-          {understanding?.summary ? (
-            <p className="mb-5 border border-white/10 bg-navy-950/40 p-4 text-sm leading-6 text-navy-100">{understanding.summary}</p>
-          ) : null}
-          <KnowledgeCollectionBoard result={snapshot} siteUrl={data.site.url} platform={session.platform} />
+          <KnowledgeCollectionBoard
+            result={snapshot}
+            siteUrl={data.site.url}
+            platform={session.platform}
+            compact
+          />
         </section>
       ) : (
-        <section className="panel p-5 sm:p-6">
-          <h2 className="font-display text-xl text-white">Site knowledge</h2>
-          <p className="mt-2 text-sm text-navy-300">Run a site scan from Knowledge to fill Pages, Colors, Images, and more.</p>
-          <Link href="/knowledge" className="btn-primary mt-4 inline-flex">
-            Teach AI from site
+        <section className="panel flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+          <div>
+            <h2 className="font-display text-lg text-white">Site knowledge</h2>
+            <p className="mt-1 text-sm text-navy-300">Scan your site to teach the AI.</p>
+          </div>
+          <Link href="/knowledge" className="btn-primary">
+            Teach AI
           </Link>
         </section>
       )}
@@ -190,48 +171,45 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Conversations" value={formatNumber(data.metrics.conversations)} hint="All conversations" />
-        <MetricCard label="Resolved by AI" value={formatNumber(data.metrics.resolvedByAi)} />
-        <MetricCard label="Human escalations" value={formatNumber(data.metrics.humanEscalations)} />
-        <MetricCard label="Leads" value={formatNumber(data.metrics.leads)} hint={`${formatNumber(data.metrics.salesAssisted)} sales assisted`} />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="panel p-6">
-          <div className="flex items-end justify-between gap-3">
-            <h2 className="font-display text-xl text-white">Top questions</h2>
-            <span className="text-[11px] uppercase tracking-[0.16em] text-navy-400">Live signal</span>
+      <section className="grid gap-3 lg:grid-cols-2">
+        <div className="panel p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg text-white">Top questions</h2>
+            <Link href="/conversations" className="text-xs text-navy-400 hover:text-amber-300">
+              Inbox
+            </Link>
           </div>
-          <div className="mt-5 space-y-3">
+          <div className="mt-3 space-y-2">
             {data.topQuestions.length ? (
-              data.topQuestions.map((item, index) => (
+              data.topQuestions.slice(0, 4).map((item, index) => (
                 <div
                   key={item.topic}
-                  className="flex items-center justify-between border border-white/5 bg-navy-950/40 px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-navy-950/35 px-3 py-2.5"
                 >
-                  <div>
-                    <p className="text-sm text-white">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-white">
                       {index + 1}. {item.topic}
                     </p>
-                    <p className="text-xs text-navy-300">{item.question}</p>
+                    <p className="truncate text-xs text-navy-400">{item.question}</p>
                   </div>
-                  <span className="bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">{item.occurrences}×</span>
+                  <span className="shrink-0 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">
+                    {item.occurrences}×
+                  </span>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-navy-300">Questions from live chats will show here after visitors start talking.</p>
+              <p className="text-sm text-navy-400">Live visitor questions will appear here.</p>
             )}
           </div>
         </div>
-        <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">AI health</h2>
-          <dl className="mt-5 space-y-3 text-sm">
-            <Row label="Knowledge coverage" value={`${data.metrics.knowledgeCoverage}%`} accent />
-            <Row label="Unanswered questions" value={String(data.metrics.unanswered)} />
-            <Row label="Improvement suggestions" value={String(data.metrics.improvementSuggestions)} />
-            <Row label="Plan" value={data.entitlements.planKey} />
-            <Row label="Site" value={data.site.connectionStatus} />
+
+        <div className="panel p-4 sm:p-5">
+          <h2 className="font-display text-lg text-white">AI health</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <HealthCell label="Unanswered" value={String(data.metrics.unanswered)} />
+            <HealthCell label="Suggestions" value={String(data.metrics.improvementSuggestions)} />
+            <HealthCell label="Leads" value={formatNumber(data.metrics.leads)} />
+            <HealthCell label="Plan" value={planLabel(data.entitlements.planKey)} />
           </dl>
         </div>
       </section>
@@ -239,36 +217,22 @@ export default async function DashboardPage() {
   );
 }
 
-function QuickLink({
-  href,
-  icon,
-  label,
-  hint,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-}) {
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <Link
-      href={href}
-      className="group border border-white/10 bg-navy-950/40 px-4 py-3 transition hover:border-amber-500/35 hover:bg-amber-500/5"
-    >
-      <div className="flex items-center gap-2 text-amber-300">
-        {icon}
-        <span className="text-sm font-medium text-white group-hover:text-amber-100">{label}</span>
-      </div>
-      <p className="mt-1 text-xs text-navy-400">{hint}</p>
-    </Link>
+    <div className="rounded-xl border border-white/10 bg-navy-950/40 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-400">{label}</p>
+      <p className={cn("mt-1 font-display text-xl tabular-nums sm:text-2xl", accent ? "text-amber-300" : "text-white")}>
+        {value}
+      </p>
+    </div>
   );
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function HealthCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between bg-navy-950/35 px-3 py-2.5">
-      <dt className="text-navy-300">{label}</dt>
-      <dd className={accent ? "font-medium text-amber-300" : "font-medium text-white"}>{value}</dd>
+    <div className="rounded-xl border border-white/5 bg-navy-950/35 px-3 py-2.5">
+      <dt className="text-[10px] uppercase tracking-[0.12em] text-navy-400">{label}</dt>
+      <dd className="mt-1 font-medium text-white">{value}</dd>
     </div>
   );
 }

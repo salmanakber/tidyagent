@@ -89,7 +89,7 @@ const config: Config = {
         "drift-alt": "drift-alt 22s ease-in-out infinite",
         "fade-up": "fade-up 0.35s ease-out both",
         "wave-bar": "wave-bar 0.9s ease-in-out infinite",
-        "flow-dash": "flow-dash 1.2s linear infinite",
+        "flow-dash": "flow-dash 0.85s linear infinite",
         shimmer: "shimmer 1.8s ease-in-out infinite",
         "card-fill": "card-fill 0.45s ease-out both",
       },

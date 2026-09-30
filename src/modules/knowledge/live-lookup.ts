@@ -1,14 +1,21 @@
 import { extractPage, isSafeHttpUrl, sameSite } from "@/modules/knowledge/extract";
 import { expandTerms, questionTerms, textMatchesTerms } from "@/modules/knowledge/match";
 import { prisma } from "@/lib/prisma";
+import { isShopifyPlatform, isWebflowPlatform } from "@/modules/platforms/types";
 
 const FETCH_MS = 4500;
 
+/**
+ * Runtime site exploration: when stored knowledge is thin, fetch live pages from the
+ * connected site (same-origin only) and feed them into the reply evidence set.
+ * This is RAG + live crawl — not a fine-tuned model per merchant.
+ */
 export async function liveLookupForQuestion(input: {
   organizationId: string;
   siteId: string;
   siteUrl?: string | null;
   question: string;
+  platform?: string | null;
 }) {
   const origin = siteOrigin(input.siteUrl);
   if (!origin) return [];
@@ -21,17 +28,32 @@ export async function liveLookupForQuestion(input: {
   const documents = await prisma.knowledgeDocument.findMany({
     where: { organizationId: input.organizationId, siteId: input.siteId, sourceUrl: { not: null } },
     select: { title: true, sourceUrl: true, contentType: true },
-    take: 200,
+    take: 240,
   });
 
   const known = documents
     .filter((row) => row.sourceUrl && textMatchesTerms(`${row.title} ${row.sourceUrl}`, terms))
     .map((row) => row.sourceUrl as string);
 
-  const guessed = guessUrls(origin, terms);
-  const urls = unique([...known, ...guessed])
+  // Prefer product/page URLs already indexed from Shopify/Webflow APIs.
+  const catalogish = documents
+    .filter((row) => {
+      const url = row.sourceUrl || "";
+      const type = String(row.contentType || "");
+      return (
+        type === "PRODUCT" ||
+        type === "PAGE" ||
+        type === "POLICY" ||
+        /\/(products?|pages|policies|collections)\//i.test(url)
+      );
+    })
+    .filter((row) => row.sourceUrl && textMatchesTerms(`${row.title} ${row.sourceUrl}`, terms))
+    .map((row) => row.sourceUrl as string);
+
+  const guessed = guessUrls(origin, terms, input.platform);
+  const urls = unique([...catalogish, ...known, ...guessed])
     .filter((url) => isSafeHttpUrl(url) && sameSite(url, host))
-    .slice(0, 4);
+    .slice(0, 6);
 
   const pages = await Promise.all(urls.map((url) => fetchPage(url, host)));
   return pages.filter((row): row is NonNullable<typeof row> => Boolean(row));
@@ -67,16 +89,28 @@ async function fetchPage(url: string, host: string) {
   }
 }
 
-function guessUrls(origin: string, terms: string[]) {
+function guessUrls(origin: string, terms: string[], platform?: string | null) {
   const base = origin.replace(/\/$/, "");
   const slugs = terms
     .filter((term) => term.length >= 3 && !["the", "and"].includes(term))
     .slice(0, 6)
     .flatMap((term) => {
       const slug = term.replace(/\s+/g, "-");
+      if (isShopifyPlatform(platform)) {
+        return [`/products/${slug}`, `/pages/${slug}`, `/collections/${slug}`, `/policies/${slug}`];
+      }
+      if (isWebflowPlatform(platform)) {
+        return [`/${slug}`, `/${slug}s`, `/blog/${slug}`];
+      }
       return [`/${slug}`, `/${slug}s`, `/product-page/${slug}`];
     });
-  const common = ["/pricing", "/prices", "/rates", "/rentals", "/rental", "/packages", "/book", "/booking", "/services"];
+
+  const common = isShopifyPlatform(platform)
+    ? ["/pages/contact", "/pages/about", "/policies/shipping-policy", "/policies/refund-policy", "/collections/all"]
+    : isWebflowPlatform(platform)
+      ? ["/pricing", "/contact", "/about", "/services", "/faq"]
+      : ["/pricing", "/prices", "/rates", "/rentals", "/packages", "/book", "/booking", "/services"];
+
   return [...common, ...slugs].map((path) => `${base}${path}`);
 }
 

@@ -382,6 +382,7 @@ export async function replyToVisitor(input: {
       siteId: input.agent.siteId,
       siteUrl: input.agent.site.url,
       question: searchQuery,
+      platform: input.agent.site.platform,
     });
     if (live.length) evidence = rankEvidence(searchQuery, [...live, ...evidence]).slice(0, 8);
   }
