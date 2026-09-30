@@ -96,6 +96,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     rawBilling: session as unknown as Prisma.InputJsonValue,
   });
 
+  await prisma.organization.updateMany({
+    where: { id: organizationId, onboardingStatus: "SITE_CONNECTED" },
+    data: { onboardingStatus: "ANALYZING" },
+  });
+
   // Prefer TRIALING when Stripe still has a trial (payment_status can be unpaid during trial).
   if (subscriptionId) {
     try {

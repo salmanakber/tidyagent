@@ -5,27 +5,25 @@ import type { PlanKey } from "@prisma/client";
 import type { PlanScopeConfig } from "@/modules/billing/plan-scopes";
 import { bulletsForPlanScope } from "@/modules/billing/plan-scopes";
 import { bulletsForPlatform } from "@/modules/platforms/copy";
-import { ShopifyPlanCheckoutButton } from "@/components/shopify/ShopifyPlanCheckoutButton";
 import { continueFreePlan } from "@/app/actions/workspace";
 
 const ALL_PLANS = ["FREE", "STARTER", "GROWTH", "PRO"] as const;
 
-/**
- * Shopify-only plan picker. Checkout fetches confirmationUrl inside the iframe
- * (session cookie stays valid), then opens Shopify Admin billing with target=_top.
- */
-export function ShopifyBillingPlans({
+/** Webflow plan picker — Free locally, paid via Stripe checkout. */
+export function WebflowBillingPlans({
   currentPlanKey,
   isPaidSeat,
   pricing,
   scopes,
   needsPlanPick = false,
+  checkoutReady,
 }: {
   currentPlanKey: string;
   isPaidSeat: boolean;
   pricing: DisplayPricing;
   scopes: Record<PlanKey, PlanScopeConfig>;
   needsPlanPick?: boolean;
+  checkoutReady: boolean;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -36,11 +34,12 @@ export function ShopifyBillingPlans({
         const price = free ? null : pricing.plans[key];
         const monthly = price ? formatListedPrice(price.monthly, pricing.symbol) : null;
         const yearly = price ? formatListedPrice(price.yearly, pricing.symbol) : null;
-        const bullets = bulletsForPlatform("SHOPIFY", bulletsForPlanScope(key, scopes[key]))
+        const bullets = bulletsForPlatform("WEBFLOW", bulletsForPlanScope(key, scopes[key]))
           .filter((item) => !/7-day/i.test(item))
           .slice(0, 5);
         const planParam = key === "GROWTH" ? "BUSINESS" : key;
-        const canCheckout = !free && Boolean(monthly);
+        const checkoutHref =
+          !free && checkoutReady && monthly ? `/api/billing/stripe/checkout?plan=${planParam}` : null;
 
         return (
           <div
@@ -50,18 +49,12 @@ export function ShopifyBillingPlans({
                 ? "border-amber-400/40 bg-amber-500/10 amber-ring"
                 : featured
                   ? "border-emerald-400/30 bg-white/[0.05]"
-                  : free
-                    ? "border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent"
-                    : "border-white/10 bg-white/[0.03]"
+                  : "border-white/10 bg-white/[0.03]"
             }`}
           >
             {featured ? (
               <span className="absolute -top-2.5 left-4 rounded-full border border-emerald-400/30 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-200">
                 Popular
-              </span>
-            ) : free && needsPlanPick ? (
-              <span className="absolute -top-2.5 left-4 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-navy-200">
-                No charge
               </span>
             ) : null}
 
@@ -69,7 +62,6 @@ export function ShopifyBillingPlans({
               {showingCurrent && !needsPlanPick ? "Current" : free ? "Included" : "Paid"}
             </p>
             <p className="mt-2 font-display text-2xl text-white">{planLabel(key)}</p>
-
             <p className="mt-2 text-xl text-amber-200">
               {free ? (
                 <>
@@ -85,19 +77,11 @@ export function ShopifyBillingPlans({
               )}
             </p>
             {yearly ? <p className="mt-0.5 text-xs text-navy-400">{yearly} / year</p> : null}
-            {!free && pricing.trialDays > 0 ? (
-              <p className="mt-1.5 text-[11px] text-navy-300">{pricing.trialDays}-day trial</p>
-            ) : null}
 
             <ul className="mt-4 flex-1 space-y-2 text-sm text-navy-200">
               {bullets.map((item) => (
                 <li key={item} className="flex gap-2">
-                  <span
-                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      free ? "bg-navy-300/80" : "bg-emerald-300/80"
-                    }`}
-                    aria-hidden
-                  />
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300/70" aria-hidden />
                   <span>{item}</span>
                 </li>
               ))}
@@ -118,19 +102,20 @@ export function ShopifyBillingPlans({
                       : "border-white/10 bg-white/5 text-navy-300"
                   }`}
                 >
-                  {showingCurrent ? "You’re on Free" : "Cancel in Shopify to return"}
+                  {showingCurrent ? "You’re on Free" : "Cancel paid plan to return"}
                 </p>
               )
-            ) : canCheckout ? (
-              <ShopifyPlanCheckoutButton
-                planParam={planParam}
-                label={showingCurrent ? "Change plan" : `Start ${planLabel(key)}`}
-                className={`inline-flex w-full items-center justify-center disabled:opacity-60 ${
+            ) : checkoutHref ? (
+              <a
+                href={checkoutHref}
+                className={`mt-5 inline-flex w-full items-center justify-center ${
                   showingCurrent || featured ? "btn-primary" : "btn-secondary"
                 }`}
-              />
+              >
+                {showingCurrent ? "Change plan" : `Start ${planLabel(key)}`}
+              </a>
             ) : (
-              <p className="mt-5 text-xs text-navy-400">Price not set yet.</p>
+              <p className="mt-5 text-xs text-navy-400">Checkout not ready yet.</p>
             )}
           </div>
         );

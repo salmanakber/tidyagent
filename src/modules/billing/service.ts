@@ -20,7 +20,7 @@ import { applyPlanScope, defaultPlanScope } from "@/modules/billing/plan-scopes"
 import { getAllPlanScopes } from "@/modules/billing/plan-scope-store";
 import { reportAppUpgraded } from "@/modules/wix/bi-events";
 import { getReviewerConfig, reviewComplimentaryPlan } from "@/modules/auth/reviewer";
-import { isShopifyPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWebflowPlatform, isWixPlatform, resolveSitePlatform } from "@/modules/platforms/types";
 
 export type WixWebhookEnvelope = {
   eventType?: string;
@@ -268,14 +268,14 @@ export async function entitlementsForOrganization(organizationId: string): Promi
         suspended,
       );
 
-  // Shopify Free is a real usable seat (limited). Wix/Webflow Free still requires a paid plan.
-  const shopifyFreeSeat =
-    isShopifyPlatform(site?.platform) &&
+  // Shopify + Webflow Free is a real usable seat (limited). Wix Free still requires a paid plan.
+  const freemiumSeat =
+    (isShopifyPlatform(site?.platform) || isWebflowPlatform(site?.platform)) &&
     !suspended &&
     (base.planKey === "FREE" || base.isFree) &&
     !base.isPaidSeat;
 
-  const resolved = shopifyFreeSeat
+  const resolved = freemiumSeat
     ? {
         ...base,
         planKey: "FREE" as const,

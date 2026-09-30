@@ -155,15 +155,11 @@ export function OnboardingWizard({
 
       <div className="panel border border-white/10 p-6 sm:p-8">
         {step === 1 && (
-          <Step
-            title="Website connected"
-            body={copy.connected(siteName, planLabel)}
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
+          <Step title="Site connected" body={`${siteName} is ready. Next, teach the AI from the live site.`}>
+            <div className="grid gap-3 sm:grid-cols-3">
               <Info label="Site" value={siteName} />
-              <Info label="Public URL" value={siteUrl || "Unpublished"} />
               <Info label="Plan" value={planLabel} />
-              <Info label="Scan depth" value={scopeNote} />
+              <Info label="URL" value={siteUrl || "Unpublished"} />
             </div>
           </Step>
         )}
@@ -171,11 +167,7 @@ export function OnboardingWizard({
         {step === 2 && (
           <Step
             title="Collect site knowledge"
-            body={
-              webflow
-                ? "Read your Webflow site through official Data APIs, then continue."
-                : "Scan the live site so the AI learns pages, policies, and catalog data."
-            }
+            body={webflow ? "Read your Webflow site through Data APIs." : "Scan the live site for pages, policies, and catalog."}
           >
             <SiteScanPanel planLabel={planLabel} scopeNote={scopeNote} siteUrl={siteUrl} onComplete={setScan} platform={platform} />
           </Step>
@@ -183,12 +175,8 @@ export function OnboardingWizard({
 
         {step === 3 && (
           <Step
-            title="What we understand about this business"
-            body={
-              webflow
-                ? "This profile is built from Webflow Data API content the scanner read. If something is thin, add owner notes in the next steps rather than inventing it."
-                : "This profile is built from pages the scanner actually read. If something is thin, add owner notes in the next steps rather than inventing it."
-            }
+            title="Business profile"
+            body="Built from what the scanner read. Add owner notes later if anything is thin."
           >
             {understanding ? (
               <div className="space-y-4">

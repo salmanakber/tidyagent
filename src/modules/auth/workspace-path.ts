@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { entitlementsForOrganization } from "@/modules/billing/service";
-import { isShopifyPlatform } from "@/modules/platforms/types";
+import { isShopifyPlatform, isWebflowPlatform } from "@/modules/platforms/types";
 
 /** Shared post-login path for Wix, Webflow, and email sessions. */
 export async function workspacePathForOrganization(organizationId: string) {
@@ -15,8 +15,11 @@ export async function workspacePathForOrganization(organizationId: string) {
   });
   const entitlements = await entitlementsForOrganization(organizationId);
 
-  // Shopify first install / reinstall: pick Free or paid before onboarding.
-  if (isShopifyPlatform(site?.platform) && organization?.onboardingStatus === "SITE_CONNECTED") {
+  // Shopify / Webflow first install: pick Free or paid before onboarding.
+  if (
+    (isShopifyPlatform(site?.platform) || isWebflowPlatform(site?.platform)) &&
+    organization?.onboardingStatus === "SITE_CONNECTED"
+  ) {
     return "/billing";
   }
 

@@ -425,12 +425,12 @@ export async function advanceOnboarding(status: "ANALYZING" | "QUESTIONS" | "CON
   revalidatePath("/dashboard");
 }
 
-/** Shopify install gate: stay on Free and continue into onboarding. */
-export async function continueShopifyFreePlan() {
+/** Shopify / Webflow install gate: stay on Free and continue into onboarding. */
+export async function continueFreePlan() {
   const session = await requireSession();
-  const { isShopifyPlatform } = await import("@/modules/platforms/types");
-  if (!isShopifyPlatform(session.platform)) {
-    throw new Error("Free continue is only available for Shopify stores.");
+  const { isShopifyPlatform, isWebflowPlatform } = await import("@/modules/platforms/types");
+  if (!isShopifyPlatform(session.platform) && !isWebflowPlatform(session.platform)) {
+    throw new Error("Free continue is only available for Shopify and Webflow sites.");
   }
   await prisma.organization.update({
     where: { id: session.organizationId },
@@ -440,6 +440,11 @@ export async function continueShopifyFreePlan() {
   revalidatePath("/onboarding");
   const { redirect } = await import("next/navigation");
   redirect("/onboarding");
+}
+
+/** @deprecated Use continueFreePlan */
+export async function continueShopifyFreePlan() {
+  return continueFreePlan();
 }
 
 export async function toggleWorkflow(key: string, enabled: boolean) {

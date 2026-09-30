@@ -9,6 +9,7 @@ import { formatListedPrice } from "@/modules/billing/platform-prices";
 import { isStripeCheckoutConfigured } from "@/modules/billing/stripe/config";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ShopifyBillingPlans } from "@/components/shopify/ShopifyBillingPlans";
+import { WebflowBillingPlans } from "@/components/webflow/WebflowBillingPlans";
 import { refreshWixBilling } from "@/app/actions/billing";
 import {
   isShopifyPlatform,
@@ -53,42 +54,35 @@ export default async function BillingPage({
   const hasCardCustomer = Boolean(subscription?.stripeCustomerId);
   const checkoutReady = wix ? Boolean(upgradeUrl) : webflow ? cardReady : shopify;
   const shopDomain = shopify ? session.wixInstanceId.replace(/^shopify:/, "") : "";
-  const needsPlanPick = shopify && data.organization.onboardingStatus === "SITE_CONNECTED";
+  const needsPlanPick =
+    (shopify || webflow) && data.organization.onboardingStatus === "SITE_CONNECTED";
+
+  const description = needsPlanPick
+    ? "Continue with Free, or pick a paid plan for higher limits."
+    : e.isPaidSeat
+      ? `Current plan for this ${name} site.`
+      : wix
+        ? "Choose Starter, Business, or Pro to unlock the dashboard."
+        : `Pick a plan below to continue on ${name}.`;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={`${name} billing`}
-        title={needsPlanPick ? "Choose your plan" : e.isPaidSeat ? "Plan & limits" : "Choose a plan to go live"}
-        description={
-          wix
-            ? e.isPaidSeat
-              ? "Checkout stays on Wix. Paid plans include a 7-day free trial."
-              : "The dashboard and live chat stay off until a plan is purchased. Start a 7-day trial — Starter, Business, or Pro."
-            : shopify
-              ? needsPlanPick
-                ? "Continue with Free, or approve a paid plan in Shopify to unlock higher limits."
-                : e.isPaidSeat
-                  ? `Current plan and limits for this ${name} store. Billing is managed in Shopify.`
-                  : `Pick a plan below. You’ll approve the charge on Shopify’s billing screen.`
-              : e.isPaidSeat
-                ? `Current plan and limits for this ${name} site.`
-                : cardReady
-                  ? `Pick a plan below. Paid plans include a ${pricing.trialDays}-day trial when configured.`
-                  : `The dashboard and live chat stay off until a plan is active on this ${name} site.`
-        }
+        title={needsPlanPick ? "Choose your plan" : e.isPaidSeat ? "Plan & limits" : "Choose a plan"}
+        description={description}
         actions={
           wix ? (
             <>
               {upgradeUrl ? (
                 <a href={upgradeUrl} className="btn-primary" target="_blank" rel="noreferrer">
-                  {e.isPaidSeat ? "Change plan in Wix" : "View Wix pricing"}
+                  {e.isPaidSeat ? "Change in Wix" : "View Wix pricing"}
                 </a>
               ) : (
-                <span className="btn-secondary">Upgrade via Wix App Market</span>
+                <span className="btn-secondary">Upgrade via Wix</span>
               )}
               <form action={refreshWixBilling}>
-                <button className="btn-secondary">Refresh from Wix</button>
+                <button className="btn-secondary">Refresh</button>
               </form>
             </>
           ) : webflow && hasCardCustomer ? (
@@ -108,80 +102,49 @@ export default async function BillingPage({
         }
       />
 
-      {shopify && params.error === "checkout" ? (
-        <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
-          Could not start Shopify billing. Confirm Shopify plan prices are set in Admin → Settings, then try again.
-        </div>
-      ) : null}
-      {shopify && params.error === "app_pricing" ? (
-        <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
-          Shopify blocked charge creation because this app is on <strong>Shopify App Pricing</strong>. tidySync opens
-          a RecurringApplicationCharge confirm link because that app uses <strong>Manual / Billing API</strong> pricing.
-          In Partner Dashboard → tidyAgent → Distribution → Pricing: switch to Manual pricing, remove App Pricing plans,
-          wait a few minutes, then click a plan again.
-        </div>
-      ) : null}
-      {shopify && params.error === "plan" ? (
-        <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-100">
-          That plan is not available. Choose Starter, Business, or Pro.
-        </div>
-      ) : null}
-      {shopify && params.checkout === "success" ? (
-        <div className="rounded-3xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-100">
-          Shopify subscription updated. Your plan should unlock shortly.
-        </div>
-      ) : null}
-
-      {e.grantedByAdmin ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          This workspace has complimentary paid access from the platform owner.
-        </div>
-      ) : null}
-
-      {wix && e.status === "TRIALING" && !e.grantedByAdmin ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          7-day free trial is active. Wix charges when the trial ends. Click Refresh from Wix after day 7, or reopen the
-          dashboard.
-        </div>
-      ) : null}
-      {wix && e.cancelAtPeriodEnd ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Auto-renewal is off. You keep paid features until the current billing period ends.
-        </div>
-      ) : null}
-      {wix && e.billingIssue ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          This site is still marked as paid (billing issue). We will not drop you to Free until that flag clears.
-        </div>
-      ) : null}
-
-      {!wix && !shopify && e.status === "TRIALING" && !e.grantedByAdmin ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Your free trial is active. You will be charged when the trial ends unless you cancel from Manage billing.
-        </div>
-      ) : null}
-      {shopify && e.status === "TRIALING" && !e.grantedByAdmin ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Your Shopify trial is active. Shopify charges when the trial ends unless you cancel the app subscription.
-        </div>
-      ) : null}
-      {!wix && e.cancelAtPeriodEnd ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          Cancellation is scheduled. You keep paid features until the current billing period ends.
-        </div>
-      ) : null}
-      {!wix && e.billingIssue ? (
-        <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
-          {shopify
-            ? "There is a payment issue on this Shopify subscription. Update billing in Shopify Admin."
-            : "There is a payment issue on this plan. Update your card in Manage billing, or contact support."}
-        </div>
-      ) : null}
-
-      {webflow && !e.isPaidSeat && !cardReady ? (
-        <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-navy-200">
-          Card checkout is not configured yet. An operator must add payment keys in Admin → Settings.
-          Complimentary access from the platform owner still applies. Prices below are the current {name} packages.
+      {params.error || params.checkout === "success" || e.grantedByAdmin || e.status === "TRIALING" || e.cancelAtPeriodEnd || e.billingIssue || (webflow && !e.isPaidSeat && !cardReady && !needsPlanPick) ? (
+        <div className="space-y-3">
+          {shopify && params.error === "checkout" ? (
+            <Alert tone="rose">Could not start Shopify billing. Confirm plan prices in Admin → Settings.</Alert>
+          ) : null}
+          {shopify && params.error === "app_pricing" ? (
+            <Alert tone="rose">
+              Shopify App Pricing is blocking charges. Switch this app to Manual pricing in Partner Dashboard.
+            </Alert>
+          ) : null}
+          {shopify && params.error === "plan" ? (
+            <Alert tone="rose">That plan is not available. Choose Starter, Business, or Pro.</Alert>
+          ) : null}
+          {shopify && params.checkout === "success" ? (
+            <Alert tone="emerald">Shopify subscription updated.</Alert>
+          ) : null}
+          {e.grantedByAdmin ? (
+            <Alert tone="amber">Complimentary paid access from the platform owner.</Alert>
+          ) : null}
+          {e.status === "TRIALING" && !e.grantedByAdmin ? (
+            <Alert tone="amber">
+              {wix
+                ? "Trial active — Wix charges when it ends."
+                : shopify
+                  ? "Trial active — Shopify charges when it ends."
+                  : "Trial active — you’ll be charged when it ends unless you cancel."}
+            </Alert>
+          ) : null}
+          {e.cancelAtPeriodEnd ? (
+            <Alert tone="amber">Cancellation scheduled. Paid features stay until the period ends.</Alert>
+          ) : null}
+          {e.billingIssue ? (
+            <Alert tone="amber">
+              {shopify
+                ? "Payment issue on this Shopify subscription. Update billing in Shopify Admin."
+                : "Payment issue on this plan. Update your card in Manage billing."}
+            </Alert>
+          ) : null}
+          {webflow && !e.isPaidSeat && !cardReady && !needsPlanPick ? (
+            <Alert tone="neutral">
+              Card checkout isn’t configured yet. Free still works; paid upgrades need Admin → Settings keys.
+            </Alert>
+          ) : null}
         </div>
       ) : null}
 
@@ -193,54 +156,54 @@ export default async function BillingPage({
           scopes={scopes}
           needsPlanPick={needsPlanPick}
         />
+      ) : webflow ? (
+        <WebflowBillingPlans
+          currentPlanKey={e.planKey}
+          isPaidSeat={e.isPaidSeat}
+          pricing={pricing}
+          scopes={scopes}
+          needsPlanPick={needsPlanPick}
+          checkoutReady={checkoutReady}
+        />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PAID_PLANS.map((key) => {
             const current = e.planKey === key && e.isPaidSeat;
             const price = pricing.plans[key];
             const monthly = formatListedPrice(price.monthly, pricing.symbol);
             const yearly = formatListedPrice(price.yearly, pricing.symbol);
-            const bullets = bulletsForPlatform(platform, bulletsForPlanScope(key, scopes[key]));
+            const bullets = bulletsForPlatform(platform, bulletsForPlanScope(key, scopes[key]))
+              .filter((item) => !/7-day/i.test(item))
+              .slice(0, 5);
             const planParam = key === "GROWTH" ? "BUSINESS" : key;
             const checkoutHref = !checkoutReady
               ? null
-              : wix
-                ? `/api/billing/checkout?plan=${planParam}`
-                : `/api/billing/stripe/checkout?plan=${planParam}`;
+              : `/api/billing/checkout?plan=${planParam}`;
             return (
-              <div key={key} className={`panel p-6 ${current ? "amber-ring" : ""}`}>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-navy-300">
-                  {current ? "Current plan" : "Package"}
+              <div key={key} className={`panel p-5 ${current ? "amber-ring" : ""}`}>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-navy-300">
+                  {current ? "Current" : "Package"}
                 </p>
-                <p className="mt-3 font-display text-3xl text-white">{planLabel(key)}</p>
-                <p className="mt-2 text-2xl text-amber-200">
+                <p className="mt-2 font-display text-2xl text-white">{planLabel(key)}</p>
+                <p className="mt-2 text-xl text-amber-200">
                   {monthly ? (
                     <>
                       {monthly}
-                      <span className="text-sm font-normal text-navy-300"> / month</span>
+                      <span className="text-sm font-normal text-navy-300"> / mo</span>
                     </>
                   ) : (
-                    <span className="text-lg text-navy-400">Price on request</span>
+                    <span className="text-base text-navy-400">Price on request</span>
                   )}
                 </p>
-                {yearly ? <p className="mt-1 text-sm text-navy-300">{yearly} / year</p> : null}
-                {pricing.trialDays > 0 ? (
-                  <p className="mt-1 text-xs text-navy-400">{pricing.trialDays}-day trial on signup</p>
-                ) : null}
+                {yearly ? <p className="mt-0.5 text-xs text-navy-400">{yearly} / year</p> : null}
                 <ul className="mt-4 space-y-2 text-sm text-navy-200">
-                  {bullets.filter((item) => !/7-day/i.test(item)).map((item) => (
+                  {bullets.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
                 {checkoutHref ? (
-                  <a href={checkoutHref} className="btn-secondary mt-6 inline-flex">
-                    {wix
-                      ? current
-                        ? "Manage in Wix"
-                        : `Start ${planLabel(key)} trial`
-                      : current
-                        ? "Change plan"
-                        : `Start ${planLabel(key)}`}
+                  <a href={checkoutHref} className="btn-secondary mt-5 inline-flex">
+                    {current ? "Manage in Wix" : `Start ${planLabel(key)}`}
                   </a>
                 ) : null}
               </div>
@@ -248,45 +211,24 @@ export default async function BillingPage({
           })}
         </div>
       )}
-
-      {wix ? (
-        <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">How a purchase reaches this backend</h2>
-          <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
-            <li>1. Customer picks Starter, Business, or Pro on the Wix pricing page.</li>
-            <li>2. Wix POSTs one webhook to /api/wix/webhooks with vendorProductId for that package.</li>
-            <li>3. We map that ID to Starter / Business / Pro and unlock the matching features.</li>
-            <li>4. Plan Changed and Auto Renewal Cancelled use the same URL. Cancelled seats stay paid until period end.</li>
-          </ol>
-        </div>
-      ) : shopify ? (
-        <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">How billing works for Shopify</h2>
-          <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
-            <li>1. Pick Starter, Business, or Pro on this page.</li>
-            <li>
-              2. Shopify returns a Billing API confirmation URL (same shape as tidySync:
-              …/RecurringApplicationCharge/confirm_recurring_application_charge?…).
-            </li>
-            <li>3. After you approve, Shopify notifies this app and the matching plan unlocks.</li>
-            <li>4. Charges and invoices stay inside Shopify Admin.</li>
-          </ol>
-          <p className="mt-4 text-xs leading-5 text-navy-400">
-            Partner requirement: tidyAgent must use Manual / Billing API pricing (like tidySync). Shopify App Pricing
-            blocks charge creation and cannot produce that confirm link.
-          </p>
-        </div>
-      ) : (
-        <div className="panel p-6">
-          <h2 className="font-display text-xl text-white">How billing works for {name}</h2>
-          <ol className="mt-4 space-y-3 text-sm leading-6 text-navy-200">
-            <li>1. Customer picks Starter, Business, or Pro on this page.</li>
-            <li>2. Secure checkout opens with the Admin-listed {name} price (and trial days when set).</li>
-            <li>3. After payment succeeds, this workspace unlocks the matching plan.</li>
-            <li>4. You can manage the card and renewals from Manage billing.</li>
-          </ol>
-        </div>
-      )}
     </div>
   );
+}
+
+function Alert({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: "rose" | "amber" | "emerald" | "neutral";
+}) {
+  const styles =
+    tone === "rose"
+      ? "border-rose-400/30 bg-rose-500/10 text-rose-100"
+      : tone === "emerald"
+        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+        : tone === "amber"
+          ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
+          : "border-white/10 bg-white/5 text-navy-200";
+  return <div className={`rounded-2xl border px-4 py-3 text-sm ${styles}`}>{children}</div>;
 }

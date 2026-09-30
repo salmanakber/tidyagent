@@ -7,7 +7,7 @@ import { entitlementsForOrganization } from "@/modules/billing/service";
 import { AppShell } from "@/components/layout/AppShell";
 import { ShopifyEmbeddedSession } from "@/components/shopify/ShopifyEmbeddedSession";
 import { getShopifyOAuthConfig } from "@/modules/platforms/marketplace";
-import { isShopifyPlatform, platformLabel } from "@/modules/platforms";
+import { isShopifyPlatform, isWebflowPlatform, platformLabel } from "@/modules/platforms";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -22,7 +22,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const setupComplete =
     workspace.organization.onboardingStatus === "PUBLISHED" || workspace.agent?.status === "ACTIVE";
   const shopify = isShopifyPlatform(session.platform);
-  const choosePlan = shopify && workspace.organization.onboardingStatus === "SITE_CONNECTED";
+  const webflow = isWebflowPlatform(session.platform);
+  const choosePlan =
+    (shopify || webflow) && workspace.organization.onboardingStatus === "SITE_CONNECTED";
   const shopifyApiKey = shopify ? (await getShopifyOAuthConfig()).apiKey || "" : "";
 
   if (choosePlan && !path.startsWith("/billing")) {
